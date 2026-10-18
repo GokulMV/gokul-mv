@@ -106,6 +106,12 @@ export const ENDING = {
   paperPeelEnd: 0.995,
   /** Progress 1.0 = the end of the 3D track; the footer section follows it. */
   footerAfter: 1.0,
+  /**
+   * Where the paper leaves the backpack: the protagonist stands on the summit
+   * [0,55,-35] facing the next mountain (-z), so the pack on their back faces
+   * the camera; its top flap is ~1.25 up and ~0.3 toward +z.
+   */
+  paperOrigin: [0, 56.25, -34.7] as Vec3Tuple,
 } as const;
 
 /**

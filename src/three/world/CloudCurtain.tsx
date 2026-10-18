@@ -382,6 +382,9 @@ function createCloudSystem(tier: GpuTier): CloudSystem {
 
   const noise = createCloudNoiseTexture();
   const uniforms = createCloudCurtainUniforms(noise);
+  // Depth/size metadata in the layout (layer = depth / LAYER_SPAN) and the
+  // shader's parting + approach fade share one reference distance.
+  uniforms.uPartDepth.value = LAYER_SPAN;
   if (tier <= 1) uniforms.uCoverage.value += 0.05;
 
   const material = new THREE.ShaderMaterial({
