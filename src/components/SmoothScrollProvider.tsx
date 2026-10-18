@@ -23,9 +23,17 @@ declare global {
 }
 
 /**
- * Owns Lenis and drives it from GSAP's ticker so Lenis, ScrollTrigger and the
- * scroll store share one clock. Progress is written to the mutable
- * `scrollStore` — never to React state.
+ * Owns Lenis and syncs it with GSAP ScrollTrigger over the 1400vh track:
+ * Lenis is driven from GSAP's ticker and every Lenis scroll updates
+ * ScrollTrigger, so Lenis, ScrollTrigger and the scroll store share one
+ * clock. Progress is written to the mutable `scrollStore` — never to React
+ * state.
+ *
+ * A resize or rotation keeps the story where it was: the 1400vh track
+ * rescales, so the scroll position is re-anchored to the progress (or the
+ * footer offset) from before the resize. A mobile URL bar showing or hiding
+ * (same width, small height change) is left alone so it never fights a touch
+ * scroll.
  *
  * Progress is TRACK-relative: it reaches exactly 1.0 when the bottom of the
  * 1400vh track meets the bottom of the viewport (scroll = trackEnd −
@@ -105,14 +113,38 @@ export function SmoothScrollProvider({ children, trackVh = SCROLL_TRACK_VH, afte
       scrollStore.setRawProgress(readProgress());
       updatePage();
     };
-    window.addEventListener('resize', remeasure);
+    // The resize event runs before the browser clamps the scroll position (and before the scroll event that
+    // follows), so scrollStore.rawProgress still holds the progress from before the resize here.
+    let lastWidth = window.innerWidth;
+    let lastHeight = window.innerHeight;
+    const onResize = () => {
+      const width = window.innerWidth;
+      const height = window.innerHeight;
+      const urlBarOnly = width === lastWidth && Math.abs(height - lastHeight) < lastHeight * 0.2;
+      lastWidth = width;
+      lastHeight = height;
+      if (urlBarOnly) {
+        remeasure();
+        return;
+      }
+      const progress = scrollStore.rawProgress;
+      const footerOffset = pageScroll.inFooter ? Math.max(0, (lenis.scroll as number) - trackLimit) : 0;
+      lenis.resize();
+      measureTrack();
+      const target = footerOffset > 0 ? trackLimit + footerOffset : progress * trackLimit;
+      lenis.scrollTo(target, { immediate: true, force: true });
+      ScrollTrigger.refresh();
+      scrollStore.setRawProgress(footerOffset > 0 ? 1 : progress);
+      updatePage();
+    };
+    window.addEventListener('resize', onResize);
     const observer = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(remeasure) : null;
     if (observer && trackRef.current) observer.observe(trackRef.current);
 
     if (scrollStore.auditMode) window.__ascent = { scrollStore, pageScroll };
 
     return () => {
-      window.removeEventListener('resize', remeasure);
+      window.removeEventListener('resize', onResize);
       observer?.disconnect();
       gsap.ticker.remove(update);
       lenis.off('scroll', onScroll);

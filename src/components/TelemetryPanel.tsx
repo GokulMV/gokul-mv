@@ -192,12 +192,13 @@ export function TelemetryPanel({ gpu }: { gpu: GpuInfo }) {
     const setDot = (color: string) => {
       if (dot.current) dot.current.style.background = color;
     };
-    const poll = async () => {
+    /** One /healthz round trip; resolves true when the server answered healthy. */
+    const poll = async (): Promise<boolean> => {
       const started = performance.now();
       try {
         const res = await fetch('/healthz', { cache: 'no-store', headers: { Accept: 'application/json' } });
         const latency = performance.now() - started;
-        if (cancelled) return;
+        if (cancelled) return false;
         let payload: HealthPayload = {};
         if ((res.headers.get('content-type') ?? '').includes('json')) {
           payload = (await res.json()) as HealthPayload;
@@ -208,18 +209,39 @@ export function TelemetryPanel({ gpu }: { gpu: GpuInfo }) {
         write('port', payload.port ?? '—');
         write('serverTime', payload.time ? new Date(payload.time).toLocaleTimeString() : '—');
         setDot(ok ? '#34D399' : '#FBBF24');
+        return ok;
       } catch {
-        if (cancelled) return;
+        if (cancelled) return false;
         write('health', 'unreachable');
         write('latency', '—');
         setDot('#F87171');
+        return false;
       }
     };
-    void poll();
-    const id = window.setInterval(() => void poll(), HEALTH_INTERVAL_MS);
+    // Only while the tab is visible; failures back off (x2 per failure, up to 60 s).
+    let timer = 0;
+    let failures = 0;
+    const schedule = () => {
+      window.clearTimeout(timer);
+      if (cancelled || document.hidden) return;
+      timer = window.setTimeout(tick, Math.min(60_000, HEALTH_INTERVAL_MS * 2 ** failures));
+    };
+    const tick = () => {
+      void poll().then((ok) => {
+        failures = ok ? 0 : Math.min(failures + 1, 4);
+        schedule();
+      });
+    };
+    const onVisibility = () => {
+      if (document.hidden) window.clearTimeout(timer);
+      else tick();
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+    if (!document.hidden) tick();
     return () => {
       cancelled = true;
-      window.clearInterval(id);
+      window.clearTimeout(timer);
+      document.removeEventListener('visibilitychange', onVisibility);
     };
   }, []);
 

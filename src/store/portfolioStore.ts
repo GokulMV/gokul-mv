@@ -584,7 +584,7 @@ export const DEFAULT_PORTFOLIO: PortfolioData = {
     location: 'India',
     summary:
       'An engineer who climbs one problem at a time — from first principles, through production systems, to the summit of reliable software at scale.',
-    welcomeMessage: 'Hey, welcome. Please scroll to see my journey.',
+    welcomeMessage: 'Hey, welcome. Please scroll to start the hike.',
     horizonMessage: 'Waiting for the further of my journey...',
     traits: [
       { id: 'trait-curious', label: 'Mindset', value: 'Relentlessly curious' },
@@ -765,7 +765,9 @@ function upsertById<T extends { id: string }>(list: T[], item: T): T[] {
 }
 
 const PORTFOLIO_STORAGE_KEY = 'gokul-mv.portfolio';
-const PORTFOLIO_STORAGE_VERSION = 1;
+const PORTFOLIO_STORAGE_VERSION = 2;
+/** Welcome line of the first (third-person climb) version; v1 data still carrying it gets the new default. */
+const LEGACY_WELCOME_MESSAGE = 'Hey, welcome. Please scroll to see my journey.';
 
 const pickData = (state: PortfolioState): PortfolioData => ({
   profile: state.profile,
@@ -834,7 +836,14 @@ export const usePortfolioStore = create<PortfolioState>()(
       version: PORTFOLIO_STORAGE_VERSION,
       storage: createJSONStorage(() => localStorage),
       partialize: (state) => pickData(state),
-      migrate: (persisted) => (isPortfolioData(persisted) ? persisted : cloneDefaults()) as PortfolioState,
+      migrate: (persisted) => {
+        if (!isPortfolioData(persisted)) return cloneDefaults() as PortfolioState;
+        // v1 → v2: the hike's new welcome line replaces the old default (a visitor's own edit is kept).
+        if (persisted.profile.welcomeMessage === LEGACY_WELCOME_MESSAGE) {
+          persisted.profile.welcomeMessage = cloneDefaults().profile.welcomeMessage;
+        }
+        return persisted as PortfolioState;
+      },
     },
   ),
 );

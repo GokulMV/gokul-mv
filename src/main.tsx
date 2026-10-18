@@ -10,7 +10,8 @@ if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
 window.scrollTo(0, 0);
 
 const params = new URLSearchParams(window.location.search);
-scrollStore.auditMode = params.has('audit');
+scrollStore.auditAvailable = params.has('audit');
+scrollStore.auditMode = scrollStore.auditAvailable;
 
 const detected = detectGpuTier();
 // QA override, audit mode only: `?audit&tier=0..3` forces a quality tier so the

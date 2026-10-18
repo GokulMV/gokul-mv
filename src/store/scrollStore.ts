@@ -12,16 +12,16 @@ import * as THREE from 'three';
 export type GpuTier = 0 | 1 | 2 | 3;
 
 export type SceneId =
-  | 'clouds'
-  | 'baseCamp'
-  | 'equipped'
-  | 'firstAscent'
-  | 'firstChasm'
-  | 'extremeLeap'
-  | 'summit'
+  | 'mist'
+  | 'trailhead'
+  | 'gearCheck'
+  | 'switchbacks'
+  | 'crevasseLeap'
+  | 'chimneyDyno'
+  | 'summitCairn'
   | 'horizon'
-  | 'paperThrow'
-  | 'blownAway';
+  | 'fieldNotebook'
+  | 'voidFade';
 
 export interface SceneDefinition {
   index: number;
@@ -31,18 +31,18 @@ export interface SceneDefinition {
   end: number;
 }
 
-/** Exact normalized timeline over the 1400vh scroll track. */
+/** Exact normalized timeline over the 1400vh scroll track (first-person hike). */
 export const SCENES: readonly SceneDefinition[] = [
-  { index: 0, id: 'clouds', title: 'Volumetric Clouds & Welcome', start: 0.0, end: 0.08 },
-  { index: 1, id: 'baseCamp', title: 'Base Camp', start: 0.08, end: 0.18 },
-  { index: 2, id: 'equipped', title: 'Getting Equipped', start: 0.18, end: 0.28 },
-  { index: 3, id: 'firstAscent', title: 'First Ascent', start: 0.28, end: 0.45 },
-  { index: 4, id: 'firstChasm', title: 'First Chasm Jump', start: 0.45, end: 0.62 },
-  { index: 5, id: 'extremeLeap', title: 'Extreme Chasm Leap', start: 0.62, end: 0.78 },
-  { index: 6, id: 'summit', title: 'The Summit', start: 0.78, end: 0.86 },
-  { index: 7, id: 'horizon', title: 'Horizon Reveal', start: 0.86, end: 0.92 },
-  { index: 8, id: 'paperThrow', title: 'The Next Mountain & the Note', start: 0.92, end: 0.98 },
-  { index: 9, id: 'blownAway', title: 'Blown Away into Nothingness', start: 0.98, end: 1.0 },
+  { index: 0, id: 'mist', title: 'Volumetric Mist & Welcome', start: 0.0, end: 0.08 },
+  { index: 1, id: 'trailhead', title: 'Base Camp Trailhead', start: 0.08, end: 0.18 },
+  { index: 2, id: 'gearCheck', title: 'Gear Check Point', start: 0.18, end: 0.28 },
+  { index: 3, id: 'switchbacks', title: 'Switchback Climb', start: 0.28, end: 0.45 },
+  { index: 4, id: 'crevasseLeap', title: 'Glacial Crevasse Leap', start: 0.45, end: 0.62 },
+  { index: 5, id: 'chimneyDyno', title: 'Chimney Boulder Dyno', start: 0.62, end: 0.78 },
+  { index: 6, id: 'summitCairn', title: 'The Summit Cairn', start: 0.78, end: 0.86 },
+  { index: 7, id: 'horizon', title: 'Horizon Panorama', start: 0.86, end: 0.92 },
+  { index: 8, id: 'fieldNotebook', title: 'Field Notebook', start: 0.92, end: 0.98 },
+  { index: 9, id: 'voidFade', title: 'Wind Gust & Void', start: 0.98, end: 1.0 },
 ] as const;
 
 export const SCROLL_TRACK_VH = 1400;
@@ -229,6 +229,11 @@ export interface ScrollStore {
   activeGearCount: number;
   gpuTier: GpuTier;
   audioEnabled: boolean;
+  /**
+   * The page was opened with ?audit: the telemetry panel, the Audit button, the backtick hotkey and the
+   * /healthz poller exist only then (never for visitors).
+   */
+  auditAvailable: boolean;
   auditMode: boolean;
   /** Damping factor used for `dampedProgress` (higher = snappier). */
   progressLambda: number;
@@ -256,6 +261,7 @@ export const scrollStore: ScrollStore = {
   activeGearCount: 0,
   gpuTier: 2,
   audioEnabled: false,
+  auditAvailable: false,
   auditMode: false,
   progressLambda: 6,
   elapsed: 0,

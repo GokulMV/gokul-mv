@@ -82,7 +82,7 @@ html.lenis body {
 
 @layer components {
   .hud-glass {
-    @apply rounded-2xl border border-white/10 bg-white/[0.04] shadow-[0_8px_40px_rgba(0,0,0,0.45)] backdrop-blur-md;
+    @apply rounded-2xl border border-white/10 bg-[rgba(8,12,20,0.62)] shadow-[0_8px_40px_rgba(0,0,0,0.45)] backdrop-blur-xl backdrop-saturate-[1.2];
   }
 
   .hud-kicker {

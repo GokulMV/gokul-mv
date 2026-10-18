@@ -15,7 +15,7 @@ const HIGH_END = /rtx|gtx 1[06-9]\d0|gtx 16\d0|radeon rx [5-7]\d{3}|radeon pro|a
 
 /**
  * Heuristic GPU tiering without third-party benchmarks:
- *   0 — no WebGL; 1 — software / low-end; 2 — mainstream; 3 — high-end.
+ *   0 — no WebGL2 (three r169 renders with WebGL2 only); 1 — software / low-end; 2 — mainstream; 3 — high-end.
  */
 export function detectGpuTier(): GpuInfo {
   const fallback: GpuInfo = {
@@ -34,8 +34,15 @@ export function detectGpuTier(): GpuInfo {
 
   const canvas = document.createElement('canvas');
   const gl2 = canvas.getContext('webgl2', { powerPreference: 'high-performance' });
-  const gl = (gl2 ?? canvas.getContext('webgl')) as WebGLRenderingContext | WebGL2RenderingContext | null;
-  if (!gl) return { ...fallback, isMobile };
+  if (!gl2) {
+    // WebGL1 at most: the 3D layer cannot run. Probe it only to name the GPU in telemetry.
+    const gl1 = canvas.getContext('webgl');
+    const debug1 = gl1?.getExtension('WEBGL_debug_renderer_info');
+    const renderer1 = gl1 ? String(debug1 ? gl1.getParameter(debug1.UNMASKED_RENDERER_WEBGL) : gl1.getParameter(gl1.RENDERER)) : 'unavailable';
+    gl1?.getExtension('WEBGL_lose_context')?.loseContext();
+    return { ...fallback, renderer: renderer1, isMobile };
+  }
+  const gl = gl2;
 
   const debug = gl.getExtension('WEBGL_debug_renderer_info');
   const renderer = String(debug ? gl.getParameter(debug.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER));
@@ -49,7 +56,6 @@ export function detectGpuTier(): GpuInfo {
   else if (LOW_END.test(renderer) || maxTextureSize < 4096) tier = 1;
   else if (HIGH_END.test(renderer) && cores >= 6) tier = 3;
   else if (isMobile && cores < 6) tier = 1;
-  if (!gl2 && tier > 1) tier = 1;
 
-  return { tier, renderer, vendor, webgl2: Boolean(gl2), maxTextureSize, isMobile };
+  return { tier, renderer, vendor, webgl2: true, maxTextureSize, isMobile };
 }

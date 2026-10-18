@@ -183,7 +183,7 @@ export function HudControls() {
     syncAudit();
     const offAudio = soundEngine.onChange(syncAudio);
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === '`') {
+      if (e.key === '`' && scrollStore.auditAvailable) {
         scrollStore.auditMode = !scrollStore.auditMode;
         syncAudit();
       }
@@ -237,9 +237,11 @@ export function HudControls() {
         data-tucked="false"
         className="hud-top-controls interactive fixed right-4 top-4 z-20 flex gap-2 sm:right-8"
       >
-        <button ref={auditBtn} type="button" className="hud-btn" aria-pressed="false">
-          Audit · off
-        </button>
+        {scrollStore.auditAvailable ? (
+          <button ref={auditBtn} type="button" className="hud-btn" aria-pressed="false">
+            Audit · off
+          </button>
+        ) : null}
         <button
           ref={audioBtn}
           type="button"

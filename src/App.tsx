@@ -1,10 +1,11 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect, useState } from 'react';
 import { SmoothScrollProvider } from './components/SmoothScrollProvider';
 import { SceneHud } from './components/SceneHud';
 import { HudControls } from './components/HudControls';
 import { TelemetryPanel } from './components/TelemetryPanel';
 import { LensPaperOverlay } from './components/LensPaperOverlay';
 import { CreditsFooter } from './components/CreditsFooter';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import { Experience } from './three/Experience';
 import { scrollStore } from './store/scrollStore';
 import { soundEngine } from './utils/soundEngine';
@@ -44,16 +45,25 @@ function WebGLUnavailable() {
 }
 
 export default function App({ gpu }: { gpu: GpuInfo }) {
-  const canRender3D = useMemo(() => gpu.tier > 0, [gpu.tier]);
+  // The 3D layer runs on WebGL2 tiers; if it still fails to start (or dies), the boundary swaps in the fallback
+  // and the rest of the page (story cards, controls, footer) keeps working.
+  const [failed3D, setFailed3D] = useState(false);
+  const canRender3D = gpu.tier > 0 && !failed3D;
   useFallbackSoundDriver(!canRender3D);
 
   return (
     <SmoothScrollProvider after={<CreditsFooter />}>
-      {canRender3D ? <Experience /> : <WebGLUnavailable />}
+      {canRender3D ? (
+        <ErrorBoundary fallback={<WebGLUnavailable />} onError={() => setFailed3D(true)}>
+          <Experience />
+        </ErrorBoundary>
+      ) : (
+        <WebGLUnavailable />
+      )}
       <SceneHud />
       {canRender3D ? <LensPaperOverlay /> : null}
       <HudControls />
-      <TelemetryPanel gpu={gpu} />
+      {scrollStore.auditAvailable ? <TelemetryPanel gpu={gpu} /> : null}
     </SmoothScrollProvider>
   );
 }
