@@ -40,9 +40,10 @@ import { ENDING } from '../three/world/worldLayout';
  * plays twice within 80 ms (a direct call and a cue on the same threshold):
  *   • playGearEquip       — cloth and leather brush (GEAR_EQUIP_AT)
  *   • playGearDrop        — low air-and-cloth release (GEAR_DROP_AT)
- *   • playChasmJumpWhoosh — resonant swept air (both chasm take-offs)
- *   • playPaperThrowAndFlutter — paper rustle bursts (the gust that tears the
- *     note out of the backpack, and a lighter one when it peels off the lens)
+ *   • playChasmJumpWhoosh — deep, wide air rush (both chasm take-offs)
+ *   • playPaperThrowAndFlutter — soft warm paper flutter on the foley bus (the
+ *     gust that tears the note out of the backpack, and a lighter one when it
+ *     peels off the lens)
  * plus soft boot contacts while scrolling through the three climbs, at
  * least 380 ms apart (updateClimbingFoley).
  *
@@ -295,9 +296,9 @@ function createFoleyBuffer(
 }
 
 /**
- * Boot on granite, 110 ms: a sub body gliding 55 → 32 Hz under an
- * exponential decay, plus "velvet" pink noise low-passed at 220 Hz. No
- * gravel, no high frequencies.
+ * Rubber boot sole on rock, 110 ms: firm "velvet" pink noise low-passed at
+ * 340 Hz (6 ms attack, fast decay) over a light sub body gliding 55 → 32 Hz.
+ * No gravel, no high frequencies, no booming heartbeat.
  */
 function createBootStepBuffer(ctx: BaseAudioContext, seed: number): AudioBuffer {
   const seconds = 0.11;
@@ -315,15 +316,20 @@ function createBootStepBuffer(ctx: BaseAudioContext, seed: number): AudioBuffer 
         phase += 2 * Math.PI * f * Math.max(0, t - lastT);
         lastT = t;
         const sub = Math.sin(phase) * Math.exp(-t / 0.035);
-        const velvet = lp.next(pink.next(rand() * 2 - 1), 220) * 4 * Math.exp(-t / 0.028);
-        return 0.7 * sub + 0.6 * velvet;
+        const attack = 0.5 - 0.5 * Math.cos(Math.PI * Math.min(1, t / 0.006));
+        const velvet = lp.next(pink.next(rand() * 2 - 1), 340) * 4 * attack * Math.exp(-t / 0.022);
+        return 0.28 * sub + 0.85 * velvet;
       };
     },
     (t) => hannGate(t, 0, seconds - (2 * FOLEY_EDGE) / ctx.sampleRate, 0.004, 0.05),
   );
 }
 
-/** Cloth and leather brush, 220 ms: two overlapping Hann swells of pink noise low-passed at 480 and 680 Hz. */
+/**
+ * Gear settling onto the body, 220 ms: a tight, damped pack-settle thump
+ * (75 → 42 Hz, decaying in ~18 ms) then a firmer cloth rub — pink noise
+ * low-passed at 420 Hz with a 14 ms rise, followed by a 620 Hz layer.
+ */
 function createGearEquipBuffer(ctx: BaseAudioContext, seed: number): AudioBuffer {
   const seconds = 0.22;
   return createFoleyBuffer(
@@ -335,9 +341,20 @@ function createGearEquipBuffer(ctx: BaseAudioContext, seed: number): AudioBuffer
       const pinkB = new PinkFilter();
       const lpA = new SoftLowpass(rate);
       const lpB = new SoftLowpass(rate);
-      return (t) =>
-        lpA.next(pinkA.next(rand() * 2 - 1), 480) * hannGate(t, 0, 0.15, 0.075, 0.075) +
-        0.8 * lpB.next(pinkB.next(rand() * 2 - 1), 680) * hannGate(t, 0.07, 0.217, 0.07, 0.077);
+      let phase = 0; // starts on a zero crossing, so the thump never steps
+      let lastT = 0;
+      return (t) => {
+        let thump = 0;
+        if (t < 0.06) {
+          const f = 42 + (75 - 42) * Math.exp(-t / 0.02);
+          phase += 2 * Math.PI * f * Math.max(0, t - lastT);
+          thump = Math.sin(phase) * Math.exp(-t / 0.018) * (1 - Math.exp(-t / 0.0015)) * (1 - smoothstep(0.045, 0.06, t));
+        }
+        lastT = t;
+        const rubA = lpA.next(pinkA.next(rand() * 2 - 1), 420) * 3 * hannGate(t, 0.004, 0.14, 0.014, 0.09);
+        const rubB = lpB.next(pinkB.next(rand() * 2 - 1), 620) * 2.4 * hannGate(t, 0.05, 0.217, 0.03, 0.1);
+        return 0.45 * thump + rubA + 0.75 * rubB;
+      };
     },
     () => 1,
   );
@@ -673,7 +690,7 @@ export class SoundGraph {
     this.playFoley(this.bootSteps, when, level, (Math.random() * 2 - 1) * 0.2, 0.94 + 0.12 * Math.random());
   }
 
-  /** Resonant swept air for a leap: 180 → 900 → 220 Hz over 650 ms, panning across. */
+  /** A deep chest-air rush for a leap: wide bands swept 130 → 380 → 140 Hz over 650 ms, panning across. */
   chasmWhoosh(intensity: number, when: number): void {
     const ctx = this.ctx;
     const k = clamp01(intensity);
@@ -685,21 +702,20 @@ export class SoundGraph {
     const src = this.noiseSource(when, duration + 0.15);
     const env = ctx.createGain();
     env.gain.setValueAtTime(0, when);
-    env.gain.linearRampToValueAtTime(0.39 + 0.31 * k, when + duration * 0.42);
+    env.gain.linearRampToValueAtTime(0.11 + 0.06 * k, when + duration * 0.42);
     env.gain.exponentialRampToValueAtTime(0.0005, when + duration + 0.1);
     env.connect(pan);
-    // Two bands: a resonant one carrying the sweep, and a broad one an octave
-    // below for body.
+    // Two wide, non-whistling air bands: one carrying the sweep, a broader one below it for body.
     for (const [q, scale, level] of [
-      [5, 1, 1],
-      [1.1, 0.5, 0.55],
+      [1.2, 1, 0.7],
+      [0.7, 0.45, 0.6],
     ] as const) {
       const band = ctx.createBiquadFilter();
       band.type = 'bandpass';
       band.Q.value = q;
-      band.frequency.setValueAtTime(180 * scale, when);
-      band.frequency.exponentialRampToValueAtTime(900 * scale, when + duration * 0.45);
-      band.frequency.exponentialRampToValueAtTime(220 * scale, when + duration);
+      band.frequency.setValueAtTime(130 * scale, when);
+      band.frequency.exponentialRampToValueAtTime(380 * scale, when + duration * 0.45);
+      band.frequency.exponentialRampToValueAtTime(140 * scale, when + duration);
       const tap = ctx.createGain();
       tap.gain.value = level;
       src.connect(band).connect(tap).connect(env);
@@ -711,20 +727,21 @@ export class SoundGraph {
   }
 
   /**
-   * Cotton-paper rustle: a cluster of 40–90 ms bursts of high-passed pink
-   * noise through narrow-ish bands between 1.2 and 3.2 kHz, each with its own
-   * amplitude flicker, swelling then thinning out as the sheet flies off.
+   * Soft cotton paper fluttering in the breeze: a few 40–90 ms bursts of
+   * pink noise, high-passed at 280 Hz, through wide bands between 420 and
+   * 950 Hz with smooth 18 ms attacks and a small flicker, on the warm foley
+   * bus, swelling then thinning out as the sheet flies off.
    */
   paperFlutter(intensity: number, when: number): void {
     const ctx = this.ctx;
     const k = clamp01(intensity);
-    const bursts = 9 + Math.round(9 * k);
+    const bursts = 5 + Math.round(4 * k);
     const pan = this.panner(-0.15, when);
     pan.pan.linearRampToValueAtTime(0.55, when + 1.6);
-    pan.connect(this.master);
+    pan.connect(this.foleyBus);
     const highpass = ctx.createBiquadFilter();
     highpass.type = 'highpass';
-    highpass.frequency.value = 950;
+    highpass.frequency.value = 280;
     highpass.Q.value = 0.6;
     highpass.connect(pan);
 
@@ -736,15 +753,16 @@ export class SoundGraph {
       const src = this.noiseSource(t, duration + 0.01);
       const band = ctx.createBiquadFilter();
       band.type = 'bandpass';
-      band.frequency.value = 1200 + Math.random() * 2000;
-      band.Q.value = 1.8 + Math.random() * 1.6;
+      band.frequency.value = 420 + Math.random() * 530;
+      band.Q.value = 1;
       const env = ctx.createGain();
-      const peak = (0.2 + 0.5 * k) * (0.35 + 0.65 * shape) * (0.6 + 0.4 * Math.random());
+      const peak = (0.045 + 0.055 * k) * (0.35 + 0.65 * shape) * (0.6 + 0.4 * Math.random());
+      const attack = 0.018;
       env.gain.setValueAtTime(0, t);
-      env.gain.linearRampToValueAtTime(peak, t + 0.004);
-      // Flicker: a quick dip and recovery inside the burst (the sheet snapping).
-      env.gain.linearRampToValueAtTime(peak * 0.35, t + duration * 0.45);
-      env.gain.linearRampToValueAtTime(peak * 0.8, t + duration * 0.6);
+      env.gain.linearRampToValueAtTime(peak, t + attack);
+      // A gentle flicker after the attack (the sheet flexing), then a smooth fade.
+      env.gain.linearRampToValueAtTime(peak * 0.55, t + attack + (duration - attack) * 0.35);
+      env.gain.linearRampToValueAtTime(peak * 0.8, t + attack + (duration - attack) * 0.55);
       env.gain.exponentialRampToValueAtTime(0.0005, t + duration);
       src.connect(band).connect(env).connect(highpass);
       src.onended = () => env.disconnect();
