@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { SCENES, scrollStore } from '../store/scrollStore';
+import { adaptiveQuality } from '../three/perf/adaptiveQuality';
 import type { GpuInfo } from '../utils/gpuTier';
 
 /* ==========================================================================
@@ -21,7 +22,9 @@ type FieldKey =
   | 'velocity'
   | 'scene'
   | 'gear'
-  | 'audio';
+  | 'audio'
+  | 'quality'
+  | 'frameEma';
 
 interface HealthPayload {
   status?: string;
@@ -69,6 +72,8 @@ export function TelemetryPanel({ gpu }: { gpu: GpuInfo }) {
       write('scene', `${scene.index + 1}/10 ${scene.title}`);
       write('gear', `${scrollStore.activeGearCount}/4`);
       write('audio', scrollStore.audioEnabled ? 'on' : 'muted');
+      write('quality', `${adaptiveQuality.level} ${(adaptiveQuality.particleDensity * 100).toFixed(0)}%`);
+      write('frameEma', `${adaptiveQuality.frameMsEma.toFixed(1)} ms`);
       if (details.current) {
         const show = scrollStore.auditMode;
         if (details.current.dataset.open !== String(show)) {
@@ -160,6 +165,10 @@ export function TelemetryPanel({ gpu }: { gpu: GpuInfo }) {
         <span ref={bind('port')} className="text-right">—</span>
         <span className="text-white/40">server time</span>
         <span ref={bind('serverTime')} className="text-right">—</span>
+        <span className="text-white/40">quality</span>
+        <span ref={bind('quality')} className="text-right">—</span>
+        <span className="text-white/40">frame ema</span>
+        <span ref={bind('frameEma')} className="text-right">—</span>
         <span className="text-white/40">worst frame</span>
         <span ref={bind('frame')} className="text-right">—</span>
         <span className="text-white/40">raw</span>

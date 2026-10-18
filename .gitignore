@@ -27,3 +27,6 @@ Thumbs.db
 
 # coverage
 coverage/
+
+# local visual-test harnesses
+harness/

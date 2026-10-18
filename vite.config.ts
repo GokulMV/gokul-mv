@@ -59,6 +59,8 @@ function healthz(): Plugin {
 
 export default defineConfig({
   plugins: [react(), healthz()],
+  // Lets several local dev servers run side by side without sharing a deps cache.
+  cacheDir: process.env.VITE_CACHE_DIR ?? 'node_modules/.vite',
   define: {
     __BUILD_SHA__: JSON.stringify(BUILD_SHA),
     __BUILD_ENV__: JSON.stringify(BUILD_ENV),
