@@ -27,14 +27,18 @@ import { ENDING } from '../three/world/worldLayout';
  *     0.035. Over the summit (0.78 → 0.92) the filter opens to 950 Hz and a
  *     soft F#4 shimmer fades in.
  *
- * Foley one-shots (fire on forward threshold crossings, with hysteresis,
- * per-cue cooldowns and seek detection so a scrubbed or jumped threshold
- * never machine-guns a sound):
- *   • playGearEquip       — fabric/strap thud + carabiner click (GEAR_EQUIP_AT)
- *   • playGearDrop        — buckle release thump + falling air (GEAR_DROP_AT)
+ * Foley — filtered noise transients only (no oscillator: nothing pings at a
+ * musical pitch), peaks under the wind. One-shots fire on forward threshold
+ * crossings, with hysteresis, per-cue cooldowns and seek detection so a
+ * scrubbed or jumped threshold never machine-guns a sound:
+ *   • playGearEquip       — canvas pack settling, webbing pull, matte buckle
+ *                           latch (GEAR_EQUIP_AT)
+ *   • playGearDrop        — fabric unclip + low air rustle (GEAR_DROP_AT)
  *   • playChasmJumpWhoosh — resonant swept air (both chasm take-offs)
  *   • playPaperThrowAndFlutter — paper rustle bursts (the gust that tears the
  *     note out of the backpack, and a lighter one when it peels off the lens)
+ * plus climbing contacts (boot / glove thud + granite grit) while scrolling
+ * through the three climbs, at least 380 ms apart (updateClimbingFoley).
  *
  * Muted by default. The AudioContext is created on the first user gesture
  * (browser autoplay policy) from `setEnabled(true)` / `toggle()`, and is
@@ -57,6 +61,7 @@ const IR_PREDELAY = 0.025;
 
 const BROWN_SECONDS = 5;
 const BROWN_LEAK = 0.998;
+const FOLEY_BROWN_LEAK = 0.99;
 
 const WIND_MAX = 0.14;
 const RUMBLE_MIN_HZ = 110;
@@ -100,6 +105,17 @@ const CUE_HYSTERESIS = 0.004;
 const CUE_COOLDOWN = 0.6;
 /** Minimum time between any two one-shots. */
 const ONE_SHOT_SPACING = 0.12;
+
+/** Climbing stretches (progress) that get boot / glove contacts: cliff 1, the pillar, the scramble. */
+const CLIMB_ZONES: ReadonlyArray<readonly [number, number]> = [
+  [PATH_PHASES.ascentStart, PATH_PHASES.ascentEnd],
+  [PATH_PHASES.jumpOneEnd, PATH_PHASES.climbOneEnd],
+  [PATH_PHASES.leapTwoEnd, PATH_PHASES.scrambleEnd],
+];
+/** Contacts need the page moving at least this fast (progress / s). */
+const CLIMB_MIN_SPEED = 0.0005;
+/** Shortest gap between two contacts (s); slower scrolling stretches it to ~0.7 s. */
+const CLIMB_STEP_MIN = 0.38;
 /** A per-frame progress step this large, or this fast, is a seek (End key, rail click): no one-shots. */
 const SEEK_STEP = 0.03;
 const SEEK_SPEED = 0.8;
@@ -161,21 +177,32 @@ function normalizePeak(data: Float32Array, peak: number): void {
 
 /**
  * Brownian (1/f²) noise: leaky-integrated white noise, DC removed and
- * peak-normalised, independent per channel (wide, decorrelated stereo).
+ * peak-normalised, independent per channel (wide, decorrelated stereo). The
+ * leak sets the corner below which it flattens: 0.998 (~15 Hz) for the wind
+ * bed; the foley uses 0.99 (~75 Hz) so a 45 ms slice taken anywhere in the
+ * buffer has a steady level instead of riding the slow random-walk drift.
  */
-function createBrownNoiseBuffer(ctx: BaseAudioContext, seconds: number): AudioBuffer {
+function createBrownNoiseBuffer(ctx: BaseAudioContext, seconds: number, channels = 2, leak = BROWN_LEAK): AudioBuffer {
   const length = Math.floor(ctx.sampleRate * seconds);
-  const buffer = ctx.createBuffer(2, length, ctx.sampleRate);
-  for (let channel = 0; channel < 2; channel += 1) {
+  const buffer = ctx.createBuffer(channels, length, ctx.sampleRate);
+  for (let channel = 0; channel < channels; channel += 1) {
     const data = buffer.getChannelData(channel);
     let b = 0;
     for (let i = 0; i < length; i += 1) {
-      b = BROWN_LEAK * b + (Math.random() * 2 - 1) * 0.02;
+      b = leak * b + (Math.random() * 2 - 1) * 0.02;
       data[i] = b;
     }
     normalizePeak(data, 0.85);
     crossfadeLoop(data, Math.min(8192, Math.floor(length / 6)));
   }
+  return buffer;
+}
+
+function createWhiteNoiseBuffer(ctx: BaseAudioContext, seconds: number): AudioBuffer {
+  const length = Math.floor(ctx.sampleRate * seconds);
+  const buffer = ctx.createBuffer(1, length, ctx.sampleRate);
+  const data = buffer.getChannelData(0);
+  for (let i = 0; i < length; i += 1) data[i] = (Math.random() * 2 - 1) * 0.9;
   return buffer;
 }
 
@@ -259,6 +286,9 @@ export class SoundGraph {
   private readonly output: GainNode;
   private readonly convolver: ConvolverNode;
   private readonly pinkNoise: AudioBuffer;
+  /** Mono one-shot sources for the foley transients. */
+  private readonly brownNoise: AudioBuffer;
+  private readonly whiteNoise: AudioBuffer;
 
   private readonly windSource: AudioBufferSourceNode;
   private readonly windBus: GainNode;
@@ -299,6 +329,8 @@ export class SoundGraph {
     this.output.connect(ctx.destination);
 
     this.pinkNoise = createPinkNoiseBuffer(ctx, 2);
+    this.brownNoise = createBrownNoiseBuffer(ctx, 2, 1, FOLEY_BROWN_LEAK);
+    this.whiteNoise = createWhiteNoiseBuffer(ctx, 1);
 
     // --- Wind -------------------------------------------------------------
     this.windSource = ctx.createBufferSource();
@@ -429,80 +461,65 @@ export class SoundGraph {
 
   /* --- Foley ------------------------------------------------------------ */
 
-  /** Strap/fabric thud, then 35 ms later a damped carabiner click (2.4 + 3.85 kHz). */
+  /*
+   * Gear and climbing foley are pure filtered-noise transients: no oscillator
+   * anywhere, so nothing rings at a musical pitch. Peaks stay under the wind
+   * (FOLEY_PEAK) and every hit goes through the canyon reverb.
+   */
+
+  /**
+   * Tactical nylon / canvas strap lock, three staggered noise transients:
+   *   0 ms   heavy pack settling — 90 ms of Brownian noise, low-pass 320 → 110 Hz
+   *   35 ms  webbing pull — 55 ms of pink noise, band-pass 900 → 1600 Hz (Q 2.2)
+   *   75 ms  matte buckle latch — a 6 ms white-noise impulse, band-pass 2.8 kHz
+   *          (Q 4), gone in 12 ms (no tonal tail)
+   */
   gearEquip(itemIndex: number, when: number): void {
-    const ctx = this.ctx;
-    const pan = this.panner(((itemIndex % 4) - 1.5) * 0.18, when);
+    const vary = 1 + ((itemIndex % 4) - 1.5) * 0.04 + (Math.random() - 0.5) * 0.08;
+    const pan = this.panner(((itemIndex % 4) - 1.5) * 0.12, when);
     pan.connect(this.master);
-
-    this.noiseHit(when, 0.018, 'bandpass', 1800, 1.4, 0.42, pan);
-
-    const clickAt = when + 0.035;
-    const tune = 1 + (itemIndex % 4) * 0.025;
-    const click = ctx.createGain();
-    click.gain.setValueAtTime(0, clickAt);
-    click.gain.linearRampToValueAtTime(0.16, clickAt + 0.0015);
-    click.gain.exponentialRampToValueAtTime(0.0005, clickAt + 0.065);
-    click.connect(pan);
-    for (const [hz, level] of [
-      [2400, 1],
-      [3850, 0.62],
-    ] as const) {
-      const osc = ctx.createOscillator();
-      osc.type = 'sine';
-      osc.frequency.value = hz * tune;
-      const partial = ctx.createGain();
-      partial.gain.value = level;
-      osc.connect(partial).connect(click);
-      osc.start(clickAt);
-      osc.stop(clickAt + 0.08);
-      osc.onended = () => {
-        partial.disconnect();
-        click.disconnect();
-        pan.disconnect();
-      };
-    }
-    this.noiseHit(clickAt, 0.006, 'highpass', 5200, 0.7, 0.12, pan);
+    const parts = [
+      this.transient(this.brownNoise, when, 0.09, 'lowpass', 320 * vary, 110 * vary, 0.7, 0.16, 0.004, pan),
+      this.transient(this.pinkNoise, when + 0.035, 0.055, 'bandpass', 900 * vary, 1600 * vary, 2.2, 0.06, 0.035, pan),
+      this.transient(this.whiteNoise, when + 0.075, 0.006, 'bandpass', 2800 * vary, 2800 * vary, 4, 0.08, 0, pan, 0.012),
+    ];
+    parts[parts.length - 1].onended = () => pan.disconnect();
   }
 
-  /** Buckle release: a short tick, a 140 → 55 Hz thump, then air falling away into the chasm. */
+  /**
+   * Gear released into the chasm: a 10 ms fabric unclip (noise at 1.9 kHz),
+   * then a quiet low-passed (240 Hz) Brownian air rustle buffeting away over
+   * 400 ms, drifting outward in the stereo field.
+   */
   gearDrop(shedStage: number, when: number): void {
-    const ctx = this.ctx;
-    const side = shedStage % 2 === 0 ? -0.2 : 0.2;
+    const side = shedStage % 2 === 0 ? -0.15 : 0.15;
     const pan = this.panner(side, when);
-    pan.pan.linearRampToValueAtTime(side * 2.2, when + 1.4);
+    pan.pan.linearRampToValueAtTime(side * 3, when + 0.45);
     pan.connect(this.master);
+    this.transient(this.whiteNoise, when, 0.01, 'bandpass', 1900, 1900, 2, 0.1, 0, pan, 0.012);
+    const rustle = this.transient(this.brownNoise, when + 0.012, 0.4, 'lowpass', 240, 240, 0.7, 0.14, 0.06, pan);
+    rustle.onended = () => pan.disconnect();
+  }
 
-    this.noiseHit(when, 0.012, 'bandpass', 1300, 2, 0.18, pan);
-
-    const thump = ctx.createOscillator();
-    thump.type = 'sine';
-    thump.frequency.setValueAtTime(140, when);
-    thump.frequency.exponentialRampToValueAtTime(55, when + 0.18);
-    const body = ctx.createGain();
-    body.gain.setValueAtTime(0, when);
-    body.gain.linearRampToValueAtTime(0.42, when + 0.005);
-    body.gain.exponentialRampToValueAtTime(0.0005, when + 0.2);
-    thump.connect(body).connect(pan);
-    thump.start(when);
-    thump.stop(when + 0.22);
-    thump.onended = () => body.disconnect();
-
-    const air = this.noiseSource(when, 1.6);
-    const band = ctx.createBiquadFilter();
-    band.type = 'bandpass';
-    band.Q.value = 1.6;
-    band.frequency.setValueAtTime(760, when + 0.05);
-    band.frequency.exponentialRampToValueAtTime(240, when + 1.5);
-    const fall = ctx.createGain();
-    fall.gain.setValueAtTime(0, when);
-    fall.gain.linearRampToValueAtTime(0.07 + 0.015 * (shedStage % 3), when + 0.25);
-    fall.gain.exponentialRampToValueAtTime(0.0005, when + 1.55);
-    air.connect(band).connect(fall).connect(pan);
-    air.onended = () => {
-      fall.disconnect();
-      pan.disconnect();
-    };
+  /**
+   * One climbing contact: a rubber boot / glove on granite (45 ms of
+   * Brownian noise low-passed at ~165 Hz) and 2–3 grains of crushed grit
+   * (8 ms band-passed noise bursts between 1.4 and 2.2 kHz, 12 ms apart).
+   * Cutoffs vary by ±15 % and the pan by ±0.2 on every step.
+   */
+  climbStep(when: number, intensity: number): void {
+    const k = 0.6 + 0.4 * clamp01(intensity);
+    const jitter = (): number => 1 + (Math.random() * 2 - 1) * 0.15;
+    const pan = this.panner((Math.random() * 2 - 1) * 0.2, when);
+    pan.connect(this.master);
+    let last = this.transient(this.brownNoise, when, 0.045, 'lowpass', 165 * jitter(), 165 * jitter(), 0.8, 0.11 * k, 0.003, pan);
+    const grains = 2 + (Math.random() < 0.5 ? 1 : 0);
+    for (let i = 0; i < grains; i += 1) {
+      const at = when + 0.004 + i * 0.012 + Math.random() * 0.003;
+      const hz = (1400 + Math.random() * 800) * jitter();
+      last = this.transient(this.pinkNoise, at, 0.008, 'bandpass', hz, hz, 3, 0.035 * k, 0.001, pan);
+    }
+    last.onended = () => pan.disconnect();
   }
 
   /** Resonant swept air for a leap: 180 → 900 → 220 Hz over 650 ms, panning across. */
@@ -517,7 +534,7 @@ export class SoundGraph {
     const src = this.noiseSource(when, duration + 0.15);
     const env = ctx.createGain();
     env.gain.setValueAtTime(0, when);
-    env.gain.linearRampToValueAtTime(0.62 + 0.5 * k, when + duration * 0.42);
+    env.gain.linearRampToValueAtTime(0.39 + 0.31 * k, when + duration * 0.42);
     env.gain.exponentialRampToValueAtTime(0.0005, when + duration + 0.1);
     env.connect(pan);
     // Two bands: a resonant one carrying the sweep, and a broad one an octave
@@ -624,35 +641,57 @@ export class SoundGraph {
     return node;
   }
 
-  private noiseSource(when: number, duration: number): AudioBufferSourceNode {
+  private noiseSource(when: number, duration: number, buffer: AudioBuffer = this.pinkNoise): AudioBufferSourceNode {
     const src = this.ctx.createBufferSource();
-    src.buffer = this.pinkNoise;
+    src.buffer = buffer;
     src.loop = true;
-    src.start(when, Math.random() * (this.pinkNoise.duration - 0.2));
+    src.start(when, Math.random() * (buffer.duration - 0.2));
     src.stop(when + duration);
     return src;
   }
 
-  private noiseHit(
+  /**
+   * One filtered noise transient: `buffer` through a `type` filter swept
+   * exponentially from `fromHz` to `toHz` over `duration`, with an envelope
+   * that rises to `level` over `attack`, then decays to silence by `decay`
+   * (default: the end of the burst). Returns the source (for onended).
+   */
+  private transient(
+    buffer: AudioBuffer,
     when: number,
     duration: number,
     type: BiquadFilterType,
-    frequency: number,
+    fromHz: number,
+    toHz: number,
     q: number,
     level: number,
+    attack: number,
     destination: AudioNode,
-  ): void {
-    const src = this.noiseSource(when, duration + 0.01);
+    decay = duration,
+  ): AudioBufferSourceNode {
+    const src = this.noiseSource(when, Math.max(duration, decay) + 0.005, buffer);
     const filter = this.ctx.createBiquadFilter();
     filter.type = type;
-    filter.frequency.value = frequency;
     filter.Q.value = q;
+    filter.frequency.setValueAtTime(fromHz, when);
+    if (toHz !== fromHz) filter.frequency.exponentialRampToValueAtTime(toHz, when + duration);
     const env = this.ctx.createGain();
-    env.gain.setValueAtTime(0, when);
-    env.gain.linearRampToValueAtTime(level, when + 0.001);
-    env.gain.exponentialRampToValueAtTime(0.0005, when + duration);
+    if (attack > 0) {
+      env.gain.setValueAtTime(0, when);
+      env.gain.linearRampToValueAtTime(level, when + attack);
+    } else {
+      env.gain.setValueAtTime(level, when);
+    }
+    if (attack === 0) {
+      // Impulse: straight to zero, no exponential tail.
+      env.gain.linearRampToValueAtTime(0, when + decay);
+    } else {
+      env.gain.exponentialRampToValueAtTime(0.0005, when + decay);
+      env.gain.linearRampToValueAtTime(0, when + decay + 0.004);
+    }
     src.connect(filter).connect(env).connect(destination);
-    src.onended = () => env.disconnect();
+    src.addEventListener('ended', () => env.disconnect());
+    return src;
   }
 }
 
@@ -712,6 +751,7 @@ export class SoundEngine {
   private readonly lastFired = new Float64Array(CUE_COUNT).fill(-Infinity);
   private lastOneShot = -Infinity;
   private lastSeek = -Infinity;
+  private nextClimbStep = 0;
   private lastProgress = Number.NaN;
   private clock = 0;
   private nextParamAt = 0;
@@ -770,8 +810,9 @@ export class SoundEngine {
   /**
    * Per-frame tick (from the render loop). Tracks every scroll cue even while
    * muted, so enabling sound mid-journey never fires stale one-shots; drives
-   * the wind and pad beds; fires foley on forward threshold crossings.
-   * Allocation-free.
+   * the wind and pad beds; fires foley on forward threshold crossings and
+   * climbing contacts. Allocation-free except for the audio nodes of a sound
+   * that actually fires.
    */
   updateOnFrame(dampedProgress: number, velocity: number, delta: number): void {
     const p = clamp01(dampedProgress);
@@ -811,6 +852,25 @@ export class SoundEngine {
       this.nextParamAt = this.clock + PARAM_INTERVAL;
       this.applyBeds(p, velocity, ctx.currentTime);
     }
+    if (live) this.updateClimbingFoley(p, velocity, this.clock - this.lastSeek < SEEK_HOLD);
+  }
+
+  /**
+   * Boot / glove contacts while the climber is on rock: only inside
+   * CLIMB_ZONES, only while scrolling, never during a seek, and at least
+   * CLIMB_STEP_MIN apart (the gap grows as scrolling slows).
+   */
+  private updateClimbingFoley(p: number, velocity: number, seeking: boolean): void {
+    const speed = Math.abs(velocity);
+    if (seeking || speed <= CLIMB_MIN_SPEED || this.clock < this.nextClimbStep) return;
+    let climbing = false;
+    for (let i = 0; i < CLIMB_ZONES.length; i += 1) {
+      if (p >= CLIMB_ZONES[i][0] && p <= CLIMB_ZONES[i][1]) climbing = true;
+    }
+    if (!climbing) return;
+    const brisk = smoothstep(0.002, 0.04, speed);
+    this.nextClimbStep = this.clock + CLIMB_STEP_MIN + 0.3 * (1 - brisk) + Math.random() * 0.06;
+    this.playClimbStep(0.5 + 0.5 * brisk);
   }
 
   /* --- one-shots (also fired automatically by updateOnFrame) -------------- */
@@ -828,6 +888,12 @@ export class SoundEngine {
   playChasmJumpWhoosh(intensity = 1): void {
     const ctx = this.readyContext();
     if (ctx && this.graph) this.graph.chasmWhoosh(intensity, ctx.currentTime + 0.005);
+  }
+
+  /** One boot / glove contact on granite (fired automatically while climbing). */
+  playClimbStep(intensity = 1): void {
+    const ctx = this.readyContext();
+    if (ctx && this.graph) this.graph.climbStep(ctx.currentTime + 0.005, intensity);
   }
 
   playPaperThrowAndFlutter(intensity = 1): void {
