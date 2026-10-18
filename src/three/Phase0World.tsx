@@ -475,53 +475,6 @@ function CloudCurtain() {
 }
 
 /* ---------------------------------------------------------------------------
- * Contact paper (Scene 9) and wind gust (Scene 10).
- * ------------------------------------------------------------------------- */
-
-function ContactPaper({ bodyRef }: { bodyRef: RefObject<THREE.Group> }) {
-  const ref = useRef<THREE.Mesh>(null);
-  const { camera } = useThree();
-  const hand = useMemo(() => new THREE.Vector3(), []);
-  const lens = useMemo(() => new THREE.Vector3(), []);
-  const target = useMemo(() => new THREE.Vector3(), []);
-  const gust = useMemo(() => new THREE.Vector3(), []);
-
-  useFrame((_, delta) => {
-    const mesh = ref.current;
-    const body = bodyRef.current;
-    if (!mesh || !body) return;
-    const p = scrollStore.dampedProgress;
-    const throwT = smoothstep(0.925, 0.955, p);
-    const gustT = smoothstep(0.98, 0.998, p);
-    mesh.visible = p > 0.918 && gustT < 0.999;
-    if (!mesh.visible) return;
-
-    body.localToWorld(hand.set(0.35, 1.5, 0.3));
-    lens.set(0, -0.15, -1.6).applyMatrix4(camera.matrixWorld);
-    target.lerpVectors(hand, lens, throwT);
-    target.y += Math.sin(throwT * Math.PI) * 1.2;
-    // Gust: off to the right and up, out of frame.
-    target.add(gust.set(gustT * 4, gustT * 1.5, 0).applyQuaternion(camera.quaternion));
-
-    mesh.position.x = damp(mesh.position.x, target.x, 9, delta);
-    mesh.position.y = damp(mesh.position.y, target.y, 9, delta);
-    mesh.position.z = damp(mesh.position.z, target.z, 9, delta);
-    mesh.quaternion.copy(camera.quaternion);
-    mesh.rotateZ(Math.sin(scrollStore.elapsed * 3) * 0.05 * (1 - gustT) - gustT * 1.8);
-    mesh.rotateX(lerp(1.2, 0, throwT) + gustT * 0.8);
-    const s = lerp(0.25, 1, throwT) * (1 - gustT * 0.4);
-    mesh.scale.setScalar(s);
-  });
-
-  return (
-    <mesh ref={ref} visible={false} renderOrder={12}>
-      <planeGeometry args={[0.9, 0.6]} />
-      <meshStandardMaterial color="#F8F5EE" roughness={0.85} side={THREE.DoubleSide} emissive="#F8F5EE" emissiveIntensity={0.15} />
-    </mesh>
-  );
-}
-
-/* ---------------------------------------------------------------------------
  * Camera rig — per-scene framing blended by smoothstep, damped every frame.
  * ------------------------------------------------------------------------- */
 
@@ -659,7 +612,6 @@ export function Phase0World() {
         <Beacon key={beacon.scene} {...beacon} />
       ))}
 
-      <ContactPaper bodyRef={bodyRef} />
       <CloudCurtain />
       <AuditPath />
       <CameraRig bodyRef={bodyRef} />

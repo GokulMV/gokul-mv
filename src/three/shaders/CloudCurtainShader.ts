@@ -95,12 +95,13 @@ void main() {
   // travels exactly uPartX world units.
   float lateral = side * part * uPartX * aPartTune.y * clamp(dist / uPartDepth, 0.15, 1.6);
   // Puffs enlarged beyond the reference layout (fewer instances on low tiers
-  // or after an adaptive-quality drop) also travel their extra half-width, so
-  // the inner edges clear the centre of the frame on the same schedule at
-  // every tier instead of keeping the curtain shut longer.
+  // or after an adaptive-quality drop) travel further, so the gap opens on
+  // the same schedule at every tier instead of the curtain staying shut
+  // longer. Half the extra half-width matches the reference gap: the sparser
+  // layout's spacing already accounts for the rest.
   float stretch = 1.0 + part * 0.35 + uDissolve * 0.25;
   float extraHalf = max(size - aShape.w / uLayoutScale, 0.0) * 0.5 * aMotion.w * stretch;
-  lateral += side * extraHalf * smoothstep(0.0, 0.3, part);
+  lateral += side * extraHalf * 0.5 * smoothstep(0.0, 0.3, part);
   vec4 mvCenter = mvBase + modelViewMatrix * vec4(lateral, 0.0, 0.0, 0.0);
 
   // Depth fade: near-plane fade scales with the puff size so a cloud never
