@@ -23,14 +23,17 @@ import { PATH_PHASES, WAYPOINTS, protagonistPositionAt } from '../protagonistPat
  *   summit   the faceted summit pyramid whose south face carries the catch lip
  *            and the scramble, topped by a tiny standing platform;
  *   detail   world-space strata / jointing / FBM displacement, suppressed close
- *            to the route so the clearances stay exact.
+ *            to the route so the clearances stay exact;
+ *   facets   planar fracture facets cut into the rock in two octaves (slabs
+ *            and chips): flat faces, sharp edges and snow-holding steps.
  *
  * Two surface-net passes: a fine one over the climb ("detail domain") and a
  * coarse one over the whole massif whose surface is tucked just under the fine
  * one where they overlap. Beyond the massif the ground heightfield continues as
  * a graded-resolution skirt mesh. Vertices close to the route are projected
- * onto the exact iso-surface. Deterministic (fixed seeds); built once per
- * detail level, optionally time-sliced.
+ * onto the exact iso-surface. Ambient occlusion and curvature (cavity) are
+ * baked per vertex. Deterministic (fixed seeds); built once per detail level,
+ * optionally time-sliced.
  * ========================================================================== */
 
 export type TerrainDetail = 'high' | 'medium' | 'low';
@@ -38,7 +41,11 @@ export type TerrainDetail = 'high' | 'medium' | 'low';
 export interface TerrainPiece {
   /** Stable name, e.g. `massif-1-0-2`, `flank-0-1-1` or `skirt`. */
   name: string;
-  /** World-space, indexed geometry with `position`, `normal` and `aOcclusion` (0..1). */
+  /**
+   * World-space, indexed geometry with `position`, `normal`, `aOcclusion`
+   * (0..1, baked ambient occlusion) and `aCurvature` (-1..1: negative in
+   * creases and hollows, positive on convex edges).
+   */
   geometry: THREE.BufferGeometry;
   /** massif = fine climb detail, flank = coarse outer massif, skirt = far heightfield. */
   kind: 'massif' | 'flank' | 'skirt';
@@ -98,12 +105,14 @@ interface DetailConfig {
   skirtGrowth: number;
   /** Spacing of the coarse field used for baked ambient occlusion. */
   aoSpacing: number;
+  /** Size of the fracture-facet cells cut into the fine surface. */
+  chipSize: number;
 }
 
 const DETAIL_CONFIG: Readonly<Record<TerrainDetail, DetailConfig>> = {
-  high: { cell: 0.3, outerCell: 0.8, fineNoise: true, skirtNear: 1.8, skirtGrowth: 1.05, aoSpacing: 2.0 },
-  medium: { cell: 0.42, outerCell: 1.05, fineNoise: true, skirtNear: 2.4, skirtGrowth: 1.065, aoSpacing: 2.3 },
-  low: { cell: 0.62, outerCell: 1.45, fineNoise: false, skirtNear: 3.2, skirtGrowth: 1.09, aoSpacing: 2.8 },
+  high: { cell: 0.3, outerCell: 0.8, fineNoise: true, skirtNear: 1.8, skirtGrowth: 1.05, aoSpacing: 2.0, chipSize: 1.7 },
+  medium: { cell: 0.42, outerCell: 1.05, fineNoise: true, skirtNear: 2.4, skirtGrowth: 1.065, aoSpacing: 2.3, chipSize: 1.9 },
+  low: { cell: 0.62, outerCell: 1.45, fineNoise: false, skirtNear: 3.2, skirtGrowth: 1.09, aoSpacing: 2.8, chipSize: 2.3 },
 };
 
 /** Terrain detail for a GPU tier (tier 0 never renders WebGL; it maps to low). */
@@ -879,11 +888,12 @@ function displacement(x: number, y: number, z: number, fine: boolean): number {
   // Small buttresses and grooves (a few metres): sharp crests of a ridged noise.
   const mb = noise3(x * 0.21 - 2.3, y * 0.13 + 7.1, z * 0.21 + 3.3);
   const blocky = 1 - Math.abs(mb);
+  // The rounded terms stay gentle: the planar slabs and chips cut afterwards give the rock its angular form.
   let d =
-    1.0 * n1 +
+    0.8 * n1 +
     0.9 * (crease * crease * crease - 0.42) +
-    0.6 * (blocky * blocky - 0.45) +
-    0.55 * (joint * joint - 0.45) +
+    0.28 * (blocky * blocky - 0.45) +
+    0.3 * (joint * joint - 0.45) +
     strataAmp * (saw - 0.5) * 2 +
     blockAmp * (blocks - 0.5) * 2;
   if (fine) d += 0.15 * noise3(x * 0.9 - 2.1, y * 0.9, z * 0.9 + 7.7);
@@ -1016,22 +1026,319 @@ function composeField(g: number, x: number, y: number, z: number, fine: boolean)
   return f;
 }
 
-let sdfCache: GroundCache | null = null;
+/* ==========================================================================
+ * Fracture facets — planar chips cut into the rock.
+ *
+ * Space is divided into jittered (Voronoi) cells. Each cell whose centre lies
+ * near the surface owns a cutting plane: the local surface, tilted by a random
+ * angle and sunk a little below it. Inside its own cell a plane cuts freely; in
+ * a neighbouring cell its cut is lowered in proportion to how far the point
+ * lies past the bisector (|p - c_m|² - |p - c_near|², a linear function of p).
+ * The cut is the max over the nearby planes, so the field stays continuous and
+ * piecewise planar: flat facets, sharp convex edges and steep little steps
+ * where a deeper facet meets a shallower one, never deeper than the spec's
+ * `cut`. Two octaves: slabs (~4.5 units) and chips (~2 units) cut into the
+ * slabs. Chips only ever remove rock; they are suppressed along the route and
+ * at the standing spots (detailMask) and faded out by a region function — the
+ * fine pass fades them out toward the edge of the detail domain, the coarse
+ * pass only carries slabs well outside it, so the two surfaces always meet
+ * uncut at the seam.
+ * ========================================================================== */
+
+interface ChipSpec {
+  /** Cell size (world units). */
+  size: number;
+  /** Deepest cut below the uncut surface. */
+  cut: number;
+  /** Tangential tilt of the planes (0.3 ≈ up to 17°). */
+  tilt: number;
+  /** 0 = random tilt directions, 1 = every facet tilted down the fall line. */
+  fallLine: number;
+  /**
+   * Range of the planes' depth below the surface at the cell. Kept narrow: a
+   * cell cut much deeper than all its neighbours would read as a pit.
+   */
+  depth0: number;
+  depth1: number;
+}
+
+/*
+ * A plane's cut grows by ~tilt per unit away from its cell; tilt × reach +
+ * depth stays under `cut`, so facets are never flattened onto the cap (a capped
+ * floor follows the rounded uncut surface and reads as a pit).
+ */
+const SLAB_CHIPS = { cut: 1.1, tilt: 0.34, fallLine: 0.7, depth0: 0.24, depth1: 0.3 } as const;
+const SMALL_CHIPS = { cut: 0.5, tilt: 0.36, fallLine: 0.45, depth0: 0.09, depth1: 0.12 } as const;
+/** Slab cells are this many times the size of the small chips. */
+const SLAB_SCALE = 2.6;
+
+/** Steepness of a plane's fall-off past its cell's bisector (per cell size). */
+const CHIP_PENALTY = 1.1;
+/** Per cell: jittered centre (3), plane normal (3), plane offset, state (0 unknown, 1 no chip, 2 chip). */
+const CHIP_STRIDE = 8;
+
+interface ChipGrid {
+  spec: ChipSpec;
+  x0: number;
+  y0: number;
+  z0: number;
+  nx: number;
+  ny: number;
+  nz: number;
+  data: Float32Array;
+  /** The uncut field the planes are fitted to. */
+  base: ScalarField;
+  /** Where the chips apply (0..1), before the route mask. */
+  region: ScalarField;
+  /** Half-width of the band around the surface in which the cut is evaluated. */
+  band: number;
+  salt: number;
+  /**
+   * Scratch for chipField, per grid: fitting a plane lazily evaluates the base
+   * field, which may run another grid's chipField in the middle of this one.
+   */
+  r2: Float64Array;
+  ids: Int32Array;
+}
+
+/** Deterministic integer hash → [0, 1). */
+function hash3i(i: number, j: number, k: number, salt: number): number {
+  let h = Math.imul(i, 0x27d4eb2d) ^ Math.imul(j, 0x165667b1) ^ Math.imul(k, 0x1b873593) ^ Math.imul(salt + 1, 0x85ebca77);
+  h = Math.imul(h ^ (h >>> 15), 0x2c1b3c6d);
+  h = Math.imul(h ^ (h >>> 12), 0x297a2d39);
+  h ^= h >>> 15;
+  return (h >>> 0) / 4294967296;
+}
+
+function createChipGrid(box: Box, spec: ChipSpec, base: ScalarField, region: ScalarField, band: number, salt: number): ChipGrid {
+  const size = spec.size;
+  const pad = 2;
+  const x0 = box.x0 - pad * size;
+  const y0 = box.y0 - pad * size;
+  const z0 = box.z0 - pad * size;
+  const nx = Math.ceil((box.x1 - box.x0) / size) + 2 * pad;
+  const ny = Math.ceil((box.y1 - box.y0) / size) + 2 * pad;
+  const nz = Math.ceil((box.z1 - box.z0) / size) + 2 * pad;
+  const data = new Float32Array(nx * ny * nz * CHIP_STRIDE);
+  for (let k = 0; k < nz; k += 1) {
+    for (let j = 0; j < ny; j += 1) {
+      for (let i = 0; i < nx; i += 1) {
+        const o = (i + nx * (j + ny * k)) * CHIP_STRIDE;
+        data[o] = x0 + (i + 0.1 + 0.8 * hash3i(i, j, k, salt + 1)) * size;
+        data[o + 1] = y0 + (j + 0.1 + 0.8 * hash3i(i, j, k, salt + 2)) * size;
+        data[o + 2] = z0 + (k + 0.1 + 0.8 * hash3i(i, j, k, salt + 3)) * size;
+      }
+    }
+  }
+  return { spec, x0, y0, z0, nx, ny, nz, data, base, region, band, salt, r2: new Float64Array(27), ids: new Int32Array(27) };
+}
+
+/** Fits (once) the cutting plane of a cell; false when the cell carries no chip. */
+function chipPlane(g: ChipGrid, cell: number): boolean {
+  const d = g.data;
+  const o = cell * CHIP_STRIDE;
+  const state = d[o + 7];
+  if (state !== 0) return state === 2;
+  const cx = d[o];
+  const cy = d[o + 1];
+  const cz = d[o + 2];
+  const f = g.base(cx, cy, cz);
+  if (Math.abs(f) > 0.8 * g.spec.size) {
+    d[o + 7] = 1;
+    return false;
+  }
+  const e = 0.2;
+  let gx = g.base(cx + e, cy, cz) - g.base(cx - e, cy, cz);
+  let gy = g.base(cx, cy + e, cz) - g.base(cx, cy - e, cz);
+  let gz = g.base(cx, cy, cz + e) - g.base(cx, cy, cz - e);
+  const gl = Math.sqrt(gx * gx + gy * gy + gz * gz);
+  if (gl < 1e-6) {
+    d[o + 7] = 1;
+    return false;
+  }
+  gx /= gl;
+  gy /= gl;
+  gz /= gl;
+  // Point on the surface under the centre (one Newton step is plenty at this scale).
+  const sx = cx - f * gx;
+  const sy = cy - f * gy;
+  const sz = cz - f * gz;
+  // Tilt within the tangent plane: mostly down the fall line, jittered per cell. Each facet leans
+  // out at its top, so where it meets the facet above, the step between them is an up-facing
+  // ledge (it holds snow) rather than an overhang. On flat ground the fall line is undefined and
+  // the tilt is random.
+  let tx = hash3i(cell, 7, 1, g.salt + 4) * 2 - 1;
+  let ty = hash3i(cell, 7, 2, g.salt + 5) * 2 - 1;
+  let tz = hash3i(cell, 7, 3, g.salt + 6) * 2 - 1;
+  const tn = tx * gx + ty * gy + tz * gz;
+  tx -= tn * gx;
+  ty -= tn * gy;
+  tz -= tn * gz;
+  // Downhill tangent: -Y with its normal component removed.
+  const ux = gy * gx;
+  const uy = gy * gy - 1;
+  const uz = gy * gz;
+  const ul = Math.sqrt(ux * ux + uy * uy + uz * uz);
+  const coherence = g.spec.fallLine * smoothstep(0.15, 0.5, ul);
+  if (ul > 1e-4) {
+    const tl = Math.sqrt(tx * tx + ty * ty + tz * tz) || 1;
+    const strength = 0.55 + 0.45 * hash3i(cell, 8, 8, g.salt + 8);
+    tx = (tx / tl) * (1 - coherence) + (ux / ul) * coherence * strength;
+    ty = (ty / tl) * (1 - coherence) + (uy / ul) * coherence * strength;
+    tz = (tz / tl) * (1 - coherence) + (uz / ul) * coherence * strength;
+  }
+  const tilt = g.spec.tilt;
+  let mx = gx + tilt * tx;
+  let my = gy + tilt * ty;
+  let mz = gz + tilt * tz;
+  const ml = Math.sqrt(mx * mx + my * my + mz * mz);
+  mx /= ml;
+  my /= ml;
+  mz /= ml;
+  // Concave rock (hollows, gullies) is left uncut: a plane tangent at the bottom of a hollow lies
+  // above its walls and would cut them back, deepening the hollow into a pit. The field's Laplacian
+  // over a third of a cell (≈ twice the mean curvature) must not be markedly negative.
+  const h = 0.33 * g.spec.size;
+  const laplacian =
+    (g.base(cx + h, cy, cz) + g.base(cx - h, cy, cz) + g.base(cx, cy + h, cz) + g.base(cx, cy - h, cz) + g.base(cx, cy, cz + h) + g.base(cx, cy, cz - h) - 6 * f) /
+    (h * h);
+  if (laplacian < -1.6 / g.spec.size) {
+    d[o + 7] = 1;
+    return false;
+  }
+  // Thin rock (fins, lips, the rims of shelves) is left uncut: a cut from either side could slice
+  // a sliver loose. The rock must stay solid well past twice the cut depth under the surface point.
+  const probe = 2 * g.spec.cut + 0.35;
+  if (g.base(sx - gx * probe, sy - gy * probe, sz - gz * probe) > -0.3) {
+    d[o + 7] = 1;
+    return false;
+  }
+  const depth = g.spec.depth0 + (g.spec.depth1 - g.spec.depth0) * hash3i(cell, 9, 9, g.salt + 7);
+  d[o + 3] = mx;
+  d[o + 4] = my;
+  d[o + 5] = mz;
+  d[o + 6] = depth - (sx * mx + sy * my + sz * mz);
+  d[o + 7] = 2;
+  return true;
+}
+
+/** The field `f` (uncut, at x, y, z) with the grid's facets cut into it. */
+function chipField(g: ChipGrid, x: number, y: number, z: number, f: number): number {
+  // Far from the surface the cut cannot change the sign of the field at any
+  // grid point next to a crossing, so only a band around the surface is cut.
+  if (f > g.band || f < -(g.spec.cut + g.band)) return f;
+  const s = g.spec.size;
+  const region = g.region(x, y, z);
+  if (region <= 0) return f;
+  const amount = smoothstep(0.25, 0.65, detailMask(x, y, z)) * region;
+  if (amount <= 0) return f;
+  const ci = Math.floor((x - g.x0) / s);
+  const cj = Math.floor((y - g.y0) / s);
+  const ck = Math.floor((z - g.z0) / s);
+  // The grid is padded by two cells around its box, and every region lies inside the box.
+  if (ci < 1 || cj < 1 || ck < 1 || ci > g.nx - 2 || cj > g.ny - 2 || ck > g.nz - 2) return f;
+  const d = g.data;
+  // Squared distances to the 27 candidate centres; the nearest defines the bisector penalties.
+  const r2 = g.r2;
+  const ids = g.ids;
+  const sy = g.nx;
+  const sz = g.nx * g.ny;
+  let n = 0;
+  let near2 = Infinity;
+  for (let k = ck - 1; k <= ck + 1; k += 1) {
+    for (let j = cj - 1; j <= cj + 1; j += 1) {
+      const row = sy * j + sz * k;
+      for (let i = ci - 1; i <= ci + 1; i += 1) {
+        const cell = i + row;
+        const o = cell * CHIP_STRIDE;
+        const dx = x - d[o];
+        const dy = y - d[o + 1];
+        const dz = z - d[o + 2];
+        const dd = dx * dx + dy * dy + dz * dz;
+        ids[n] = cell;
+        r2[n] = dd;
+        n += 1;
+        if (dd < near2) near2 = dd;
+      }
+    }
+  }
+  const slope = CHIP_PENALTY / s;
+  const reach = 2.5 + g.spec.cut;
+  let cut = -Infinity;
+  for (let m = 0; m < 27; m += 1) {
+    const penalty = slope * (r2[m] - near2);
+    // Planes penalised this much sit far below the nearest facet wherever the cut can reach;
+    // skipping them also spares fitting distant cells.
+    if (penalty > reach) continue;
+    const cell = ids[m];
+    const o = cell * CHIP_STRIDE;
+    const state = d[o + 7];
+    if (state === 1 || (state === 0 && !chipPlane(g, cell))) continue;
+    const plane = d[o + 3] * x + d[o + 4] * y + d[o + 5] * z + d[o + 6] - penalty;
+    if (plane > cut) cut = plane;
+  }
+  if (cut === -Infinity) return f;
+  return Math.max(f, Math.min(cut, f + g.spec.cut * amount));
+}
+
+/** Fine-pass chip region: full inside the detail domain, fading out over its last few units. */
+const fineChipRegion: ScalarField = (x, y, z) => smoothstep(1, 5, insideDetail(x, y, z));
+
+/** Coarse-pass slab region: only well outside the detail domain, fading out at the massif edge. */
+const coarseChipRegion: ScalarField = (x, y, z) => smoothstep(4, 9, -insideDetail(x, y, z)) * smoothstep(2, 8, massifEdge(x, z));
+
+/**
+ * Band around the surface that must be cut exactly for a surface-net pass with
+ * cells of `cell` units (the field changes by at most LIPSCHITZ per unit).
+ */
+function chipBand(cell: number): number {
+  return Math.max(1, LIPSCHITZ * cell);
+}
+
+/** The fine field `uncut` with slabs and chips (cell size `chip`) cut into it, exact for `cell`-sized surface nets. */
+function fineChippedField(uncut: ScalarField, chip: number, cell: number): ScalarField {
+  const band = chipBand(cell);
+  const slabs = createChipGrid(DI, { size: chip * SLAB_SCALE, ...SLAB_CHIPS }, uncut, fineChipRegion, band + SMALL_CHIPS.cut, 100);
+  const slabbed: ScalarField = (x, y, z) => chipField(slabs, x, y, z, uncut(x, y, z));
+  const chips = createChipGrid(DI, { size: chip, ...SMALL_CHIPS }, slabbed, fineChipRegion, band, 200);
+  return (x, y, z) => chipField(chips, x, y, z, slabbed(x, y, z));
+}
+
+/** The coarse field `uncut` with slabs (cell size `chip` × SLAB_SCALE) cut into it outside the detail domain. */
+function coarseChippedField(uncut: ScalarField, chip: number, cell: number): ScalarField {
+  const slabs = createChipGrid(DO, { size: chip * SLAB_SCALE, ...SLAB_CHIPS }, uncut, coarseChipRegion, chipBand(cell), 300);
+  return (x, y, z) => chipField(slabs, x, y, z, uncut(x, y, z));
+}
+
+let sdfField: ScalarField | null = null;
 
 /**
  * Signed distance (approximate, negative inside rock) of the mountain at a
- * world position, at full detail. Useful for placing effects near rock. The
- * first call builds a 0.5-unit ground lookup over the massif (~50k samples).
+ * world position, at full detail (the high-detail fine surface inside the
+ * detail domain, the coarse surface's slabs outside it). Useful for placing
+ * effects near rock. The first call builds a 0.5-unit ground lookup over the
+ * massif (~50k samples).
  */
 export function mountainSdf(x: number, y: number, z: number): number {
-  if (!sdfCache) {
+  if (!sdfField) {
     const steps = buildCacheForBox(DO, 0.5, 10);
     let r = steps.next();
     while (!r.done) r = steps.next();
-    sdfCache = r.value;
+    const cache = r.value;
+    const chip = DETAIL_CONFIG.high.chipSize;
+    const uncut: ScalarField = (px, py, pz) => composeField(groundAt(cache, px, py, pz), px, py, pz, true);
+    // Exact within 1.6 of the surface (the band of a 0.67-unit surface net).
+    const fine = fineChippedField(uncut, chip, 0.67);
+    const coarse = coarseChippedField(uncut, chip, 0.67);
+    sdfField = (px, py, pz) => (insideDetail(px, py, pz) > -4 ? fine(px, py, pz) : coarse(px, py, pz));
   }
+  return sdfField(x, y, z);
+}
+
+/** Ground term from the cache inside its footprint, exact outside. */
+function groundAt(cache: GroundCache, x: number, y: number, z: number): number {
   const inCache = x > DO.x0 - 9 && x < DO.x1 + 9 && z > DO.z0 - 9 && z < DO.z1 + 9;
-  return composeField(groundTerm(inCache ? sdfCache : null, x, y, z), x, y, z, true);
+  return groundTerm(inCache ? cache : null, x, y, z);
 }
 
 /* ==========================================================================
@@ -1558,6 +1865,72 @@ function* bakeOcclusion(
 }
 
 /* ==========================================================================
+ * Baked curvature (cavity): the mesh Laplacian along the normal, smoothed.
+ * ========================================================================== */
+
+/**
+ * Per-vertex curvature in -1..1 (negative in creases and hollows, positive on
+ * convex edges), measured on the 1-ring Laplacian and smoothed over two rings
+ * so the surface-net staircase does not show. `cell` is the mesh resolution.
+ */
+function* bakeCurvature(positions: Float32Array, normals: Float32Array, indices: Uint32Array, cell: number): Generator<void, Float32Array, void> {
+  const count = positions.length / 3;
+  const sum = new Float32Array(count * 3);
+  const weight = new Float32Array(count);
+  const addEdge = (a: number, b: number): void => {
+    sum[a * 3] += positions[b * 3];
+    sum[a * 3 + 1] += positions[b * 3 + 1];
+    sum[a * 3 + 2] += positions[b * 3 + 2];
+    weight[a] += 1;
+  };
+  for (let t = 0; t < indices.length; t += 3) {
+    const a = indices[t];
+    const b = indices[t + 1];
+    const c = indices[t + 2];
+    addEdge(a, b);
+    addEdge(a, c);
+    addEdge(b, a);
+    addEdge(b, c);
+    addEdge(c, a);
+    addEdge(c, b);
+    if ((t & 131071) === 0) yield;
+  }
+  let curv = new Float32Array(count);
+  const gain = 1 / (0.22 * cell);
+  for (let v = 0; v < count; v += 1) {
+    const w = weight[v];
+    if (w === 0) continue;
+    const lx = sum[v * 3] / w - positions[v * 3];
+    const ly = sum[v * 3 + 1] / w - positions[v * 3 + 1];
+    const lz = sum[v * 3 + 2] / w - positions[v * 3 + 2];
+    // Neighbours below the tangent plane (Laplacian against the normal) = convex.
+    curv[v] = -(lx * normals[v * 3] + ly * normals[v * 3 + 1] + lz * normals[v * 3 + 2]) * gain;
+  }
+  yield;
+  for (let pass = 0; pass < 2; pass += 1) {
+    const acc = new Float32Array(count);
+    const accW = new Float32Array(count);
+    for (let t = 0; t < indices.length; t += 3) {
+      const a = indices[t];
+      const b = indices[t + 1];
+      const c = indices[t + 2];
+      const m = curv[a] + curv[b] + curv[c];
+      acc[a] += m;
+      acc[b] += m;
+      acc[c] += m;
+      accW[a] += 3;
+      accW[b] += 3;
+      accW[c] += 3;
+    }
+    for (let v = 0; v < count; v += 1) curv[v] = accW[v] > 0 ? acc[v] / accW[v] : 0;
+    curv = curv.slice();
+    yield;
+  }
+  for (let v = 0; v < count; v += 1) curv[v] = clamp(curv[v], -1, 1);
+  return curv;
+}
+
+/* ==========================================================================
  * Chunking (frustum / shadow culling) with globally consistent normals.
  * ========================================================================== */
 
@@ -1576,6 +1949,7 @@ function* chunkSurface(
   normals: Float32Array,
   indices: Uint32Array,
   ao: Float32Array,
+  curvature: Float32Array,
   spec: ChunkSpec,
 ): Generator<void, TerrainPiece[], void> {
   const { box } = spec;
@@ -1648,6 +2022,7 @@ function* chunkSurface(
     const pos = new Float32Array(vc * 3);
     const nor = new Float32Array(vc * 3);
     const occ = new Float32Array(vc);
+    const crv = new Float32Array(vc);
     for (let l = 0; l < vc; l += 1) {
       const g = used[l];
       pos[l * 3] = positions[g * 3];
@@ -1657,12 +2032,14 @@ function* chunkSurface(
       nor[l * 3 + 1] = normals[g * 3 + 1];
       nor[l * 3 + 2] = normals[g * 3 + 2];
       occ[l] = ao[g];
+      crv[l] = curvature[g];
       remap[g] = -1;
     }
     const geometry = new THREE.BufferGeometry();
     geometry.setAttribute('position', new THREE.BufferAttribute(pos, 3));
     geometry.setAttribute('normal', new THREE.BufferAttribute(nor, 3));
     geometry.setAttribute('aOcclusion', new THREE.BufferAttribute(occ, 1));
+    geometry.setAttribute('aCurvature', new THREE.BufferAttribute(crv, 1));
     geometry.setIndex(new THREE.BufferAttribute(local, 1));
     geometry.computeBoundingBox();
     geometry.computeBoundingSphere();
@@ -1798,6 +2175,8 @@ function* buildSkirt(cfg: DetailConfig): Generator<void, TerrainPiece, void> {
   geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
   geometry.setAttribute('normal', new THREE.BufferAttribute(normals, 3));
   geometry.setAttribute('aOcclusion', new THREE.BufferAttribute(ao, 1));
+  // The skirt is far away and smooth: no cavity detail.
+  geometry.setAttribute('aCurvature', new THREE.BufferAttribute(new Float32Array(vertexCount), 1));
   geometry.setIndex(new THREE.BufferAttribute(indices, 1));
   geometry.computeBoundingBox();
   geometry.computeBoundingSphere();
@@ -1840,7 +2219,8 @@ function* mountainBuildSteps(
 
   // ---- Fine pass over the climb.
   const innerCache = yield* buildCacheForBox(DI, cfg.cell, 2);
-  const innerField: ScalarField = (x, y, z) => composeField(groundTerm(innerCache, x, y, z), x, y, z, cfg.fineNoise);
+  const innerUncut: ScalarField = (x, y, z) => composeField(groundTerm(innerCache, x, y, z), x, y, z, cfg.fineNoise);
+  const innerField = fineChippedField(innerUncut, cfg.chipSize, cfg.cell);
   const inner = yield* polygonise(DI, cfg.cell, innerField);
   const debris = yield* removeFloatingComponents(inner, DI, cfg.cell);
   const projected = yield* projectNearRoute(inner, innerField, cfg.cell * 0.75);
@@ -1848,10 +2228,11 @@ function* mountainBuildSteps(
 
   // ---- Coarse pass over the whole massif, tucked under the fine surface inside the detail domain.
   const outerCache = yield* buildCacheForBox(DO, cfg.outerCell, 12);
+  const outerUncut: ScalarField = (x, y, z) => composeField(groundTerm(outerCache, x, y, z), x, y, z, false);
+  const outerSlabbed = coarseChippedField(outerUncut, cfg.chipSize, cfg.outerCell);
   const outerField: ScalarField = (x, y, z) => {
-    const f = composeField(groundTerm(outerCache, x, y, z), x, y, z, false);
     const inside = insideDetail(x, y, z);
-    return inside > 0 ? f + TUCK_DEPTH * smoothstep(0, TUCK_BAND, inside) : f;
+    return inside > 0 ? outerUncut(x, y, z) + TUCK_DEPTH * smoothstep(0, TUCK_BAND, inside) : outerSlabbed(x, y, z);
   };
   const outer = yield* polygonise(DO, cfg.outerCell, outerField);
   const outerDebris = yield* removeFloatingComponents(outer, DO, cfg.outerCell);
@@ -1861,8 +2242,10 @@ function* mountainBuildSteps(
   const coarse = yield* buildCoarseField(outerCache, cfg.aoSpacing);
   const innerAo = yield* bakeOcclusion(coarse, inner.positions, inner.normals);
   const outerAo = yield* bakeOcclusion(coarse, outer.positions, outer.normals);
+  const innerCurv = yield* bakeCurvature(inner.positions, inner.normals, inner.indices, cfg.cell);
+  const outerCurv = yield* bakeCurvature(outer.positions, outer.normals, outer.indices, cfg.outerCell);
 
-  const pieces = yield* chunkSurface(inner.positions, inner.normals, inner.indices, innerAo, {
+  const pieces = yield* chunkSurface(inner.positions, inner.normals, inner.indices, innerAo, innerCurv, {
     box: DI,
     sizeXZ: 16,
     sizeY: 28,
@@ -1876,7 +2259,7 @@ function* mountainBuildSteps(
   const op = outer.positions;
   const dropDepth = TUCK_BAND + 2 * cfg.outerCell;
   const deep = (v: number): boolean => insideDetail(op[v * 3], op[v * 3 + 1], op[v * 3 + 2]) > dropDepth;
-  const flankPieces = yield* chunkSurface(outer.positions, outer.normals, outer.indices, outerAo, {
+  const flankPieces = yield* chunkSurface(outer.positions, outer.normals, outer.indices, outerAo, outerCurv, {
     box: DO,
     sizeXZ: 34,
     sizeY: 62,
@@ -1966,8 +2349,9 @@ export function createMountainBuilder(detail: TerrainDetail): MountainBuilder {
 /**
  * Builds the whole mountain synchronously for a detail level: chunked fine
  * massif pieces, coarse flank pieces and the outer skirt. Deterministic;
- * world-space positions; normals and a baked `aOcclusion` attribute (0..1)
- * included. Callers own and must dispose the returned geometries.
+ * world-space positions; normals and baked `aOcclusion` (0..1) and
+ * `aCurvature` (-1..1) attributes included. Callers own and must dispose the
+ * returned geometries.
  */
 export function buildMountainGeometries(detail: TerrainDetail): TerrainPiece[] {
   const builder = createMountainBuilder(detail);

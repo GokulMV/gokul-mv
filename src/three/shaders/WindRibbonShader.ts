@@ -18,9 +18,12 @@ import * as THREE from 'three';
  * The fragment stage gives the strip feathered edges, filamentary FBM alpha
  * and forward scattering toward the low sun.
  *
- * Tone mapped and fogged like the rest of the world (so the Scene 10
- * exposure dissolve applies to it automatically). Mesh model matrix is
- * identity (world-space attributes).
+ * Blending is additive: thin ice-crystal streaks only ever scatter light
+ * into the view (they can never darken the bright sky around the low sun),
+ * with strong forward scattering toward the sun. Fog therefore attenuates
+ * the contribution instead of tinting it. Tone mapped like the rest of the
+ * world (so the Scene 10 exposure dissolve applies to it automatically).
+ * Mesh model matrix is identity (world-space attributes).
  * ========================================================================== */
 
 export const WIND_RIBBON_VERTEX_SHADER = /* glsl */ `
@@ -56,8 +59,8 @@ vec3 centreAt( float s, vec3 lateral, float len, float wave ) {
   float ph = aFlow.w * 6.2831853;
   // Travelling waves running downwind (they never reach the ends at full size).
   float env = 0.35 + 0.65 * sin( 3.14159265 * s );
-  float lat = 0.68 * sin( k * x - wave + ph ) + 0.32 * sin( k * 2.3 * x - wave * 1.9 + ph * 1.7 );
-  float ver = sin( k * 0.71 * x - wave * 0.83 + ph * 2.9 ) * 0.6 + 0.25 * sin( k * 3.1 * x - wave * 2.6 + ph * 0.3 );
+  float lat = 0.75 * sin( k * x - wave + ph ) + 0.25 * sin( k * 0.45 * x - wave * 0.6 + ph * 1.7 );
+  float ver = 0.6 * sin( k * 0.71 * x - wave * 0.83 + ph * 2.9 ) + 0.25 * sin( k * 0.33 * x - wave * 0.4 + ph * 0.3 );
   return c + ( lateral * lat + vec3( 0.0, ver, 0.0 ) ) * ( aP1.w * env );
 }
 
@@ -111,7 +114,8 @@ void main() {
   vStrip = vec2( s, side );
   vFlowUv = vec2( ( s * len - uTime * aFlow.x ) * 0.032, aFlow.w * 3.7 );
   vAlpha = alpha;
-  vFwd = pow( max( dot( -view, uSunDir ), 0.0 ), 4.0 );
+  float towardSun = max( dot( -view, uSunDir ), 0.0 );
+  vFwd = pow( towardSun, 3.0 ) * 0.45 + pow( towardSun, 12.0 ) * 2.6;
   vHead = smoothstep( head - 0.3, head - 0.02, s ) * seg;
   #include <fog_vertex>
 }
@@ -144,12 +148,20 @@ void main() {
   float streak = smoothstep( 0.32, 0.82, n1 * 0.55 + n2 * 0.3 + n3 * 0.15 );
   float core = 1.0 - smoothstep( 0.0, 0.55, abs( side ) );
   float a = vAlpha * edge * ( 0.18 + 0.82 * streak ) * ( 0.75 + 0.25 * core ) * ( 1.0 + 0.6 * vHead );
-  a *= uIntensity;
+  a *= uIntensity * ( 1.0 + 0.8 * min( vFwd, 1.5 ) );
+#ifdef USE_FOG
+  #ifdef FOG_EXP2
+  float fogFactor = 1.0 - exp( - fogDensity * fogDensity * vFogDepth * vFogDepth );
+  #else
+  float fogFactor = smoothstep( fogNear, fogFar, vFogDepth );
+  #endif
+  a *= 1.0 - fogFactor;
+#endif
   if ( a < 0.002 ) discard;
   vec3 col = mix( uShadowColor, uColor, 0.45 + 0.55 * streak );
   col += uSunColor * vFwd * ( 0.35 + 0.65 * streak );
+  // Additive: the blend adds col * alpha.
   gl_FragColor = vec4( col, min( a, 1.0 ) );
-  #include <fog_fragment>
   #include <tonemapping_fragment>
   #include <colorspace_fragment>
 }
@@ -202,6 +214,7 @@ export function createWindRibbonMaterial(
     fragmentShader: WIND_RIBBON_FRAGMENT_SHADER,
     uniforms: { ...THREE.UniformsUtils.clone(THREE.UniformsLib.fog), ...uniforms },
     transparent: true,
+    blending: THREE.AdditiveBlending,
     depthWrite: false,
     depthTest: true,
     side: THREE.DoubleSide,

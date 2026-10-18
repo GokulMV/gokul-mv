@@ -24,7 +24,10 @@ import type { GpuTier } from '../../store/scrollStore';
  * with the event without any per-frame buffer upload.
  *
  * All materials are tone mapped like the rest of the world and use the scene
- * fog. Mesh model matrices are identity (world-space attributes).
+ * fog. Particles blend premultiplied and partially additive (snow scatters
+ * light into the view and barely occludes; dust occludes more; gravel is an
+ * opaque dark chip), so nothing turns grey against the bright sky near the
+ * sun. Mesh model matrices are identity (world-space attributes).
  * ========================================================================== */
 
 export type ChasmFxQuality = 0 | 1 | 2;
@@ -260,23 +263,25 @@ void main() {
     vec2 q = vec2( vLocal.x, vLocal.y / max( taper, 0.05 ) );
     // Drift along the chasm axis; each layer its own speed (parallax between layers).
     vec2 p = vWorld.xz - vAxis * ( vShape.w * t );
-    vec2 uv = p * 0.075 + vec2( seed * 7.13, seed * 3.71 );
-    vec2 warp = texture2D( uNoise, uv * 0.43 + vec2( t * 0.012, -t * 0.009 ) ).rg - 0.5;
-    vec2 wuv = uv + warp * 0.62;
+    vec2 uv = p * 0.055 + vec2( seed * 7.13, seed * 3.71 );
+    // Two slowly counter-drifting warps make the pool churn in place.
+    vec2 warp = texture2D( uNoise, uv * 0.47 + vec2( t * 0.011, -t * 0.008 ) ).rg - 0.5;
+    warp += ( texture2D( uNoise, uv * 0.31 + vec2( -t * 0.007, t * 0.012 ) + 0.5 ).gr - 0.5 ) * 0.6;
+    vec2 wuv = uv + warp * 0.5;
     float d1 = texture2D( uNoise, wuv ).r;
 #if QUALITY > 0
-    float d2 = texture2D( uNoise, uv * 2.7 - warp * 0.4 + vec2( 0.31, t * 0.019 ) ).a;
-    float dens = d1 * 0.64 + d2 * 0.36;
+    float d2 = texture2D( uNoise, uv * 1.65 + warp * 0.35 + vec2( 0.31, t * 0.013 ) ).g;
+    float dens = d1 * 0.62 + d2 * 0.38;
 #else
     float dens = d1;
 #endif
-    // Billowy rounded footprint (the walls swallow its fringe; never a straight edge).
-    vec2 e = abs( q ) + ( vec2( d1, dens ) - 0.5 ) * 0.34;
-    float box = length( max( e - vec2( 0.4 ), 0.0 ) ) / 0.56;
+    // Billowy rounded footprint with a wide core (the walls swallow its fringe; never a straight edge).
+    vec2 e = abs( q ) + ( vec2( d1, dens ) - 0.5 ) * 0.3;
+    float box = length( max( e - vec2( 0.55 ), 0.0 ) ) / 0.4;
     float foot = ( 1.0 - smoothstep( 0.0, 1.0, box ) ) * quadSafety( vLocal );
-    // Top layers are patchy wisps, deep layers an almost solid churning floor.
-    float lo = mix( 0.44, 0.06, depth );
-    float m = smoothstep( lo, lo + mix( 0.3, 0.5, depth ), dens );
+    // Top layers are patchy wisps, deep layers a solid churning haze with no floor.
+    float lo = mix( 0.42, -0.08, depth );
+    float m = smoothstep( lo, lo + mix( 0.3, 0.55, depth ), dens );
 #if QUALITY > 1
     // Fake self-shadowing: brighter where the density falls off toward the sun.
     float ds = texture2D( uNoise, wuv + uSunXZ * 0.045 ).r;
@@ -299,7 +304,7 @@ void main() {
     vec2 wuv = uv + warp * vec2( 0.55, 0.8 );
     float d1 = texture2D( uNoise, wuv ).r;
 #if QUALITY > 0
-    float d2 = texture2D( uNoise, wuv * 2.3 + vec2( 0.53, -riseT * 0.6 ) ).a;
+    float d2 = texture2D( uNoise, wuv * 1.7 + vec2( 0.53, -riseT * 0.6 ) ).g;
     float dens = d1 * 0.6 + d2 * 0.4;
 #else
     float dens = d1;
@@ -490,6 +495,7 @@ uniform vec3 uSunColor;
 varying vec2 vQuad;
 varying vec4 vColor;
 varying float vSoft;
+varying float vOcclusion;
 varying vec2 vNoiseUv;
 
 #include <fog_pars_vertex>
@@ -540,8 +546,8 @@ void main() {
       center = bp.xyz + aStart.xyz * bd.w + bd.xyz * ( 0.35 + 1.2 * grow ) * ( 0.6 + bd.w ) + aVel.xyz * grow
         + uWind * ( tt * 0.45 ) + vec3( 0.0, -0.45 * tt, 0.0 );
       vel = uWind * 0.45;
-      size = ( 0.35 + bd.w ) * ( 0.55 + 2.1 * grow ) * aSeed.y;
-      alpha = 0.5 * smoothstep( 0.0, 0.07, tt ) * ( 1.0 - smoothstep( 0.25, 2.3, tt ) );
+      size = ( 0.22 + bd.w * 1.2 ) * ( 0.4 + 1.6 * grow ) * aSeed.y;
+      alpha = 0.32 * smoothstep( 0.0, 0.07, tt ) * ( 1.0 - smoothstep( 0.2, 2.2, tt ) );
       color = uDustColor;
       soft = 1.0;
     } else {
@@ -560,8 +566,9 @@ void main() {
 
   // Forward scattering: snow and dust light up when seen against the sun.
   vec3 viewDir = normalize( center - cameraPosition );
-  float fwd = pow( max( dot( viewDir, uSunDir ), 0.0 ), 5.0 );
-  color += uSunColor * fwd * ( kind > 2.5 && kind < 3.5 ? 0.15 : 0.7 );
+  float towardSun = max( dot( viewDir, uSunDir ), 0.0 );
+  float fwd = pow( towardSun, 4.0 ) * 0.6 + pow( towardSun, 14.0 ) * 2.4;
+  color += uSunColor * fwd * ( kind > 2.5 && kind < 3.5 ? 0.12 : 1.0 );
 
   vec4 mvPosition = modelViewMatrix * vec4( center, 1.0 );
   vec2 quad = position.xy;
@@ -569,10 +576,12 @@ void main() {
   vec3 vView = ( modelViewMatrix * vec4( vel, 0.0 ) ).xyz;
   float speed = length( vView.xy );
   vec2 along = speed > 1e-3 ? vView.xy / speed : vec2( 0.0, 1.0 );
-  vec2 perp = vec2( -along.y, along.x );
-  float stretch = soft > 0.5 ? 0.0 : speed * 0.024;
+  // (perp, along) must keep the quad's winding (front-facing): perp = along rotated by -90 degrees.
+  vec2 perp = vec2( along.y, -along.x );
+  // Hard particles: motion blur. Soft puffs: torn out along their drift into plumes.
+  float stretch = soft > 0.5 ? size * 1.4 * min( speed / 2.5, 1.0 ) : speed * 0.024;
   mvPosition.xy += along * ( quad.y * ( size + stretch ) ) + perp * ( quad.x * size );
-  alpha *= size / ( size + stretch * 0.6 );
+  alpha *= soft > 0.5 ? 1.0 : size / ( size + stretch * 0.6 );
   // Nothing smears across the lens.
   alpha *= smoothstep( 0.6, 2.4, -mvPosition.z );
 
@@ -582,7 +591,9 @@ void main() {
   vQuad = quad;
   vColor = vec4( color, alpha );
   vSoft = soft;
-  vNoiseUv = quad * 0.32 + aSeed.xy * 7.0;
+  // Snow scatters light (mostly additive); dust absorbs more; gravel is an opaque chip.
+  vOcclusion = kind > 2.5 && kind < 3.5 ? 1.0 : kind > 1.5 && kind < 2.5 ? 0.75 : 0.3;
+  vNoiseUv = quad * vec2( 0.3, 0.42 ) + aSeed.xy * 7.0 + vec2( uTime * 0.03, -uTime * 0.045 );
   #include <fog_vertex>
 }
 `;
@@ -593,6 +604,7 @@ uniform sampler2D uNoise;
 varying vec2 vQuad;
 varying vec4 vColor;
 varying float vSoft;
+varying float vOcclusion;
 varying vec2 vNoiseUv;
 
 #include <fog_pars_fragment>
@@ -601,8 +613,9 @@ void main() {
   float r = length( vQuad );
   float a;
   if ( vSoft > 0.5 ) {
-    float n = texture2D( uNoise, vNoiseUv ).a;
-    a = 1.0 - smoothstep( 0.1, 1.0, r + ( n - 0.5 ) * 0.55 );
+    // Noise-dominated, evolving breakup: torn wisps, never a round ball.
+    float n = texture2D( uNoise, vNoiseUv ).g * 0.65 + texture2D( uNoise, vNoiseUv * 1.7 + 0.37 ).r * 0.35;
+    a = clamp( ( 1.0 - r * r ) * 1.4 - ( 1.0 - n ) * 1.1, 0.0, 1.0 );
     a *= a;
   } else {
     a = 1.0 - smoothstep( 0.3, 1.0, r );
@@ -613,6 +626,8 @@ void main() {
   #include <fog_fragment>
   #include <tonemapping_fragment>
   #include <colorspace_fragment>
+  // Premultiplied, partially additive: emit colour * alpha, occlude only alpha * occlusion.
+  gl_FragColor = vec4( gl_FragColor.rgb * a, a * vOcclusion );
 }
 `;
 
@@ -674,6 +689,12 @@ export function createChasmParticleMaterial(
     fragmentShader: CHASM_PARTICLE_FRAGMENT_SHADER,
     uniforms: { ...THREE.UniformsUtils.clone(THREE.UniformsLib.fog), ...uniforms },
     transparent: true,
+    blending: THREE.CustomBlending,
+    blendEquation: THREE.AddEquation,
+    blendSrc: THREE.OneFactor,
+    blendDst: THREE.OneMinusSrcAlphaFactor,
+    blendSrcAlpha: THREE.OneFactor,
+    blendDstAlpha: THREE.OneMinusSrcAlphaFactor,
     depthWrite: false,
     depthTest: true,
     fog: true,
