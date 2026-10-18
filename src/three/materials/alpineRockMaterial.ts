@@ -133,6 +133,27 @@ float rockValue3( vec3 p ) {
 	return mix( mix( mix( a, b, u.x ), mix( c, d, u.x ), u.y ), mix( mix( e, f1, u.x ), mix( g, h, u.x ), u.y ), u.z );
 }
 
+/* 2D gradient noise with analytic derivatives: (value, d/dx, d/dy). */
+vec3 rockNoised( vec2 p ) {
+	vec2 i = floor( p );
+	vec2 f = fract( p );
+	vec2 u = f * f * f * ( f * ( f * 6.0 - 15.0 ) + 10.0 );
+	vec2 du = 30.0 * f * f * ( f * ( f - 2.0 ) + 1.0 );
+	vec2 ga = rockHash22( i ) * 2.0 - 1.0;
+	vec2 gb = rockHash22( i + vec2( 1.0, 0.0 ) ) * 2.0 - 1.0;
+	vec2 gc = rockHash22( i + vec2( 0.0, 1.0 ) ) * 2.0 - 1.0;
+	vec2 gd = rockHash22( i + vec2( 1.0, 1.0 ) ) * 2.0 - 1.0;
+	float va = dot( ga, f );
+	float vb = dot( gb, f - vec2( 1.0, 0.0 ) );
+	float vc = dot( gc, f - vec2( 0.0, 1.0 ) );
+	float vd = dot( gd, f - vec2( 1.0, 1.0 ) );
+	float k = va - vb - vc + vd;
+	return vec3(
+		va + u.x * ( vb - va ) + u.y * ( vc - va ) + u.x * u.y * k,
+		ga + u.x * ( gb - ga ) + u.y * ( gc - ga ) + u.x * u.y * ( ga - gb - gc + gd ) + du * ( u.yx * k + vec2( vb, vc ) - va )
+	);
+}
+
 /*
  * Jittered cells. Returns (F1, F2 - F1, cell random); the nearest cell's
  * facet tilt (-1..1) comes back through tilt.
@@ -182,10 +203,10 @@ float rockJoints( vec2 uv, float warp, out vec2 tilt, out float tone ) {
 	tilt = rockHash22( cell + 41.7 ) * 2.0 - 1.0;
 	tone = rockHash12( cell + 5.3 );
 	// Open joints: per joint plane, and per segment along it.
-	float a0 = step( 0.38, rockHash12( vec2( iA, 3.1 ) ) ) * step( 0.32, rockHash12( vec2( iA, floor( tB * 0.5 ) + 9.0 ) ) );
-	float a1 = step( 0.38, rockHash12( vec2( iA + 1.0, 3.1 ) ) ) * step( 0.32, rockHash12( vec2( iA + 1.0, floor( tB * 0.5 ) + 9.0 ) ) );
-	float b0 = step( 0.3, rockHash12( vec2( 7.7, iB ) ) ) * step( 0.36, rockHash12( vec2( floor( tA * 0.5 ) - 4.0, iB ) ) );
-	float b1 = step( 0.3, rockHash12( vec2( 7.7, iB + 1.0 ) ) ) * step( 0.36, rockHash12( vec2( floor( tA * 0.5 ) - 4.0, iB + 1.0 ) ) );
+	float a0 = step( 0.55, rockHash12( vec2( iA, 3.1 ) ) ) * step( 0.45, rockHash12( vec2( iA, floor( tB * 0.5 ) + 9.0 ) ) );
+	float a1 = step( 0.55, rockHash12( vec2( iA + 1.0, 3.1 ) ) ) * step( 0.45, rockHash12( vec2( iA + 1.0, floor( tB * 0.5 ) + 9.0 ) ) );
+	float b0 = step( 0.6, rockHash12( vec2( 7.7, iB ) ) ) * step( 0.5, rockHash12( vec2( floor( tA * 0.5 ) - 4.0, iB ) ) );
+	float b1 = step( 0.6, rockHash12( vec2( 7.7, iB + 1.0 ) ) ) * step( 0.5, rockHash12( vec2( floor( tA * 0.5 ) - 4.0, iB + 1.0 ) ) );
 	float d = 9.0;
 	d = mix( d, min( d, fA / SA ), a0 );
 	d = mix( d, min( d, ( 1.0 - fA ) / SA ), a1 );
@@ -205,20 +226,26 @@ void rockLayer( vec2 uv, float warp, vec3 fade, float px, float crackMask, inout
 	vec2 tilt;
 	// Slabs: big tilted facets.
 	vec3 c = rockCells( uv * 0.12, tilt );
-	grad += tilt * 0.34 * fade.x;
+	grad += tilt * 0.1 * fade.x;
 	tone += ( c.z - 0.5 ) * 0.5;
+	// Continuous weathered relief between the facets.
+	vec3 nd = rockNoised( uv * vec2( 0.8, 1.1 ) + vec2( 1.7, 9.2 ) );
+	grad += nd.yz * vec2( 0.8, 1.1 ) * 0.12 * fade.y;
+	tone += nd.x * 0.18 * fade.y;
 	// Blocks between joints.
 	float bt;
 	float jd = rockJoints( uv, warp, tilt, bt );
-	grad += tilt * 0.28 * fade.y;
-	tone += ( bt - 0.5 ) * 0.36 * fade.y;
-	float jw = 0.035 + px * 0.9;
+	grad += tilt * 0.13 * fade.y;
+	tone += ( bt - 0.5 ) * 0.34 * fade.y;
+	float jw = 0.022 + px * 0.9;
 	crack = max( crack, ( 1.0 - smoothstep( 0.0, jw, jd ) ) * ( 0.45 + 0.55 * crackMask ) * smoothstep( 0.18, 0.06, px ) * fade.y );
 	#if ROCK_QUALITY > 1
 		// Chips: small facets close up.
 		c = rockCells( uv * 1.6 + vec2( -3.1, 5.7 ), tilt );
-		grad += tilt * 0.2 * fade.z;
-		tone += ( c.z - 0.5 ) * 0.16 * fade.z;
+		grad += tilt * 0.11 * fade.z;
+		tone += ( c.z - 0.5 ) * 0.14 * fade.z;
+		nd = rockNoised( uv * vec2( 2.7, 3.6 ) + vec2( -5.3, 2.2 ) );
+		grad += nd.yz * vec2( 2.7, 3.6 ) * 0.045 * fade.z;
 	#endif
 }
 `;
@@ -305,7 +332,7 @@ const FRAGMENT_SURFACE = /* glsl */ `
 	float rockStreak = rockValue3( vec3( ( vRockPos.x + vRockPos.z ) * 0.7, vRockPos.y * 0.035, ( vRockPos.x - vRockPos.z ) * 0.7 ) );
 	rockAlbedo *= 1.0 - 0.32 * smoothstep( 0.6, 0.85, rockStreak ) * smoothstep( 0.45, 0.85, rockSteep );
 	// Fractures read as thin dark lines.
-	rockAlbedo *= 1.0 - 0.62 * rockCrack;
+	rockAlbedo *= 1.0 - 0.45 * rockCrack;
 
 	// Snow: up-facing (after the facet tilt), more with altitude, broken up by noise.
 	vec3 rockSurfGrad = rockGrad - dot( rockGrad, rockN ) * rockN;

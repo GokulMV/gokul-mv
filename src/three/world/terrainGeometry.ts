@@ -49,9 +49,9 @@ export interface TerrainPiece {
 export const STANDING_SURFACE_Y = {
   baseCamp: -0.03,
   firstLedge: 17.95,
-  chasmOneLanding: 21.94,
+  chasmOneLanding: 21.91,
   chasmOneTop: 31.95,
-  summit: 54.92,
+  summit: 54.95,
 } as const;
 
 /** Top of the one-handed catch lip on the summit pyramid (Scene 6). */
@@ -557,9 +557,10 @@ function lipFaceZ(l: LipSpec, y: number): number {
 /* Lip parameters found by a numeric search that keeps every route sample clear
  * of the rock (>= 0.04 in the last unit of the top-out, >= 0.25 below) while
  * putting rock as flat and as close as possible under the feet. */
-const LEDGE_ONE_LIP = makeLip(ROUTE_ASCENT, STANDING_SURFACE_Y.firstLedge, WAYPOINTS.firstLedge[2], 0.06, 0.35, 0.5, 0.75, -1e9);
-const PILLAR_LIP = makeLip(ROUTE_PILLAR, STANDING_SURFACE_Y.chasmOneTop, WAYPOINTS.chasmOneTop[2], 0.06, 0.5, 0.5, 0.55, ROUTE_PILLAR.y0);
-const SUMMIT_LIP = makeLip(ROUTE_SCRAMBLE, STANDING_SURFACE_Y.summit, WAYPOINTS.summit[2], 0.13, 0.35, 0.5, 0.62, CATCH_LIP_Y);
+const LEDGE_ONE_LIP = makeLip(ROUTE_ASCENT, STANDING_SURFACE_Y.firstLedge, WAYPOINTS.firstLedge[2], 0.06, 0.35, 1.2, 0.75, -1e9);
+const PILLAR_LIP = makeLip(ROUTE_PILLAR, STANDING_SURFACE_Y.chasmOneTop, WAYPOINTS.chasmOneTop[2], 0.06, 0.5, 1.2, 0.55, ROUTE_PILLAR.y0);
+// The summit block may not overhang (a sharp top, not a capstone): w is long enough for that.
+const SUMMIT_LIP = makeLip(ROUTE_SCRAMBLE, STANDING_SURFACE_Y.summit, WAYPOINTS.summit[2], 0.1, 0.35, 1.2, 0.62, CATCH_LIP_Y);
 
 /* ---- Base-camp shoulder ------------------------------------------------- */
 
@@ -677,7 +678,7 @@ function frontComplex(x: number, y: number, z: number): number {
   if (z > -8 && y < 3) d = baseCampSdf(x, y, z);
   if (y < 30) d = smin(d, cliffOneSdf(x, y, z, n1), 0.7);
   if (z < -6) d = smin(d, upperSdf(x, y, z, n1), 0.9);
-  if (z < -6 && y < 26) d = smin(d, shelfSdf(x, y, z, n1), 0.6);
+  if (z < -6 && y < 26) d = smin(d, shelfSdf(x, y, z, n1), 0.35);
   if (z < -10) d = smin(d, pillarSdf(x, y, z, n1), 0.8);
   // The summit pyramid's flank facets bound the face: its arêtes frame the climb.
   return smax(d, pyramidFlanks(x, y, z), 0.9);
@@ -741,12 +742,12 @@ interface PyramidPlane {
 /** Facets: outward horizontal direction, slope angle (deg), offset at the platform height. */
 const PYRAMID: readonly PyramidPlane[] = (
   [
-    [1.0, -0.06, 63, 0.55],
-    [0.4, -0.92, 65, 0.6],
-    [-0.4, -0.92, 65, 0.6],
-    [-1.0, -0.06, 62, 0.55],
-    [0.74, 0.67, 52, 1.15],
-    [-0.74, 0.67, 54, 1.15],
+    [1.0, -0.06, 64, 0.42],
+    [0.4, -0.92, 66, 0.45],
+    [-0.4, -0.92, 66, 0.45],
+    [-1.0, -0.06, 63, 0.42],
+    [0.74, 0.67, 53, 0.95],
+    [-0.74, 0.67, 55, 0.95],
   ] as const
 ).map(([hx, hz, deg, r0]) => {
   const l = Math.hypot(hx, hz);
@@ -769,8 +770,8 @@ function summitFaceZ(x: number, y: number): number {
     z = lipFaceZ(SUMMIT_LIP, y);
   } else {
     xr = WAYPOINTS.chasmTwoCatch[0];
-    // Small undercut below the lip, then a sheer wall that flares toward its foot.
-    z = CATCH_LIP_Z - 0.45 * smoothstep(CATCH_LIP_Y, CATCH_LIP_Y - 1.3, y) + 0.2 * clamp(24 - y, 0, 34);
+    // Small undercut below the lip, then a steep slab leaning out toward its foot (a V-shaped gorge).
+    z = CATCH_LIP_Z - 0.45 * smoothstep(CATCH_LIP_Y, CATCH_LIP_Y - 1.3, y) + 0.16 * clamp(CATCH_LIP_Y - 1.3 - y, 0, 60);
   }
   const dx = x - xr;
   if (dx > 2.4) z -= 0.08 * (dx - 2.4) * (dx - 2.4);
@@ -841,13 +842,13 @@ function detailMask(x: number, y: number, z: number): number {
       if (d < dStand) dStand = d;
     }
   }
-  const routeAmp = 0.14 + 0.86 * smoothstep(1.0, 3.8, dRoute);
-  const standAmp = smoothstep(1.2, 3.2, dStand);
+  const routeAmp = 0.14 + 0.86 * smoothstep(0.9, 3.0, dRoute);
+  const standAmp = smoothstep(0.9, 2.6, dStand);
   return Math.min(routeAmp, standAmp);
 }
 
 /** Upper bound of |displacement| (used to skip the noise far from any rock). */
-const MAX_DISPLACEMENT = 3.3;
+const MAX_DISPLACEMENT = 3.7;
 
 function displacement(x: number, y: number, z: number, fine: boolean): number {
   // Low-frequency warp shared by the joint sets so they never line up perfectly.
@@ -875,9 +876,13 @@ function displacement(x: number, y: number, z: number, fine: boolean): number {
   const g = v - Math.floor(v);
   const blocks = g < 0.14 ? g / 0.14 : (1 - g) / 0.86;
   const blockAmp = 0.34 * smoothstep(-0.1, 0.5, noise3(x * 0.05 - 7, y * 0.04, z * 0.05 + 2));
+  // Small buttresses and grooves (a few metres): sharp crests of a ridged noise.
+  const mb = noise3(x * 0.21 - 2.3, y * 0.13 + 7.1, z * 0.21 + 3.3);
+  const blocky = 1 - Math.abs(mb);
   let d =
     1.0 * n1 +
     0.9 * (crease * crease * crease - 0.42) +
+    0.6 * (blocky * blocky - 0.45) +
     0.55 * (joint * joint - 0.45) +
     strataAmp * (saw - 0.5) * 2 +
     blockAmp * (blocks - 0.5) * 2;
