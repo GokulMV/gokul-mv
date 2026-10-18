@@ -55,6 +55,7 @@ varying vec3 vViewPos;
 varying vec4 vInst;
 varying vec4 vSunLocal;
 varying vec2 vUpLocal;
+varying float vDetail;
 
 void main() {
   float side = aShape.x;
@@ -63,7 +64,7 @@ void main() {
   float size = aShape.w * uScaleMul;
 
   // Staggered parting: inner clouds lead, outer ones follow, all finish at 1.
-  float part = smoothstep(aPartTune.x, 1.0, uPart);
+  float part = clamp((uPart - aPartTune.x) / (1.0 - aPartTune.x), 0.0, 1.0);
 
   vec3 center = aCenter;
   center.y += aPartTune.z * part;
@@ -125,6 +126,8 @@ void main() {
   vUv = corner;
   vViewPos = mvPosition.xyz;
   vInst = vec4(seed, fade, part, layer);
+  // Larger puffs get proportionally more lobes so detail stays even in world space.
+  vDetail = clamp(sqrt(size / 5.0), 0.75, 1.8);
 }
 `;
 
@@ -150,10 +153,16 @@ varying vec3 vViewPos;
 varying vec4 vInst;
 varying vec4 vSunLocal;
 varying vec2 vUpLocal;
+varying float vDetail;
 
 const mat2 OCTAVE_ROT = mat2(0.80, -0.60, 0.60, 0.80);
 const vec2 OCTAVE_SHIFT = vec2(0.137, 0.291);
 const float NOISE_FREQ = 0.15;
+
+// |x| with a rounded crease, so billow valleys never read as hairline cracks.
+float softAbs(float x) {
+  return sqrt(x * x + 0.012) - 0.1;
+}
 
 // 5-octave FBM: two smooth octaves sculpt the lobes (x), three billowed
 // octaves |2n - 1| carve the cauliflower detail (y).
@@ -168,7 +177,7 @@ vec2 cloudFbm(vec2 p) {
   p = OCTAVE_ROT * p * 2.03 + OCTAVE_SHIFT;
   float n4 = texture2D(uNoise, p).r;
   float lobes = n0 * 0.6667 + n1 * 0.3333;
-  float billow = abs(n2 * 2.0 - 1.0) * 0.62 + abs(n3 * 2.0 - 1.0) * 0.26 + abs(n4 * 2.0 - 1.0) * 0.12;
+  float billow = softAbs(n2 * 2.0 - 1.0) * 0.62 + softAbs(n3 * 2.0 - 1.0) * 0.26 + softAbs(n4 * 2.0 - 1.0) * 0.12;
   return vec2(lobes, billow);
 }
 
@@ -179,7 +188,7 @@ vec2 cloudFbmLow(vec2 p) {
   float n1 = texture2D(uNoise, p).r;
 #if CLOUD_SHADOW_OCTAVES > 2
   p = OCTAVE_ROT * p * 2.03 + OCTAVE_SHIFT;
-  float billow = abs(texture2D(uNoise, p).r * 2.0 - 1.0);
+  float billow = softAbs(texture2D(uNoise, p).r * 2.0 - 1.0);
 #else
   float billow = 0.26;
 #endif
@@ -235,7 +244,8 @@ void main() {
 
   vec2 seedOffset = vec2(seed * 7.31, seed * 3.17);
   vec2 flow = vec2(uTime * 0.0042, -uTime * 0.0017) * (0.6 + seed * 0.8);
-  vec2 base = uv * NOISE_FREQ + seedOffset;
+  float freq = NOISE_FREQ * vDetail;
+  vec2 base = uv * freq + seedOffset;
   vec2 warp = warpField(base * 0.6 + flow * 1.6 + seed * 1.93);
   vec2 warpOffset = warp * 0.05 + flow;
 
@@ -248,13 +258,13 @@ void main() {
   vec2 sunDir = vSunLocal.xy;
   vec2 uvA = uv + sunDir * 0.1;
   float r2A = dot(uvA, uvA);
-  vec2 nzA = cloudFbmLow(uvA * NOISE_FREQ + seedOffset + warpOffset);
+  vec2 nzA = cloudFbmLow(uvA * freq + seedOffset + warpOffset);
   float dA = cloudDensity(cloudBody(nzA, r2A, dot(uvA, vUpLocal), bias), nzA, r2A);
   float opticalDepth = dA;
 #if CLOUD_SHADOW_TAPS > 1
   vec2 uvB = uv + sunDir * 0.28;
   float r2B = dot(uvB, uvB);
-  vec2 nzB = cloudFbmLow(uvB * NOISE_FREQ + seedOffset + warpOffset);
+  vec2 nzB = cloudFbmLow(uvB * freq + seedOffset + warpOffset);
   opticalDepth += cloudDensity(cloudBody(nzB, r2B, dot(uvB, vUpLocal), bias), nzB, r2B) * 0.8;
 #else
   opticalDepth *= 1.6;
@@ -262,13 +272,13 @@ void main() {
   // Single scattering plus a softer multiple-scattering octave so dense
   // cores stay luminous instead of turning into flat dark discs.
   float transmittance = exp(-opticalDepth * uShadowK);
-  float scattered = transmittance + exp(-opticalDepth * uShadowK * 0.25) * 0.3;
+  float scattered = transmittance + exp(-opticalDepth * uShadowK * 0.25) * 0.18;
 
   // ---- pseudo-spherical normal of the puff for broad sun shading ----
   float rr = sqrt(r2);
   vec3 puffNormal = normalize(vec3(uv * 0.9, sqrt(max(1.0 - r2, 0.0)) + 0.15));
   vec3 sunLocal3 = vec3(sunDir * vSunLocal.w, vSunLocal.z);
-  float wrapLight = mix(0.42, 1.0, clamp(dot(puffNormal, sunLocal3) * 0.5 + 0.5, 0.0, 1.0));
+  float wrapLight = mix(0.3, 1.0, clamp(dot(puffNormal, sunLocal3) * 0.5 + 0.5, 0.0, 1.0));
 
   // Forward scattering when the view ray points toward the sun.
   vec3 viewRay = normalize(vViewPos);
@@ -281,10 +291,10 @@ void main() {
 
   float sunLight = clamp(scattered * wrapLight, 0.0, 1.0);
   // Thin parts let skylight through, so they never go as dark as dense cores.
-  float shadowLevel = mix(0.4, 0.85, height) + (1.0 - powder) * 0.2;
-  vec3 shadowBody = uShadowColor * shadowLevel;
-  vec3 litBody = uLitColor * mix(vec3(1.0), uSunColor, 0.55) * 1.22;
-  vec3 color = mix(shadowBody, litBody, smoothstep(0.04, 0.8, sunLight));
+  float shadowLevel = mix(0.3, 0.68, height) + (1.0 - powder) * 0.16;
+  vec3 shadowBody = mix(uShadowColor, uHazeColor, 0.25) * shadowLevel;
+  vec3 litBody = uLitColor * mix(vec3(1.0), uSunColor, 0.6) * 0.98;
+  vec3 color = mix(shadowBody, litBody, smoothstep(0.08, 0.92, sunLight));
   color += uAmbientColor * (0.03 + 0.08 * height);
   color += uSunColor * scattered * phase * 0.4;
 
@@ -362,9 +372,9 @@ export function createCloudCurtainUniforms(noise: THREE.Texture): CloudCurtainUn
     uCount: { value: 1e4 },
     uCoverage: { value: 0.1 },
     uDensity: { value: 5.0 },
-    uShadowK: { value: 1.3 },
+    uShadowK: { value: 2.1 },
     uDissolve: { value: 0 },
-    uLiningStrength: { value: 2.0 },
+    uLiningStrength: { value: 2.6 },
     uSunView: { value: SUN_DIRECTION.clone() },
     uFade: { value: new THREE.Vector4(0.35, 1.6, 70, 120) },
     uDolly: { value: new THREE.Vector3() },

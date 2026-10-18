@@ -1,7 +1,7 @@
 import { useLayoutEffect, useMemo, useRef } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
-import { scrollStore, smootherstep, smoothstep, type GpuTier } from '../../store/scrollStore';
+import { clamp01, scrollStore, smoothstep, type GpuTier } from '../../store/scrollStore';
 import { adaptiveQuality } from '../perf/adaptiveQuality';
 import { sceneFx } from '../fx/sceneFx';
 import {
@@ -94,20 +94,35 @@ export interface CurtainTargets {
 }
 
 const T = CLOUD_CURTAIN.timeline;
+/** Progress at which the returning curtain has fully sealed the view. */
+const RETURN_SEALED = T.returnEnd - 0.012;
+
+/**
+ * Parting profile (cubic, monotonic, f(0) = 0, f(1) = 1). It eases out so the
+ * seam cracks open quickly, glides through the middle of the scene so the
+ * two halves stay framed like a theatre curtain (≈0.3 / 0.45 / 0.62 at a
+ * quarter / half / three quarters), then accelerates off-frame.
+ */
+function partingProfile(t: number): number {
+  const k = clamp01(t);
+  return k * (1.747 + k * (-2.667 + k * 1.92));
+}
 
 /** Target curtain state for a given (damped) progress. Pure; writes into `out`. */
 export function curtainTargetsAt(progress: number, out: CurtainTargets): CurtainTargets {
-  const p = progress;
+  const p = clamp01(progress);
   if (p < 0.5) {
-    out.part = smoothstep(T.openStart, T.openEnd - 0.008, p);
-    out.opacity = 1 - smoothstep(T.openStart + 0.03, T.openEnd - 0.003, p);
+    // Scene 1: part and fade while the camera dollies through the curtain.
+    out.part = partingProfile((p - T.openStart) / (T.openEnd - T.openStart));
+    out.opacity = 1 - smoothstep(T.openStart + 0.044, T.openEnd - 0.002, p);
     out.dissolve = 0;
   } else {
-    const dissolve = smoothstep(T.dissolveStart, T.dissolveEnd - 0.003, p);
-    out.part = 1 - smootherstep(T.returnStart, T.returnEnd - 0.012, p);
+    // Scene 9: the opening played in reverse — the halves glide back in from
+    // the frame edges and seal the view by RETURN_SEALED. Scene 10: erode + fade.
+    out.part = partingProfile(1 - (p - T.returnStart) / (RETURN_SEALED - T.returnStart));
     out.opacity =
-      smoothstep(T.returnStart, T.returnStart + 0.03, p) * (1 - smoothstep(T.dissolveStart + 0.003, T.dissolveEnd - 0.002, p));
-    out.dissolve = dissolve;
+      smoothstep(T.returnStart, T.returnStart + 0.02, p) * (1 - smoothstep(T.dissolveStart + 0.003, T.dissolveEnd - 0.002, p));
+    out.dissolve = smoothstep(T.dissolveStart, T.dissolveEnd - 0.003, p);
   }
   out.anchor = smoothstep(0.3, 0.7, p);
   out.exposure = 1 - smoothstep(T.dissolveStart + 0.001, T.dissolveEnd - 0.002, p);
@@ -137,13 +152,13 @@ interface Band {
 
 const BANDS: readonly Band[] = [
   // Backstop: broad stratiform masses that guarantee full coverage at p = 0.
-  { share: 0.24, dMin: 12.5, dMax: 18, sizeMin: 11, sizeMax: 16, spreadX: 1.1, spreadY: 1.2, aspectMin: 1.3, aspectMax: 1.8, peripheral: false },
+  { share: 0.26, dMin: 12.5, dMax: 18, sizeMin: 8.5, sizeMax: 12, spreadX: 1.1, spreadY: 1.2, aspectMin: 1.3, aspectMax: 1.8, peripheral: false },
   // Body of the curtain: mid-sized cumulus puffs.
-  { share: 0.34, dMin: 7, dMax: 12.5, sizeMin: 5.5, sizeMax: 9, spreadX: 1.15, spreadY: 1.25, aspectMin: 1.1, aspectMax: 1.5, peripheral: false },
+  { share: 0.34, dMin: 7, dMax: 12.5, sizeMin: 4.2, sizeMax: 6.6, spreadX: 1.15, spreadY: 1.25, aspectMin: 1.1, aspectMax: 1.5, peripheral: false },
   // Foreground puffs the camera flies through.
-  { share: 0.26, dMin: 3, dMax: 7, sizeMin: 2.6, sizeMax: 4.4, spreadX: 1.2, spreadY: 1.3, aspectMin: 1.0, aspectMax: 1.4, peripheral: false },
+  { share: 0.26, dMin: 3, dMax: 7, sizeMin: 1.8, sizeMax: 2.9, spreadX: 1.2, spreadY: 1.3, aspectMin: 1.0, aspectMax: 1.4, peripheral: false },
   // Wisps around (and just behind) the camera, streaming past the frame edges.
-  { share: 0.16, dMin: -2, dMax: 3, sizeMin: 1.4, sizeMax: 2.6, spreadX: 1.0, spreadY: 1.2, aspectMin: 1.0, aspectMax: 1.3, peripheral: true },
+  { share: 0.14, dMin: -2, dMax: 3, sizeMin: 1.0, sizeMax: 1.8, spreadX: 1.0, spreadY: 1.2, aspectMin: 1.0, aspectMax: 1.3, peripheral: true },
 ];
 
 interface CloudLayout {
