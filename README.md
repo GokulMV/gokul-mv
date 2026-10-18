@@ -22,18 +22,31 @@ draws the protagonist's path and waypoints.
 
 ## Deploy on Railway
 
-1. Create a service from this repository. Railway picks up `railway.json` and builds the `Dockerfile`.
+1. Create a service from this repository and set its source branch to **`main`** (Service → Settings → Source).
+   Railway picks up `railway.json` and builds the `Dockerfile`.
 2. You don't need any variables. Railway injects `PORT`, and the image defaults to `8080`.
    `RAILWAY_GIT_COMMIT_SHA` / `RAILWAY_ENVIRONMENT_NAME` are baked into the build and shown in the telemetry panel.
 3. Railway gates each deploy on the `/healthz` healthcheck, which returns
    `{"status":"ok","service":"portfolio","port":"…","time":"…"}`.
+4. When adding a domain, enter target port **8080**. The deploy logs confirm the bound port with a line like
+   `40-ipv6-listen.sh: … listener(s) on port 8080`.
+
+### CI
+
+`.github/workflows/ci.yml` runs on every push and PR to `main`:
+- **Typecheck & build:** the same `npm ci` → `tsc` → `vite build` as the container.
+- **Docker image & /healthz smoke test:** builds the exact Railway image, boots it on `PORT=8080` and checks
+  `/healthz`, the SPA fallback, 404s, gzip, immutable asset caching, the startup port line and the nginx worker count.
+
+Railway deploys through its own GitHub integration, not GitHub Actions. To deploy only commits that pass CI, enable
+**Wait for CI** in the Railway service settings.
 
 ### Container
 
 | Stage   | Image              | Notes                                                                                   |
 | ------- | ------------------ | --------------------------------------------------------------------------------------- |
 | builder | `node:20-alpine`   | `npm ci` then `npm run build`, with a 2 GB heap cap and vendor chunks split for low peak memory |
-| runtime | `nginx:1.27-alpine`| `nginx.conf.template` rendered by envsubst on `$PORT`: gzip, SPA fallback, immutable `/assets` |
+| runtime | `nginx:1.27-alpine`| `nginx.conf.template` rendered by envsubst on `$PORT`: gzip, SPA fallback, immutable `/assets`, 2 workers, `warn`-level logs |
 
 The IPv6 listener (Railway private networking) is added at boot by `docker/40-ipv6-listen.sh`, and only when
 the kernel supports IPv6.

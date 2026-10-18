@@ -35,7 +35,16 @@ FROM nginx:1.27-alpine AS runtime
 
 ENV PORT=8080
 
-RUN rm -f /etc/nginx/conf.d/default.conf
+# A static site needs few workers. `auto` would spawn one per *host* CPU
+# (~80 on Railway), and `notice`-level logs flood Railway's log view in red
+# (NGINX logs to stderr). Startup notes from the entrypoint scripts — including
+# the bound port — still print on stdout.
+ARG NGINX_WORKER_PROCESSES=2
+RUN rm -f /etc/nginx/conf.d/default.conf \
+ && sed -i \
+      -e "s/^worker_processes.*/worker_processes ${NGINX_WORKER_PROCESSES};/" \
+      -e 's#^error_log .*#error_log /var/log/nginx/error.log warn;#' \
+      /etc/nginx/nginx.conf
 COPY nginx.conf.template /etc/nginx/templates/default.conf.template
 COPY --chmod=755 docker/40-ipv6-listen.sh /docker-entrypoint.d/40-ipv6-listen.sh
 COPY --from=builder /app/dist /usr/share/nginx/html
