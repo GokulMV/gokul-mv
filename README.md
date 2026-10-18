@@ -23,7 +23,8 @@ draws the protagonist's path and waypoints.
 ## Deploy on Railway
 
 1. Create a service from this repository and set its source branch to **`main`** (Service → Settings → Source).
-   Railway picks up `railway.json` and builds the `Dockerfile`.
+   Leave **Root Directory** empty. Railway auto-detects the root `Dockerfile`, and the build log shows
+   "Using detected Dockerfile!". `railway.json` holds only deploy settings: the `/healthz` healthcheck and the restart policy.
 2. You don't need any variables. Railway injects `PORT`, and the image defaults to `8080`.
    `RAILWAY_GIT_COMMIT_SHA` / `RAILWAY_ENVIRONMENT_NAME` are baked into the build and shown in the telemetry panel.
 3. Railway gates each deploy on the `/healthz` healthcheck, which returns
