@@ -99,7 +99,7 @@ const T = CLOUD_CURTAIN.timeline;
 export function curtainTargetsAt(progress: number, out: CurtainTargets): CurtainTargets {
   const p = progress;
   if (p < 0.5) {
-    out.part = smootherstep(T.openStart + 0.004, T.openEnd - 0.006, p);
+    out.part = smoothstep(T.openStart, T.openEnd - 0.008, p);
     out.opacity = 1 - smoothstep(T.openStart + 0.03, T.openEnd - 0.003, p);
     out.dissolve = 0;
   } else {
@@ -136,14 +136,14 @@ interface Band {
 }
 
 const BANDS: readonly Band[] = [
-  // Backstop: big stratiform masses that guarantee full coverage at p = 0.
-  { share: 0.28, dMin: 12.5, dMax: 18, sizeMin: 15, sizeMax: 21, spreadX: 1.1, spreadY: 1.25, aspectMin: 1.3, aspectMax: 1.75, peripheral: false },
-  // Body of the curtain.
-  { share: 0.3, dMin: 7, dMax: 12.5, sizeMin: 10, sizeMax: 15, spreadX: 1.15, spreadY: 1.3, aspectMin: 1.15, aspectMax: 1.55, peripheral: false },
+  // Backstop: broad stratiform masses that guarantee full coverage at p = 0.
+  { share: 0.24, dMin: 12.5, dMax: 18, sizeMin: 11, sizeMax: 16, spreadX: 1.1, spreadY: 1.2, aspectMin: 1.3, aspectMax: 1.8, peripheral: false },
+  // Body of the curtain: mid-sized cumulus puffs.
+  { share: 0.34, dMin: 7, dMax: 12.5, sizeMin: 5.5, sizeMax: 9, spreadX: 1.15, spreadY: 1.25, aspectMin: 1.1, aspectMax: 1.5, peripheral: false },
   // Foreground puffs the camera flies through.
-  { share: 0.28, dMin: 3, dMax: 7, sizeMin: 6, sizeMax: 10, spreadX: 1.2, spreadY: 1.35, aspectMin: 1.05, aspectMax: 1.4, peripheral: false },
+  { share: 0.26, dMin: 3, dMax: 7, sizeMin: 2.6, sizeMax: 4.4, spreadX: 1.2, spreadY: 1.3, aspectMin: 1.0, aspectMax: 1.4, peripheral: false },
   // Wisps around (and just behind) the camera, streaming past the frame edges.
-  { share: 0.14, dMin: -2, dMax: 3, sizeMin: 3.5, sizeMax: 6, spreadX: 1.0, spreadY: 1.2, aspectMin: 1.0, aspectMax: 1.3, peripheral: true },
+  { share: 0.16, dMin: -2, dMax: 3, sizeMin: 1.4, sizeMax: 2.6, spreadX: 1.0, spreadY: 1.2, aspectMin: 1.0, aspectMax: 1.3, peripheral: true },
 ];
 
 interface CloudLayout {
@@ -282,9 +282,9 @@ export function buildCloudLayout(count: number, seed = 20241018): CloudLayout {
     layout.motion[rank * 4 + 2] = (rand() - 0.5) * 0.5;
     layout.motion[rank * 4 + 3] = aspect;
 
-    // Inner edges lead the parting; deeper layers travel the full partX.
+    // Inner edges lead the parting; the shader scales travel by view depth.
     layout.partTune[rank * 4] = inner * 0.2 + rand() * 0.06;
-    layout.partTune[rank * 4 + 1] = 0.55 + 0.45 * layer + rand() * 0.1;
+    layout.partTune[rank * 4 + 1] = 0.95 + rand() * 0.15;
     layout.partTune[rank * 4 + 2] = (-1.2 + rand() * 3.6) * (0.5 + layer);
     layout.partTune[rank * 4 + 3] = rank;
 

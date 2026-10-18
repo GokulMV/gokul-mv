@@ -41,6 +41,7 @@ attribute vec4 aPartTune;
 uniform float uTime;
 uniform float uPart;
 uniform float uPartX;
+uniform float uPartDepth;
 uniform float uScaleMul;
 uniform float uCount;
 uniform float uDissolve;
@@ -61,10 +62,8 @@ void main() {
 
   // Staggered parting: inner clouds lead, outer ones follow, all finish at 1.
   float part = smoothstep(aPartTune.x, 1.0, uPart);
-  float lateral = part * uPartX * aPartTune.y;
 
   vec3 center = aCenter;
-  center.x += side * lateral;
   center.y += aPartTune.z * part;
 
   // Slow convective drift; deeper layers swing wider.
@@ -73,8 +72,15 @@ void main() {
   center.x += sin(t) * 0.55 * swing + side * uDissolve * (1.5 + 2.5 * layer);
   center.y += cos(t * 0.71 + seed * 6.2831) * 0.28 * swing + uDissolve * 1.2;
 
-  vec4 mvCenter = modelViewMatrix * vec4(center, 1.0);
-  float dist = -mvCenter.z;
+  vec4 mvBase = modelViewMatrix * vec4(center, 1.0);
+  float dist = -mvBase.z;
+
+  // Theatre parting along curtain-space X. The travel scales with the current
+  // view depth so every layer slides the same fraction of the frame, even
+  // while the camera dollies through the curtain; a cloud at uPartDepth
+  // travels exactly uPartX world units.
+  float lateral = side * part * uPartX * aPartTune.y * clamp(dist / uPartDepth, 0.15, 1.6);
+  vec4 mvCenter = mvBase + modelViewMatrix * vec4(lateral, 0.0, 0.0, 0.0);
 
   // Depth fade: near-plane fade scales with the puff size so a cloud never
   // fills the screen as a flat sheet; far fade keeps distant puffs cheap.
@@ -137,32 +143,38 @@ varying vec4 vSunLocal;
 varying vec2 vUpLocal;
 
 const mat2 OCTAVE_ROT = mat2(0.80, -0.60, 0.60, 0.80);
-const float NOISE_FREQ = 0.17;
+const vec2 OCTAVE_SHIFT = vec2(0.137, 0.291);
+const float NOISE_FREQ = 0.15;
 
-// 5-octave FBM over the baked gradient noise (red channel).
-float fbm5(vec2 p) {
-  float sum = 0.0;
-  float amp = 0.5;
-  for (int i = 0; i < 5; i++) {
-    sum += amp * texture2D(uNoise, p).r;
-    p = OCTAVE_ROT * p * 2.03 + vec2(0.137, 0.291);
-    amp *= 0.5;
-  }
-  return sum * (1.0 / 0.96875);
+// 5-octave FBM: two smooth octaves sculpt the lobes (x), three billowed
+// octaves |2n - 1| carve the cauliflower detail (y).
+vec2 cloudFbm(vec2 p) {
+  float n0 = texture2D(uNoise, p).r;
+  p = OCTAVE_ROT * p * 2.03 + OCTAVE_SHIFT;
+  float n1 = texture2D(uNoise, p).r;
+  p = OCTAVE_ROT * p * 2.03 + OCTAVE_SHIFT;
+  float n2 = texture2D(uNoise, p).r;
+  p = OCTAVE_ROT * p * 2.03 + OCTAVE_SHIFT;
+  float n3 = texture2D(uNoise, p).r;
+  p = OCTAVE_ROT * p * 2.03 + OCTAVE_SHIFT;
+  float n4 = texture2D(uNoise, p).r;
+  float lobes = n0 * 0.6667 + n1 * 0.3333;
+  float billow = abs(n2 * 2.0 - 1.0) * 0.62 + abs(n3 * 2.0 - 1.0) * 0.26 + abs(n4 * 2.0 - 1.0) * 0.12;
+  return vec2(lobes, billow);
 }
 
-// Low-octave FBM used by the self-shadow taps (same octave basis as fbm5).
-float fbmLow(vec2 p) {
-  float sum = 0.5 * texture2D(uNoise, p).r;
-  p = OCTAVE_ROT * p * 2.03 + vec2(0.137, 0.291);
-  sum += 0.25 * texture2D(uNoise, p).r;
+// Cheaper FBM for the self-shadow taps (same octave basis, fewer octaves).
+vec2 cloudFbmLow(vec2 p) {
+  float n0 = texture2D(uNoise, p).r;
+  p = OCTAVE_ROT * p * 2.03 + OCTAVE_SHIFT;
+  float n1 = texture2D(uNoise, p).r;
 #if CLOUD_SHADOW_OCTAVES > 2
-  p = OCTAVE_ROT * p * 2.03 + vec2(0.137, 0.291);
-  sum += 0.125 * texture2D(uNoise, p).r;
-  return sum * (1.0 / 0.875);
+  p = OCTAVE_ROT * p * 2.03 + OCTAVE_SHIFT;
+  float billow = abs(texture2D(uNoise, p).r * 2.0 - 1.0);
 #else
-  return sum * (1.0 / 0.75);
+  float billow = 0.26;
 #endif
+  return vec2(n0 * 0.6667 + n1 * 0.3333, billow);
 }
 
 // Vector field for domain warping (green / blue channels).
@@ -174,10 +186,14 @@ vec2 warpField(vec2 p) {
   return w;
 }
 
-float shapeDensity(float n, float r2, float bias) {
+// Density of one puff: a dome sculpted into lobes, eroded by billows, with a
+// radial mask that reaches exactly zero before the quad's edge.
+float cloudDensity(vec2 nz, float r2, float bias) {
   float dome = 1.0 - r2;
-  float edge = 1.0 - smoothstep(0.55, 1.0, r2);
-  float d = dome * 1.05 + (n - 0.5) * 2.6 - 0.46 + bias;
+  float body = dome * 1.3 + (nz.x - 0.5) * 2.3 - 0.36 + bias;
+  float erosion = (1.0 - clamp(nz.y * 1.9, 0.0, 1.0)) * 0.34;
+  float d = (body - erosion) / (1.0 - erosion * 0.5);
+  float edge = 1.0 - smoothstep(0.62, 1.0, r2);
   return clamp(d, 0.0, 1.0) * edge;
 }
 
@@ -196,64 +212,66 @@ void main() {
   float layer = vInst.w;
 
   // Coverage thins as the curtain parts and erodes away during the dissolve.
-  float bias = uCoverage - part * 0.16 - uDissolve * 0.85;
+  float bias = uCoverage - part * 0.14 - uDissolve * 0.9;
 
   vec2 seedOffset = vec2(seed * 7.31, seed * 3.17);
   vec2 flow = vec2(uTime * 0.0042, -uTime * 0.0017) * (0.6 + seed * 0.8);
   vec2 base = uv * NOISE_FREQ + seedOffset;
-  vec2 warp = warpField(base * 0.55 + flow * 1.6 + seed * 1.93);
-  vec2 warpOffset = warp * 0.12 + flow;
+  vec2 warp = warpField(base * 0.6 + flow * 1.6 + seed * 1.93);
+  vec2 warpOffset = warp * 0.05 + flow;
 
-  float n = fbm5(base + warpOffset);
-  float density = shapeDensity(n, r2, bias);
+  vec2 nz = cloudFbm(base + warpOffset);
+  float density = cloudDensity(nz, r2, bias);
   if (density < 0.002) discard;
 
   // ---- self-shadowing: march toward the sun in the quad's local frame ----
   vec2 sunDir = vSunLocal.xy;
-  vec2 uvA = uv + sunDir * 0.14;
-  float dA = shapeDensity(fbmLow(uvA * NOISE_FREQ + seedOffset + warpOffset), dot(uvA, uvA), bias);
-  float shadowDepth = dA;
+  vec2 uvA = uv + sunDir * 0.1;
+  float dA = cloudDensity(cloudFbmLow(uvA * NOISE_FREQ + seedOffset + warpOffset), dot(uvA, uvA), bias);
+  float opticalDepth = dA;
 #if CLOUD_SHADOW_TAPS > 1
-  vec2 uvB = uv + sunDir * 0.34;
-  float dB = shapeDensity(fbmLow(uvB * NOISE_FREQ + seedOffset + warpOffset), dot(uvB, uvB), bias);
-  shadowDepth += dB * 0.75;
+  vec2 uvB = uv + sunDir * 0.28;
+  float dB = cloudDensity(cloudFbmLow(uvB * NOISE_FREQ + seedOffset + warpOffset), dot(uvB, uvB), bias);
+  opticalDepth += dB * 0.8;
+#else
+  opticalDepth *= 1.6;
 #endif
-  float transmittance = exp(-shadowDepth * uShadowK);
+  float transmittance = exp(-opticalDepth * uShadowK);
 
   // ---- pseudo-spherical normal of the puff for broad sun shading ----
   float rr = sqrt(r2);
-  vec3 puffNormal = normalize(vec3(uv * 0.85, sqrt(max(1.0 - r2, 0.0)) + 0.2));
+  vec3 puffNormal = normalize(vec3(uv * 0.9, sqrt(max(1.0 - r2, 0.0)) + 0.15));
   vec3 sunLocal3 = vec3(sunDir * vSunLocal.w, vSunLocal.z);
-  float ndl = dot(puffNormal, sunLocal3);
-  float wrapLight = clamp(ndl * 0.5 + 0.5, 0.0, 1.0);
+  float wrapLight = clamp(dot(puffNormal, sunLocal3) * 0.6 + 0.4, 0.0, 1.0);
 
   // Forward scattering when the view ray points toward the sun.
   vec3 viewRay = normalize(vViewPos);
   float cosTheta = dot(viewRay, uSunView);
-  float phase = clamp(henyeyGreenstein(cosTheta, 0.62) * 0.22 + henyeyGreenstein(cosTheta, -0.18) * 0.12, 0.0, 3.0);
+  float phase = clamp(henyeyGreenstein(cosTheta, 0.6) * 0.2 + henyeyGreenstein(cosTheta, -0.2) * 0.1, 0.0, 3.0);
 
-  // Ambient: skylight from above, darker undersides.
-  float height = dot(uv, vUpLocal) * 0.5 + 0.5;
-  float ambientTerm = mix(0.55, 1.05, height);
-  float powder = 1.0 - exp(-density * 2.4);
+  // Skylight from above, darker undersides, darker dense cores (powder).
+  float height = clamp(dot(uv, vUpLocal) * 0.5 + 0.5, 0.0, 1.0);
+  float powder = 1.0 - exp(-density * 3.0);
 
-  float sunLight = transmittance * mix(0.28, 1.0, wrapLight);
-  vec3 shadowBody = mix(uShadowColor * 0.62, uShadowColor, height) * mix(1.0, 0.82, powder);
-  vec3 litBody = mix(uLitColor, uSunColor, 0.22);
-  vec3 color = mix(shadowBody, litBody, sunLight);
-  color += uAmbientColor * ambientTerm * 0.14;
-  color += uSunColor * transmittance * phase * 0.22;
+  float sunLight = transmittance * wrapLight;
+  // Thin parts let skylight through, so they never go as dark as dense cores.
+  float shadowLevel = mix(0.3, 0.78, height) + (1.0 - powder) * 0.25;
+  vec3 shadowBody = uShadowColor * shadowLevel;
+  vec3 litBody = uLitColor * mix(vec3(1.0), uSunColor, 0.45) * 1.25;
+  vec3 color = mix(shadowBody, litBody, smoothstep(0.02, 0.7, sunLight));
+  color += uAmbientColor * (0.03 + 0.08 * height);
+  color += uSunColor * transmittance * phase * 0.25;
 
   // ---- silver lining: thin, sun-facing edges glow warm ----
-  float thin = exp(-density * 4.2);
-  float gradFacing = clamp((density - dA) * 4.5, 0.0, 1.0);
-  float rimFacing = smoothstep(0.35, 0.95, rr) * clamp(dot(uv / max(rr, 1e-3), sunDir), 0.0, 1.0);
-  float facing = max(gradFacing, rimFacing * 0.85);
-  float silver = thin * facing * (0.55 + phase * 1.6) * mix(0.6, 1.0, transmittance);
+  float thin = 1.0 - smoothstep(0.0, 0.42, density);
+  float gradFacing = clamp((density - dA) * 5.0, 0.0, 1.0);
+  float rimFacing = smoothstep(0.3, 0.92, rr) * clamp(dot(uv / max(rr, 1e-3), sunDir), 0.0, 1.0);
+  float facing = max(gradFacing, rimFacing * 0.8);
+  float silver = thin * facing * (0.6 + phase * 1.5);
   color += uLiningColor * silver * uLiningStrength;
 
   // Aerial perspective: deeper layers sink into the twilight haze.
-  color = mix(color, uHazeColor, layer * 0.22);
+  color = mix(color, uHazeColor, layer * 0.2);
 
   float alpha = (1.0 - exp(-density * uDensity)) * vInst.y * uCurtainOpacity;
   if (alpha < 0.002) discard;
@@ -270,8 +288,10 @@ export type CloudCurtainUniforms = {
   uTime: THREE.IUniform<number>;
   /** 0 = closed across the viewport, 1 = fully parted. */
   uPart: THREE.IUniform<number>;
-  /** Lateral travel of a fully parted cloud (world units). */
+  /** Lateral travel of a fully parted cloud at uPartDepth (world units). */
   uPartX: THREE.IUniform<number>;
+  /** View depth at which a fully parted cloud travels exactly uPartX. */
+  uPartDepth: THREE.IUniform<number>;
   /** Curtain opacity (0 → 1). */
   uCurtainOpacity: THREE.IUniform<number>;
   /** Global puff size multiplier (adaptive-quality coverage compensation). */
@@ -306,14 +326,15 @@ export function createCloudCurtainUniforms(noise: THREE.Texture): CloudCurtainUn
     uTime: { value: 0 },
     uPart: { value: 0 },
     uPartX: { value: CLOUD_CURTAIN.partX },
+    uPartDepth: { value: CLOUD_CURTAIN.zFar - CLOUD_CURTAIN.zNear - 2 },
     uCurtainOpacity: { value: 1 },
     uScaleMul: { value: 1 },
     uCount: { value: 1e4 },
-    uCoverage: { value: 0.12 },
-    uDensity: { value: 3.4 },
-    uShadowK: { value: 1.9 },
+    uCoverage: { value: 0.1 },
+    uDensity: { value: 5.0 },
+    uShadowK: { value: 1.3 },
     uDissolve: { value: 0 },
-    uLiningStrength: { value: 2.4 },
+    uLiningStrength: { value: 2.2 },
     uSunView: { value: SUN_DIRECTION.clone() },
     uFade: { value: new THREE.Vector4(0.35, 1.6, 70, 120) },
     uLitColor: { value: new THREE.Color(PALETTE.cloudLit) },
