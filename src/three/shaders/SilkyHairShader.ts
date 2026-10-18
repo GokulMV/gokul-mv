@@ -140,6 +140,15 @@ void main() {
   vStrand = aStrand;
   #include <logdepthbuf_vertex>
   #include <shadowmap_vertex>
+  // The sun's shadow texels are coarser than the hair volume: look shadows up a little off the scalp so the
+  // head never self-shadows the hair into blotches (terrain shadows still land).
+  #if defined( USE_SHADOWMAP ) && NUM_DIR_LIGHT_SHADOWS > 0
+    #pragma unroll_loop_start
+    for ( int i = 0; i < NUM_DIR_LIGHT_SHADOWS; i ++ ) {
+      vDirectionalShadowCoord[ i ] = directionalShadowMatrix[ i ] * ( worldPosition + vec4( shadowWorldNormal * ( directionalLightShadows[ i ].shadowNormalBias + 0.03 ), 0.0 ) );
+    }
+    #pragma unroll_loop_end
+  #endif
   #include <fog_vertex>
 }
 `;
@@ -210,11 +219,13 @@ void main() {
   float core = 1.0 - smoothstep( 0.22 - fw * 0.5, 0.5 + fw * 0.5, abs( fx - 0.5 ) );
   core = mix( core, 0.68, smoothstep( 0.3, 1.1, fw ) );
   // Strands end at different lengths: tapered, uneven tips.
-  float strandLen = mix( 0.6, 1.0, strandRand );
+  float strandLen = mix( 0.74, 1.0, strandRand );
   float fv = fwidth( v );
-  float tips = 1.0 - smoothstep( strandLen - 0.24 - fv, strandLen + fv, v );
+  float tips = 1.0 - smoothstep( strandLen - 0.32 - fv, strandLen + fv, v );
   float edges = smoothstep( 0.0, 0.2 + fw * 0.15, u ) * smoothstep( 0.0, 0.2 + fw * 0.15, 1.0 - u );
-  float alpha = core * tips * edges;
+  // Roots thin out so the hairline and partings read soft against the (hair-coloured) scalp.
+  float roots = mix( 0.5, 1.0, smoothstep( 0.0, 0.16, v ) );
+  float alpha = core * tips * edges * roots;
 
   #if defined( HAIR_PASS_OPAQUE )
     #ifdef ALPHA_TO_COVERAGE
@@ -259,6 +270,7 @@ void main() {
     #endif
     #pragma unroll_loop_start
     for ( int i = 0; i < NUM_DIR_LIGHTS; i ++ ) {
+      {
       directionalLight = directionalLights[ i ];
       vec3 L = directionalLight.direction;
       vec3 lightColor = directionalLight.color;
@@ -277,8 +289,9 @@ void main() {
         uPrimaryColor * ( uPrimaryStrength * kkSpecular( T1, H, uPrimaryExponent ) ) +
         uSecondaryColor * ( uSecondaryStrength * sparkle * kkSpecular( T2, H, uSecondaryExponent ) ) );
       float sunness = smoothstep( 0.9, 0.99, dot( L, sunDirV ) );
-      float transmit = pow( max( dot( -V, L ), 0.0 ), 3.0 ) * ( 0.35 + 0.65 * v );
+      float transmit = pow( max( dot( -V, L ), 0.0 ), 4.0 ) * v * pow( 1.0 - abs( dot( N, V ) ), 2.0 );
       rim += lightColor * sunness * transmit;
+      }
     }
     #pragma unroll_loop_end
   #else
@@ -293,7 +306,7 @@ void main() {
       specular += uSunColor * facing * (
         uPrimaryColor * ( uPrimaryStrength * kkSpecular( T1, H, uPrimaryExponent ) ) +
         uSecondaryColor * ( uSecondaryStrength * sparkle * kkSpecular( T2, H, uSecondaryExponent ) ) );
-      rim += uSunColor * pow( max( dot( -V, L ), 0.0 ), 3.0 ) * ( 0.35 + 0.65 * v );
+      rim += uSunColor * pow( max( dot( -V, L ), 0.0 ), 4.0 ) * v * pow( 1.0 - abs( dot( N, V ) ), 2.0 );
     }
   #endif
 
@@ -314,7 +327,7 @@ void main() {
   vec3 color = albedo * RECIPROCAL_PI * ( diffuse + irradiance ) * selfShadow;
   color += specular * mix( 0.55, 1.0, selfShadow );
   color += skyColor * ( uSkySheen * skySheen * selfShadow );
-  color += rim * uRimStrength * vec3( 0.71, 0.62, 0.56 ) * smoothstep( 0.2, 0.8, v + 0.3 );
+  color += rim * uRimStrength * vec3( 0.42, 0.3, 0.24 );
 
   gl_FragColor = vec4( color, alpha );
 
@@ -329,17 +342,17 @@ function createUniforms(): SilkyHairUniforms {
     uBaseColor: { value: new THREE.Color(HAIR_BASE_COLOR) },
     uRootColor: { value: new THREE.Color('#040407') },
     uTipColor: { value: new THREE.Color('#10131b') },
-    uPrimaryColor: { value: new THREE.Color('#e9eef7') },
-    uSecondaryColor: { value: new THREE.Color('#6d5d52') },
+    uPrimaryColor: { value: new THREE.Color('#eef2fa') },
+    uSecondaryColor: { value: new THREE.Color('#4b505d') },
     uPrimaryShift: { value: 0.07 },
     uSecondaryShift: { value: -0.09 },
-    uPrimaryExponent: { value: 260 },
-    uSecondaryExponent: { value: 42 },
-    uPrimaryStrength: { value: 0.16 },
-    uSecondaryStrength: { value: 0.07 },
-    uShiftJitter: { value: 0.16 },
+    uPrimaryExponent: { value: 180 },
+    uSecondaryExponent: { value: 40 },
+    uPrimaryStrength: { value: 0.15 },
+    uSecondaryStrength: { value: 0.075 },
+    uShiftJitter: { value: 0.13 },
     uSparkle: { value: 0.65 },
-    uRimStrength: { value: 0.35 },
+    uRimStrength: { value: 0.2 },
     uSkySheen: { value: 0.05 },
     uSunDir: { value: SUN_DIRECTION.clone() },
     uSunColor: { value: new THREE.Color(PALETTE.sun).multiplyScalar(3) },
@@ -347,7 +360,7 @@ function createUniforms(): SilkyHairUniforms {
     uWindDir: { value: new THREE.Vector3(0.3, 0.05, 1).normalize() },
     uTime: { value: 0 },
     uAlphaCut: { value: 0.5 },
-    uStrandsPerCard: { value: 9 },
+    uStrandsPerCard: { value: 13 },
   };
 }
 

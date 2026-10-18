@@ -23,6 +23,8 @@ export interface TwoBoneRest {
   readonly lowerAxis: THREE.Vector3;
   /** Rest direction (unit, Root space) toward which the middle joint bends. */
   readonly poleAxis: THREE.Vector3;
+  /** Rest hinge axis of the middle joint: poleAxis × upperAxis (unit). */
+  readonly hingeAxis: THREE.Vector3;
   readonly upperLength: number;
   readonly lowerLength: number;
 }
@@ -58,6 +60,7 @@ const _v = new THREE.Vector3();
 const _restB = new THREE.Vector3();
 const _restC = new THREE.Vector3();
 const _worldC = new THREE.Vector3();
+const _hinge = new THREE.Vector3();
 const _mRest = new THREE.Matrix4();
 const _mWorld = new THREE.Matrix4();
 const _fallback = new THREE.Vector3();
@@ -104,6 +107,8 @@ export function solveTwoBone(
   target: THREE.Vector3,
   poleHint: THREE.Vector3,
   out: TwoBoneResult,
+  poleFallback: THREE.Vector3 | null = null,
+  softness = SOFT_IK,
 ): TwoBoneResult {
   const l1 = rest.upperLength;
   const l2 = rest.lowerLength;
@@ -118,11 +123,27 @@ export function solveTwoBone(
     _d.multiplyScalar(1 / dist);
   }
   const minDist = Math.abs(l1 - l2) + 1e-4;
+  // Soft IK: over the last `softness` of the reach the distance is compressed exponentially, so the limb
+  // approaches full extension smoothly instead of snapping straight (the middle joint would otherwise jump
+  // as the goal crosses the reach).
+  const softStart = reach * (1 - softness);
+  if (softness > 0 && dist > softStart) {
+    const band = reach - softStart;
+    dist = softStart + band * (1 - Math.exp(-(dist - softStart) / band));
+  }
   const maxDist = reach * 0.9995;
   dist = dist < minDist ? minDist : dist > maxDist ? maxDist : dist;
 
-  // Bend direction: the pole hint with its component along the root→target line removed.
+  // Bend direction: the pole hint with its component along the root→target line removed. When the hint
+  // nearly lines up with that line its projection is unstable, so a fallback hint is blended in smoothly.
   _p.copy(poleHint).addScaledVector(_d, -poleHint.dot(_d));
+  if (poleFallback) {
+    const k = 1 - THREE.MathUtils.smoothstep(_p.length(), 0.08, 0.4);
+    if (k > 0) {
+      _fallback.copy(poleFallback).addScaledVector(_d, -poleFallback.dot(_d));
+      _p.addScaledVector(_fallback, k);
+    }
+  }
   if (_p.lengthSq() < 1e-10) {
     _fallback.set(Math.abs(_d.x) < 0.9 ? 1 : 0, Math.abs(_d.x) < 0.9 ? 0 : 1, 0);
     _p.copy(_fallback).addScaledVector(_d, -_fallback.dot(_d));
@@ -137,10 +158,16 @@ export function solveTwoBone(
   out.end.copy(root).addScaledVector(_d, dist);
   _w.subVectors(out.end, out.middle).normalize();
 
-  basisRotation(rest.upperAxis, rest.poleAxis, _u, _p, out.upper);
-  basisRotation(rest.lowerAxis, rest.poleAxis, _w, _p, out.lower);
+  // Both bones share the hinge (the bend plane's normal), so the twist of the lower bone stays consistent
+  // through any amount of flexion (a pole-referenced basis would flip by 180° past 90° of flexion).
+  _hinge.crossVectors(_p, _d).normalize();
+  basisRotation(rest.upperAxis, rest.hingeAxis, _u, _hinge, out.upper);
+  basisRotation(rest.lowerAxis, rest.hingeAxis, _w, _hinge, out.lower);
   return out;
 }
+
+/** Fraction of a limb's reach over which two-bone IK softens toward full extension. */
+export const SOFT_IK = 0.06;
 
 /* ==========================================================================
  * Frame-rate independent damping helpers.

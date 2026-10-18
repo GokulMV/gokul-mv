@@ -28,7 +28,7 @@ import { HAIR_BASE_COLOR } from '../shaders/SilkyHairShader';
  * ========================================================================== */
 
 /** Skin tone of the protagonist (sRGB hex). Change this one constant to restyle the character. */
-export const SKIN_TONE = '#a8775b';
+export const SKIN_TONE = '#9e7763';
 
 export const JACKET_COLOR = '#3a3d43';
 export const TROUSERS_COLOR = '#2a2d33';
@@ -121,6 +121,23 @@ vOcclusion = aOcclusion;
 vMask = aMask;
 `;
 
+/**
+ * Extra normal offset (metres) for the character's shadow lookups: the world's sun shadow map spans tens of
+ * metres, so its texels are coarser than facial features and fingers; without this the character would wear
+ * blotchy self-shadow acne. Terrain / gear shadows still land on the body.
+ */
+export const CHARACTER_SHADOW_OFFSET = 0.028;
+
+const VERTEX_SHADOW = /* glsl */ `
+#if defined( USE_SHADOWMAP ) && NUM_DIR_LIGHT_SHADOWS > 0
+  #pragma unroll_loop_start
+  for ( int i = 0; i < NUM_DIR_LIGHT_SHADOWS; i ++ ) {
+    vDirectionalShadowCoord[ i ] = directionalShadowMatrix[ i ] * ( worldPosition + vec4( shadowWorldNormal * ( directionalLightShadows[ i ].shadowNormalBias + ${CHARACTER_SHADOW_OFFSET.toFixed(4)} ), 0.0 ) );
+  }
+  #pragma unroll_loop_end
+#endif
+`;
+
 /** Gust flutter of the loose parts of the jacket (hem skirt, lower sleeves, collar top). */
 const VERTEX_FLUTTER = /* glsl */ `
 #ifdef CHAR_FLUTTER
@@ -143,6 +160,7 @@ varying float vOcclusion;
 varying vec2 vMask;
 uniform float uTime;
 uniform sampler2D uWeave;
+uniform float uAOStrength;
 
 float charSat( float x ) { return clamp( x, 0.0, 1.0 ); }
 
@@ -197,7 +215,7 @@ float charHash( vec2 p ) {
 
 /* ---------------------------------------------------------------------------
  * Garment detail functions: void charDetail( inout vec3 albedo, inout float rough,
- *   inout float height, inout float spec ) — all in rest space (metres).
+ *   inout float height, inout float spec, inout float sheen ) — all in rest space (metres).
  * ------------------------------------------------------------------------- */
 
 const JACKET_DETAIL = /* glsl */ `
@@ -212,7 +230,7 @@ float jacketHemY( vec3 p ) {
   return 0.902 - 0.022 * back + 0.01 * side * ( 1.0 - back );
 }
 
-void charDetail( inout vec3 albedo, inout float rough, inout float height, inout float spec ) {
+void charDetail( inout vec3 albedo, inout float rough, inout float height, inout float spec, inout float sheen ) {
   vec3 p = vRest;
   vec3 n = normalize( vRestNormal );
   float ax = abs( p.x );
@@ -338,6 +356,7 @@ void charDetail( inout vec3 albedo, inout float rough, inout float height, inout
   albedo = mix( albedo, uStitchColor, stitch * 0.55 );
   rough = clamp( rough, 0.2, 1.0 );
   spec = 1.0 - 0.3 * seam;
+  sheen = 1.0 - 0.8 * max( zip, patchM );
 }
 `;
 
@@ -346,7 +365,7 @@ uniform vec3 uPanelTint;
 uniform vec3 uStitchColor;
 uniform vec3 uZipColor;
 
-void charDetail( inout vec3 albedo, inout float rough, inout float height, inout float spec ) {
+void charDetail( inout vec3 albedo, inout float rough, inout float height, inout float spec, inout float sheen ) {
   vec3 p = vRest;
   vec3 n = normalize( vRestNormal );
   float ax = abs( p.x );
@@ -421,7 +440,7 @@ uniform vec3 uLaceColor;
 uniform vec3 uCollarColor;
 uniform vec3 uStitchColor;
 
-void charDetail( inout vec3 albedo, inout float rough, inout float height, inout float spec ) {
+void charDetail( inout vec3 albedo, inout float rough, inout float height, inout float spec, inout float sheen ) {
   vec3 p = vRest;
   vec3 n = normalize( vRestNormal );
   float bx = abs( p.x ) - 0.091;
@@ -491,12 +510,16 @@ uniform vec3 uScalpColor;
 uniform vec3 uBrowColor;
 uniform vec3 uHeadPivot;
 
-void charDetail( inout vec3 albedo, inout float rough, inout float height, inout float spec ) {
+void charDetail( inout vec3 albedo, inout float rough, inout float height, inout float spec, inout float sheen ) {
   vec3 p = vRest;
   vec3 n = normalize( vRestNormal );
   vec3 h = p - uHeadPivot;
   float head = smoothstep( 1.33, 1.4, p.y );
   float ahx = abs( h.x );
+  // Pixel footprint (m): small painted features fade out once they are sub-pixel instead of smearing.
+  float footprint = length( fwidth( p ) );
+  float fine = 1.0 - smoothstep( 0.0025, 0.007, footprint );
+  float medium = 1.0 - smoothstep( 0.005, 0.014, footprint );
 
   // Pores / micro-relief (fades out with distance through the derivative filter).
   float pore = charHash( floor( p.xy * 1400.0 ) + floor( p.z * 1400.0 ) );
@@ -506,38 +529,45 @@ void charDetail( inout vec3 albedo, inout float rough, inout float height, inout
   float noseTip = 1.0 - smoothstep( 0.0, 0.016, length( h - vec3( 0.0, -0.016, 0.112 ) ) );
   float cheeks = 1.0 - smoothstep( 0.0, 0.03, length( vec3( ahx - 0.045, h.y + 0.012, h.z - 0.065 ) ) );
   float ears = 1.0 - smoothstep( 0.0, 0.03, length( vec3( ahx - 0.078, h.y - 0.012, h.z + 0.016 ) ) );
-  vec3 flush = vec3( 1.06, 0.93, 0.9 );
+  vec3 flush = vec3( 1.04, 0.95, 0.93 );
   albedo *= mix( vec3( 1.0 ), flush, head * charSat( noseTip * 0.6 + cheeks * 0.35 + ears * 0.45 ) );
 
   // Lips.
   float lipD = length( vec2( h.x * 0.92, ( h.y + 0.046 ) * 2.1 ) ) - 0.0205;
-  float lips = ( 1.0 - charStep( lipD ) ) * smoothstep( 0.082, 0.088, h.z ) * head;
+  float lips = ( 1.0 - charStep( lipD ) ) * smoothstep( 0.078, 0.084, h.z ) * head * medium;
   albedo = mix( albedo, albedo * vec3( 0.84, 0.66, 0.64 ), lips * 0.85 );
   rough = mix( rough, 0.36, lips );
-  float mouthLine = charLine( h.y + 0.0466, 0.0007 ) * ( 1.0 - smoothstep( 0.017, 0.022, ahx ) ) * smoothstep( 0.085, 0.09, h.z ) * head;
+  float mouthLine = charLine( h.y + 0.0466, 0.0007 ) * ( 1.0 - smoothstep( 0.016, 0.021, ahx ) ) * smoothstep( 0.081, 0.086, h.z ) * head * fine;
   albedo *= 1.0 - 0.55 * mouthLine;
 
   // Brows.
   float bxp = ahx;
   float browY = 0.0385 + 0.0045 * sin( charSat( ( bxp - 0.012 ) / 0.044 ) * 3.14159 ) - 0.002;
   float browW = mix( 0.0042, 0.0022, smoothstep( 0.02, 0.055, bxp ) );
-  float brow = ( 1.0 - smoothstep( browW * 0.55, browW, abs( h.y - browY ) ) ) * smoothstep( 0.011, 0.017, bxp ) * ( 1.0 - smoothstep( 0.049, 0.057, bxp ) ) * smoothstep( 0.066, 0.076, h.z ) * head;
+  float brow = ( 1.0 - smoothstep( browW * 0.55, browW, abs( h.y - browY ) ) ) * smoothstep( 0.011, 0.017, bxp ) * ( 1.0 - smoothstep( 0.049, 0.057, bxp ) ) * smoothstep( 0.066, 0.076, h.z ) * head * medium;
   float browHair = 0.75 + 0.25 * charLine( fract( ( bxp * 900.0 + h.y * 300.0 ) ) - 0.5, 0.25 );
-  albedo = mix( albedo, uBrowColor, brow * 0.85 * browHair );
+  albedo = mix( albedo, uBrowColor, brow * 0.7 * browHair );
   rough = mix( rough, 0.6, brow );
 
-  // Eyes (painted on the eyeball spheres).
-  vec3 ec = vec3( sign( h.x ) * 0.032, 0.016, 0.071 );
-  vec3 e = h - ec;
-  float er = length( e );
-  float onEye = ( 1.0 - smoothstep( 0.0127, 0.0134, er ) ) * head;
-  vec3 ed = e / max( er, 1e-5 );
-  float iris = smoothstep( 0.865, 0.885, ed.z );
-  float pupil = smoothstep( 0.968, 0.978, ed.z );
-  vec3 eyeColor = mix( vec3( 0.42, 0.39, 0.36 ), vec3( 0.055, 0.032, 0.02 ), iris );
+  // Eyes: an almond-shaped opening painted over the eyeball / lid geometry.
+  vec2 eq = vec2( ahx - 0.032, h.y - 0.0168 );
+  float ex = charSat( abs( eq.x + 0.0012 ) / 0.0128 );
+  float almond = max( abs( eq.y + 0.0006 * ex ) - 0.0041 * ( 1.0 - ex * ex ), abs( eq.x + 0.0012 ) - 0.0128 );
+  float eyeFront = smoothstep( 0.07, 0.076, h.z ) * head * fine;
+  float opening = ( 1.0 - charStep( almond ) ) * eyeFront;
+  float irisD = length( eq - vec2( 0.0005, -0.0004 ) );
+  float iris = 1.0 - charStep( irisD - 0.0049 );
+  float pupil = 1.0 - charStep( irisD - 0.0019 );
+  vec3 eyeColor = mix( vec3( 0.15, 0.135, 0.12 ), vec3( 0.045, 0.027, 0.018 ), iris );
   eyeColor = mix( eyeColor, vec3( 0.006 ), pupil );
-  albedo = mix( albedo, eyeColor, onEye );
-  rough = mix( rough, 0.08, onEye );
+  albedo = mix( albedo, eyeColor, opening );
+  rough = mix( rough, 0.32, opening );
+  // Upper lash line and lid crease.
+  float lash = charLine( almond, 0.0008 ) * step( -0.0004, eq.y ) * eyeFront;
+  albedo *= 1.0 - 0.6 * lash;
+  float crease = charLine( eq.y - 0.0072 + 0.002 * ex * ex, 0.0012 ) * ( 1.0 - ex ) * eyeFront;
+  albedo *= 1.0 - 0.18 * crease;
+  float onEye = max( opening, lash );
 
   // Faint stubble shadow along the jaw and upper lip.
   float stubble = charSat( vMask.y ) * head;
@@ -545,7 +575,7 @@ void charDetail( inout vec3 albedo, inout float rough, inout float height, inout
 
   // Scalp under the hair takes the hair colour.
   float scalp = charSat( vMask.x ) * head;
-  albedo = mix( albedo, uScalpColor, scalp * 0.96 );
+  albedo = mix( albedo, uScalpColor, scalp * scalp * ( 3.0 - 2.0 * scalp ) * 0.95 );
   rough = mix( rough, 0.7, scalp );
 
   // Hands: lighter palms, warmer knuckles.
@@ -560,6 +590,7 @@ void charDetail( inout vec3 albedo, inout float rough, inout float height, inout
   rough -= 0.08 * tzone;
   rough = clamp( rough, 0.06, 1.0 );
   spec = 1.0;
+  sheen = ( 1.0 - scalp ) * ( 1.0 - brow ) * ( 1.0 - onEye ) * ( 1.0 - lips * 0.5 );
 }
 `;
 
@@ -598,7 +629,8 @@ function patchMaterial(
     shader.vertexShader = shader.vertexShader
       .replace('#include <common>', `${VERTEX_DECLS}\n#include <common>`)
       .replace('#include <begin_vertex>', `#include <begin_vertex>\n${VERTEX_ATTRS}`)
-      .replace('#include <skinning_vertex>', `#include <skinning_vertex>\n${VERTEX_FLUTTER}`);
+      .replace('#include <skinning_vertex>', `#include <skinning_vertex>\n${VERTEX_FLUTTER}`)
+      .replace('#include <shadowmap_vertex>', `#include <shadowmap_vertex>\n${VERTEX_SHADOW}`);
     let fragment = shader.fragmentShader
       .replace('#include <common>', `${FRAGMENT_COMMON}\n${kind === 'skin' ? SKIN_SSS_UNIFORMS : ''}\n${DETAIL[kind]}\n#include <common>`)
       .replace(
@@ -608,10 +640,18 @@ function patchMaterial(
         float cdRough = roughness;
         float cdHeight = 0.0;
         float cdSpec = 1.0;
-        charDetail( cdAlbedo, cdRough, cdHeight, cdSpec );
+        float cdSheen = 1.0;
+        charDetail( cdAlbedo, cdRough, cdHeight, cdSpec, cdSheen );
         diffuseColor.rgb = cdAlbedo;`,
       )
       .replace('#include <roughnessmap_fragment>', `#include <roughnessmap_fragment>\nroughnessFactor = cdRough;`)
+      .replace(
+        '#include <lights_physical_fragment>',
+        `#include <lights_physical_fragment>
+        #ifdef USE_SHEEN
+          material.sheenColor *= cdSheen;
+        #endif`,
+      )
       .replace(
         '#include <normal_fragment_maps>',
         `#include <normal_fragment_maps>
@@ -621,7 +661,7 @@ function patchMaterial(
         '#include <aomap_fragment>',
         `#include <aomap_fragment>
         {
-          float charAO = clamp( vOcclusion, 0.0, 1.0 );
+          float charAO = mix( 1.0, clamp( vOcclusion, 0.0, 1.0 ), uAOStrength );
           reflectedLight.indirectDiffuse *= charAO;
           reflectedLight.indirectSpecular *= mix( 1.0, charAO, 0.8 ) * cdSpec;
           reflectedLight.directDiffuse *= mix( 1.0, charAO, 0.35 );
@@ -636,7 +676,7 @@ function patchMaterial(
     }
     shader.fragmentShader = fragment;
   };
-  material.customProgramCacheKey = () => `protagonist-${kind}-v1`;
+  material.customProgramCacheKey = () => `protagonist-${kind}-v2`;
 }
 
 export interface CharacterMaterialOptions {
@@ -664,6 +704,7 @@ export function createCharacterMaterials(options: CharacterMaterialOptions = {})
     specularIntensity: 0.6,
   });
   patchMaterial(jacket, 'jacket', uniforms, {
+    uAOStrength: { value: 1 },
     uYokeTint: { value: new THREE.Color(0.74, 0.75, 0.78) },
     uZipColor: { value: new THREE.Color('#141518') },
     uStitchColor: { value: new THREE.Color('#5b6068') },
@@ -681,6 +722,7 @@ export function createCharacterMaterials(options: CharacterMaterialOptions = {})
     specularIntensity: 0.5,
   });
   patchMaterial(trousers, 'trousers', uniforms, {
+    uAOStrength: { value: 1 },
     uPanelTint: { value: new THREE.Color(0.78, 0.79, 0.81) },
     uStitchColor: { value: new THREE.Color('#4c5058') },
     uZipColor: { value: new THREE.Color('#141518') },
@@ -694,6 +736,7 @@ export function createCharacterMaterials(options: CharacterMaterialOptions = {})
     specularIntensity: 0.6,
   });
   patchMaterial(boots, 'boots', uniforms, {
+    uAOStrength: { value: 1 },
     uRubberColor: { value: new THREE.Color('#151516') },
     uLaceColor: { value: new THREE.Color('#7b4a2e') },
     uCollarColor: { value: new THREE.Color('#2b2725') },
@@ -705,17 +748,18 @@ export function createCharacterMaterials(options: CharacterMaterialOptions = {})
     color: options.skinTone ?? SKIN_TONE,
     roughness: 0.52,
     metalness: 0,
-    sheen: 0.22,
-    sheenRoughness: 0.45,
-    sheenColor: new THREE.Color('#ffd8c2'),
+    sheen: 0.18,
+    sheenRoughness: 0.5,
+    sheenColor: new THREE.Color('#f2d2c0'),
     specularIntensity: 0.5,
   });
   patchMaterial(skin, 'skin', uniforms, {
+    uAOStrength: { value: 0.55 },
     uScalpColor: { value: new THREE.Color(HAIR_BASE_COLOR).multiplyScalar(1.15) },
     uBrowColor: { value: new THREE.Color('#15110e') },
     uHeadPivot: { value: new THREE.Vector3(HEAD_PIVOT[0], HEAD_PIVOT[1], HEAD_PIVOT[2]) },
-    uSkinWrap: { value: 0.42 },
-    uSkinScatter: { value: new THREE.Color(0.85, 0.32, 0.22) },
+    uSkinWrap: { value: 0.26 },
+    uSkinScatter: { value: new THREE.Color(0.42, 0.22, 0.15) },
   });
 
   return {

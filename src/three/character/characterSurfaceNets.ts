@@ -35,7 +35,7 @@ export interface PolygonizeOptions {
   cell: number;
   /** Finite-difference step for normals / projection, as a fraction of `cell` (default 0.35). */
   normalStep?: number;
-  /** Yield roughly every this many field evaluations (default 3000). */
+  /** Yield after roughly this much work, in field-evaluation units (default 300 ≈ well under a millisecond). */
   yieldEvery?: number;
 }
 
@@ -67,9 +67,10 @@ export function fieldGradient(field: ScalarField, x: number, y: number, z: numbe
 export function* polygonizeSdfSteps(field: ScalarField, options: PolygonizeOptions): Generator<void, PolygonizedSurface, void> {
   const { bounds, cell: h } = options;
   const step = (options.normalStep ?? 0.35) * h;
-  const yieldEvery = options.yieldEvery ?? 3000;
+  const yieldEvery = options.yieldEvery ?? 300;
   let evaluations = 0;
-  let budget = yieldEvery;
+  /** Work done since the last yield (field-evaluation units; cheap loops count fractionally). */
+  let work = 0;
 
   const span = (a: number, b: number) => Math.ceil((b - a) / h / COARSE) * COARSE + 1;
   const nx = span(bounds.x0, bounds.x1);
@@ -92,11 +93,12 @@ export function* polygonizeSdfSteps(field: ScalarField, options: PolygonizeOptio
         values[id] = field(ox + i * h, y, z);
         state[id] = 1;
         evaluations += 1;
+        work += 1;
       }
-    }
-    if (evaluations >= budget) {
-      budget = evaluations + yieldEvery;
-      yield;
+      if (work >= yieldEvery) {
+        work = 0;
+        yield;
+      }
     }
   }
 
@@ -120,6 +122,7 @@ export function* polygonizeSdfSteps(field: ScalarField, options: PolygonizeOptio
         }
         if (minAbs > band) {
           far.push(ci, cj, ck);
+          work += 0.05;
           continue;
         }
         for (let k = k0; k <= k0 + COARSE; k += 1) {
@@ -132,14 +135,15 @@ export function* polygonizeSdfSteps(field: ScalarField, options: PolygonizeOptio
               values[id] = field(ox + i * h, y, z);
               state[id] = 1;
               evaluations += 1;
+              work += 1;
             }
           }
         }
+        if (work >= yieldEvery) {
+          work = 0;
+          yield;
+        }
       }
-    }
-    if (evaluations >= budget) {
-      budget = evaluations + yieldEvery;
-      yield;
     }
   }
   for (let n = 0; n < far.length; n += 3) {
@@ -172,6 +176,11 @@ export function* polygonizeSdfSteps(field: ScalarField, options: PolygonizeOptio
           state[id] = 2;
         }
       }
+    }
+    work += 1;
+    if (work >= yieldEvery) {
+      work = 0;
+      yield;
     }
   }
 
@@ -210,10 +219,15 @@ export function* polygonizeSdfSteps(field: ScalarField, options: PolygonizeOptio
         }
         cellVertex[i + cx * (j + cy * k)] = verts.length / 3;
         verts.push(ox + (i + sx / count) * h, oy + (j + sy / count) * h, oz + (k + sz / count) * h);
+        work += 0.3;
+      }
+      work += cx * 0.04;
+      if (work >= yieldEvery) {
+        work = 0;
+        yield;
       }
     }
   }
-  yield;
 
   // 3b. Faces: one quad per sign-changing lattice edge.
   const tris: number[] = [];
@@ -240,9 +254,13 @@ export function* polygonizeSdfSteps(field: ScalarField, options: PolygonizeOptio
           quad(vid(i - 1, j - 1, k), vid(i, j - 1, k), vid(i, j, k), vid(i - 1, j, k), !in0);
         }
       }
+      work += nx * 0.03;
+      if (work >= yieldEvery) {
+        work = 0;
+        yield;
+      }
     }
   }
-  yield;
 
   // 4. One Newton step onto the iso-surface; the gradient doubles as the normal.
   const vertexCount = verts.length / 3;
@@ -283,8 +301,9 @@ export function* polygonizeSdfSteps(field: ScalarField, options: PolygonizeOptio
     normals[v * 3] = gx / len;
     normals[v * 3 + 1] = gy / len;
     normals[v * 3 + 2] = gz / len;
-    if (evaluations >= budget) {
-      budget = evaluations + yieldEvery;
+    work += 5;
+    if (work >= yieldEvery) {
+      work = 0;
       yield;
     }
   }

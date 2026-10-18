@@ -146,41 +146,41 @@ function boxBound(px: number, py: number, pz: number, x0: number, y0: number, z0
 const J = REST_JOINTS;
 const LATS_C = Math.cos(0.2);
 const LATS_S = Math.sin(0.2);
-const TRAP = cone([0.03, 1.468, -0.036], [0.165, 1.43, -0.03], 0.042, 0.036);
-const GIRDLE = cone([0, 1.392, -0.022], [0.17, 1.404, -0.024], 0.058, 0.052);
+const TRAP = cone([0.03, 1.468, -0.036], [0.16, 1.412, -0.03], 0.042, 0.034);
+const GIRDLE = cone([0, 1.388, -0.022], [0.168, 1.386, -0.024], 0.056, 0.048);
 
 /** Ribcage, pecs, upper back / traps, shoulder girdle and flaring lats (the V). */
 function chestPart(ax: number, y: number, z: number): number {
-  let d = ell(ax, y - 1.272, z + 0.004, 0.156, 0.19, 0.117);
-  d = smin(d, ell(ax - 0.066, y - 1.318, z - 0.064, 0.084, 0.064, 0.054), 0.04);
-  d = smin(d, ell(ax, y - 1.403, z + 0.045, 0.132, 0.074, 0.074), 0.05);
+  let d = ell(ax, y - 1.272, z + 0.006, 0.152, 0.19, 0.112);
+  d = smin(d, ell(ax - 0.07, y - 1.322, z - 0.056, 0.088, 0.058, 0.046), 0.06); // pecs: broad, flat
+  d = smin(d, ell(ax, y - 1.4, z + 0.045, 0.13, 0.072, 0.074), 0.05);
   d = smin(d, sdCone(TRAP, ax, y, z), 0.04);
   d = smin(d, sdCone(GIRDLE, ax, y, z), 0.04);
   // Lats: tilted so the top flares outward.
-  const lx = ax - 0.118;
-  const ly = y - 1.245;
-  d = smin(d, ell(LATS_C * lx - LATS_S * ly, LATS_S * lx + LATS_C * ly, z + 0.04, 0.066, 0.13, 0.07), 0.05);
+  const lx = ax - 0.122;
+  const ly = y - 1.255;
+  d = smin(d, ell(LATS_C * lx - LATS_S * ly, LATS_S * lx + LATS_C * ly, z + 0.04, 0.07, 0.125, 0.07), 0.05);
   return d;
 }
 
 /** Lean waist and abdomen. */
 function spinePart(ax: number, y: number, z: number): number {
-  const d = ell(ax, y - 1.088, z - 0.004, 0.134, 0.13, 0.103);
+  const d = ell(ax, y - 1.088, z - 0.004, 0.128, 0.13, 0.1);
   return smin(d, ell(ax, y - 1.14, z - 0.052, 0.098, 0.11, 0.052), 0.04);
 }
 
 /** Pelvis and glutes. */
 function pelvisPart(ax: number, y: number, z: number): number {
-  const d = ell(ax, y - 0.955, z + 0.01, 0.158, 0.105, 0.112);
-  return smin(d, ell(ax - 0.062, y - 0.888, z + 0.056, 0.079, 0.088, 0.071), 0.05);
+  const d = ell(ax, y - 0.955, z + 0.01, 0.152, 0.105, 0.11);
+  return smin(d, ell(ax - 0.06, y - 0.888, z + 0.054, 0.077, 0.086, 0.07), 0.05);
 }
 
-const UPPER_ARM = cone(J.LeftArm, J.LeftForeArm, 0.05, 0.04);
+const UPPER_ARM = cone(J.LeftArm, J.LeftForeArm, 0.046, 0.039);
 const FOREARM = cone(J.LeftForeArm, J.LeftHand, 0.041, 0.026);
 
 function upperArmPart(x: number, y: number, z: number): number {
   let d = sdCone(UPPER_ARM, x, y, z);
-  d = smin(d, ell(x - 0.198, y - 1.392, z + 0.028, 0.05, 0.084, 0.064), 0.03); // deltoid
+  d = smin(d, ell(x - 0.192, y - 1.376, z + 0.028, 0.046, 0.072, 0.058), 0.03); // deltoid
   d = smin(d, ell(x - 0.207, y - 1.245, z + 0.012, 0.039, 0.075, 0.04), 0.03); // biceps
   d = smin(d, ell(x - 0.214, y - 1.27, z + 0.06, 0.039, 0.09, 0.04), 0.03); // triceps
   return d;
@@ -220,9 +220,9 @@ const HEAD = J.Head;
 /** Head bone pivot (Root space, rest). Head-local = rest − HEAD_PIVOT. */
 export const HEAD_PIVOT: Vec3 = HEAD;
 const NECK_CONE = cone([0, 1.43, -0.032], [0, 1.6, -0.016], 0.06, 0.054);
-const JAW = cone([0.046, -0.034, -0.012], [0.018, -0.07, 0.062], 0.016, 0.016);
+const JAW = cone([0.047, -0.036, -0.016], [0.021, -0.072, 0.057], 0.015, 0.015);
 const BROW = cone([0, 0.03, 0.086], [0.038, 0.031, 0.079], 0.011, 0.009);
-const NOSE = cone([0, 0.024, 0.089], [0, -0.012, 0.109], 0.0072, 0.0102);
+const NOSE = cone([0, 0.026, 0.088], [0, -0.011, 0.11], 0.0068, 0.0098);
 const SCM = cone([0.05, 1.585, -0.03], [0.012, 1.452, 0.04], 0.013, 0.011);
 
 /** Cranium centre in head-local space (the hairline / scalp reference). */
@@ -233,27 +233,30 @@ function craniumPart(hx: number, hy: number, hz: number): number {
   return ell(hx - CRANIUM_CENTER[0], hy - CRANIUM_CENTER[1], hz - CRANIUM_CENTER[2], CRANIUM_RADII[0], CRANIUM_RADII[1], CRANIUM_RADII[2]);
 }
 
-/** Full detailed head in head-local coordinates (pivot at the Head bone). */
+/** Full detailed head in head-local coordinates (pivot at the Head bone). Neutral, generic features. */
 function headDetail(hx: number, hy: number, hz: number): number {
   const ahx = Math.abs(hx);
   let d = craniumPart(hx, hy, hz);
   d = smin(d, ell(hx, hy - 0.05, hz - 0.045, 0.064, 0.05, 0.045), 0.03); // forehead
   d = smin(d, sdCone(BROW, ahx, hy, hz), 0.016); // brow ridge
-  d = smin(d, ell(hx, hy + 0.026, hz - 0.044, 0.053, 0.05, 0.045), 0.03); // maxilla / mid-face
-  d = smin(d, ell(ahx - 0.047, hy + 0.001, hz - 0.052, 0.022, 0.017, 0.028), 0.024); // cheekbones
+  d = smin(d, ell(hx, hy + 0.03, hz - 0.04, 0.046, 0.047, 0.042), 0.028); // maxilla / mid-face
+  d = smin(d, ell(ahx - 0.041, hy + 0.004, hz - 0.052, 0.017, 0.013, 0.024), 0.022); // cheekbones (inside the skull line)
+  d = smin(d, ell(ahx - 0.038, hy + 0.024, hz - 0.024, 0.021, 0.04, 0.042), 0.024); // cheek / masseter volume
   d = smin(d, sdCone(JAW, ahx, hy, hz), 0.03); // jawline
-  d = smin(d, ell(hx, hy + 0.071, hz - 0.068, 0.023, 0.019, 0.019), 0.022); // chin
-  // Eye sockets, then the eyeballs (lids form in the smooth union).
-  d = smax(d, -sph(ahx - 0.032, hy - 0.016, hz - 0.091, 0.0165), 0.012);
-  d = smin(d, sph(ahx - 0.032, hy - 0.016, hz - 0.071, 0.0122), 0.004);
+  d = smin(d, ell(hx, hy + 0.071, hz - 0.066, 0.026, 0.019, 0.019), 0.022); // chin
+  // Eye sockets, eyeballs and lids (the opening itself is painted in the skin shader).
+  d = smax(d, -sph(ahx - 0.032, hy - 0.018, hz - 0.094, 0.0145), 0.014);
+  d = smin(d, sph(ahx - 0.032, hy - 0.0165, hz - 0.0705, 0.0122), 0.003);
+  d = smin(d, ell(ahx - 0.032, hy - 0.0215, hz - 0.0735, 0.0155, 0.0075, 0.0115), 0.004);
+  d = smin(d, ell(ahx - 0.032, hy - 0.0105, hz - 0.073, 0.0145, 0.0055, 0.011), 0.004);
   // Nose: bridge, tip, alae.
   d = smin(d, sdCone(NOSE, hx, hy, hz), 0.012);
-  d = smin(d, sph(hx, hy + 0.016, hz - 0.106, 0.0112), 0.008);
-  d = smin(d, ell(ahx - 0.0112, hy + 0.021, hz - 0.097, 0.0098, 0.0075, 0.0085), 0.007);
+  d = smin(d, sph(hx, hy + 0.015, hz - 0.105, 0.011), 0.008);
+  d = smin(d, ell(ahx - 0.0102, hy + 0.02, hz - 0.095, 0.0084, 0.0066, 0.0075), 0.007);
   // Lips and the mouth line.
-  d = smin(d, ell(hx, hy + 0.041, hz - 0.09, 0.023, 0.0082, 0.011), 0.008);
-  d = smin(d, ell(hx, hy + 0.052, hz - 0.087, 0.02, 0.0078, 0.0102), 0.007);
-  d = smax(d, -roundBox(hx, hy + 0.0466, hz - 0.1, 0.021, 0.0006, 0.012, 0.0006), 0.0025);
+  d = smin(d, ell(hx, hy + 0.041, hz - 0.0815, 0.021, 0.0076, 0.0092), 0.008);
+  d = smin(d, ell(hx, hy + 0.0515, hz - 0.079, 0.0185, 0.0073, 0.0088), 0.007);
+  d = smax(d, -roundBox(hx, hy + 0.0466, hz - 0.092, 0.019, 0.0006, 0.012, 0.0006), 0.0025);
   // Ears (tilted back), with the concha hollow.
   const ex = ahx - 0.075;
   const ey = hy - 0.012;
@@ -263,6 +266,21 @@ function headDetail(hx: number, hy: number, hz: number): number {
   d = smin(d, ell(ex, ery, erz, 0.011, 0.03, 0.019), 0.006);
   d = smax(d, -ell(ahx - 0.084, hy - 0.008, hz + 0.013, 0.006, 0.016, 0.0105), 0.004);
   return d;
+}
+
+/**
+ * Scalp-only head SDF in head-local coordinates (neck, cranium, forehead, ears): what the hair grows on.
+ * Matches headSdf wherever hair grows and is ~6× cheaper (used for strand growth).
+ */
+export function scalpSdf(hx: number, hy: number, hz: number): number {
+  const ahx = Math.abs(hx);
+  let d = sdCone(NECK_CONE, hx + HEAD[0], hy + HEAD[1], hz + HEAD[2]);
+  d = smin(d, craniumPart(hx, hy, hz), 0.025);
+  d = smin(d, ell(hx, hy - 0.05, hz - 0.045, 0.064, 0.05, 0.045), 0.03);
+  const ex = ahx - 0.075;
+  const ey = hy - 0.012;
+  const ez = hz + 0.016;
+  return smin(d, ell(ex, 0.966 * ey + 0.259 * ez, -0.259 * ey + 0.966 * ez, 0.011, 0.03, 0.019), 0.006);
 }
 
 /** Neck (rest/bind coordinates), with sternocleidomastoid hints. */
@@ -300,10 +318,10 @@ interface FingerSpec {
 }
 
 const FINGERS: readonly FingerSpec[] = [
-  { base: [-0.001, -0.092, 0.027], lengths: [0.042, 0.025, 0.021], radii: [0.0095, 0.0086, 0.0078, 0.007], curl: [0.32, 0.72, 0.42], fan: 0.07 },
-  { base: [-0.001, -0.096, 0.0085], lengths: [0.046, 0.028, 0.022], radii: [0.0098, 0.0089, 0.008, 0.0072], curl: [0.4, 0.82, 0.46], fan: 0.0 },
-  { base: [-0.001, -0.093, -0.0105], lengths: [0.043, 0.027, 0.022], radii: [0.0093, 0.0084, 0.0076, 0.0068], curl: [0.46, 0.86, 0.48], fan: -0.06 },
-  { base: [-0.001, -0.086, -0.0275], lengths: [0.034, 0.02, 0.019], radii: [0.0083, 0.0076, 0.0069, 0.0062], curl: [0.54, 0.9, 0.5], fan: -0.13 },
+  { base: [-0.001, -0.092, 0.026], lengths: [0.042, 0.025, 0.021], radii: [0.0094, 0.0085, 0.0077, 0.0069], curl: [0.16, 0.42, 0.22], fan: 0.03 },
+  { base: [-0.001, -0.096, 0.0078], lengths: [0.046, 0.028, 0.022], radii: [0.0097, 0.0088, 0.0079, 0.0071], curl: [0.21, 0.47, 0.24], fan: 0.0 },
+  { base: [-0.001, -0.093, -0.0102], lengths: [0.043, 0.027, 0.022], radii: [0.0092, 0.0083, 0.0075, 0.0067], curl: [0.27, 0.52, 0.26], fan: -0.025 },
+  { base: [-0.001, -0.086, -0.0265], lengths: [0.034, 0.02, 0.019], radii: [0.0082, 0.0075, 0.0068, 0.0061], curl: [0.33, 0.55, 0.28], fan: -0.06 },
 ];
 
 /** Hand-local cones (relative to the wrist pivot), built once. */
@@ -332,14 +350,14 @@ const HAND_CONES: Cone[] = (() => {
   }
   // Thumb: metacarpal, proximal, distal phalanx curling across the palm.
   const thumbDirs: readonly Vec3[] = [
-    [-0.42, -0.62, 0.66],
-    [-0.66, -0.6, 0.45],
-    [-0.86, -0.42, 0.29],
+    [-0.24, -0.93, 0.3],
+    [-0.2, -0.97, 0.12],
+    [-0.26, -0.96, 0.04],
   ];
   const thumbLen = [0.04, 0.031, 0.025];
-  const thumbR = [0.0125, 0.0108, 0.0096, 0.0082];
-  let tx = -0.006;
-  let ty = -0.02;
+  const thumbR = [0.0122, 0.0105, 0.0094, 0.008];
+  let tx = -0.008;
+  let ty = -0.022;
   let tz = 0.024;
   for (let s = 0; s < 3; s += 1) {
     const d = thumbDirs[s];
@@ -357,17 +375,18 @@ const HAND_CONES: Cone[] = (() => {
 
 const WRIST_CONE = cone([0, 0.035, 0], [0, -0.012, 0.002], 0.025, 0.023);
 
+/** Metacarpal shafts from the carpus to each knuckle (hand-local), built once. */
+const METACARPALS: Cone[] = FINGERS.map((f) => cone([-0.0005, -0.014, f.base[2] * 0.5], [f.base[0] + 0.0012, f.base[1] + 0.004, f.base[2]], 0.0102, 0.0098));
+
 /** Left hand in hand-local coordinates (wrist pivot at the origin). */
 function handLocal(u: number, v: number, w: number): number {
   // Wrist (extends into the cuff), flattened across the palm normal.
   let d = sdCone(WRIST_CONE, u * 1.25, v, w) / 1.12;
-  // Palm block.
-  d = smin(d, roundBox(u + 0.003, v + 0.051, w - 0.002, 0.0035, 0.038, 0.031, 0.0115), 0.018);
-  d = smin(d, ell(u + 0.012, v + 0.032, w - 0.021, 0.012, 0.024, 0.016), 0.012); // thenar
-  d = smin(d, ell(u + 0.009, v + 0.055, w + 0.03, 0.0095, 0.03, 0.011), 0.01); // hypothenar
+  for (let i = 0; i < METACARPALS.length; i += 1) d = smin(d, sdCone(METACARPALS[i], u, v, w), 0.013);
+  d = smin(d, ell(u + 0.007, v + 0.056, w - 0.0, 0.0105, 0.04, 0.035), 0.012); // palm pad
+  d = smin(d, ell(u + 0.011, v + 0.03, w - 0.021, 0.0115, 0.024, 0.015), 0.012); // thenar
+  d = smin(d, ell(u + 0.008, v + 0.056, w + 0.028, 0.009, 0.03, 0.0105), 0.01); // hypothenar
   for (let i = 0; i < HAND_CONES.length; i += 1) d = smin(d, sdCone(HAND_CONES[i], u, v, w), 0.0055);
-  // Knuckle ridge on the back of the hand.
-  d = smin(d, roundBox(u - 0.007, v + 0.09, w, 0.003, 0.004, 0.033, 0.007), 0.008);
   // The wrist ends 3 cm inside the cuff (keeps the surface closed inside the grid).
   return smax(d, v - 0.03, 0.004);
 }
@@ -398,12 +417,15 @@ function jacketHemY(x: number, z: number): number {
 
 /** Jacket ease: the shell stands off the waist (hangs from the chest) and the hips. */
 function jacketEase(y: number): number {
-  return 0.0125 + 0.008 * smoothstep(1.2, 1.06, y);
+  return 0.0125 + 0.005 * smoothstep(1.2, 1.06, y);
 }
 
 function jacketTorso(x: number, y: number, z: number): number {
   const ax = Math.abs(x);
   let d = chestPart(ax, y, z);
+  // The shell bridges the sternum between the pecs and the spine valley between the lats / shoulder blades.
+  d = smin(d, ell(x, y - 1.31, z - 0.052, 0.07, 0.075, 0.05), 0.03);
+  d = smin(d, ell(x, y - 1.215, z + 0.072, 0.135, 0.17, 0.058), 0.045);
   d = smin(d, spinePart(ax, y, z), 0.075);
   if (y < 1.08) d = smin(d, pelvisPart(ax, y, z), 0.07);
   return d - jacketEase(y);
@@ -415,32 +437,23 @@ const SLEEVE_CUFF_Y = J.LeftHand[1] + 0.012;
 function sleeve(x: number, y: number, z: number): number {
   let d = smin(upperArmPart(x, y, z), forearmPart(x, y, z), 0.045);
   // Fabric ease grows toward the elbow / forearm (fitted, not tight).
-  d -= 0.0115 + 0.005 * smoothstep(1.2, 1.0, y);
+  d -= 0.011 + 0.003 * smoothstep(1.2, 1.0, y);
   // Cuff band: a slightly raised band over the last 4 cm.
   const cuff = smoothstep(SLEEVE_CUFF_Y + 0.05, SLEEVE_CUFF_Y + 0.035, y);
   d -= 0.0035 * cuff;
-  // Cuff end plane and the opening the wrist goes into.
-  d = smax(d, SLEEVE_CUFF_Y - y, 0.004);
-  const ox = x - J.LeftHand[0];
-  const oz = z - J.LeftHand[2] + 0.003;
-  const hole = Math.sqrt(ox * ox * 1.3 + oz * oz) - 0.031;
-  d = smax(d, -Math.max(hole, y - (SLEEVE_CUFF_Y + 0.03)), 0.004);
-  return d;
+  // Rounded cuff end; the wrist emerges from it (robust at every grid resolution).
+  return smax(d, SLEEVE_CUFF_Y - y, 0.009);
 }
 
-/** Stand-up collar shell around the neck, open in a small V at the zip. */
+/** Stand-up collar: a solid rolled band the neck emerges from (robust at every grid resolution). */
 function collar(x: number, y: number, z: number): number {
   const cz = z + 0.022 - (y - 1.46) * 0.12; // leans slightly forward with height
   const r = Math.sqrt(x * x * 1.05 + cz * cz * 0.95);
-  const radius = 0.075 + 0.012 * smoothstep(1.56, 1.46, y);
-  let d = Math.abs(r - radius) - 0.0065;
-  const top = 1.555 - 0.022 * smoothstep(-0.02, 0.07, z); // taller at the back
-  d = smax(d, y - top, 0.008);
-  d = smax(d, 1.44 - y, 0.01);
-  // V opening at the front zip.
-  const open = Math.abs(x) - (0.004 + Math.max(0, y - 1.5) * 0.35);
-  d = smax(d, -Math.max(open, -z + 0.03), 0.004);
-  return d;
+  const radius = 0.079 + 0.014 * smoothstep(1.545, 1.455, y);
+  let d = r - radius;
+  const top = 1.546 - 0.02 * smoothstep(-0.02, 0.07, z); // taller at the back
+  d = smax(d, y - top, 0.014);
+  return smax(d, 1.43 - y, 0.01);
 }
 
 /** Jacket in BIND coordinates. */
@@ -737,10 +750,11 @@ const LEG_BONES = new Set<number>([B.LeftUpLeg, B.LeftLeg, B.RightUpLeg, B.Right
 
 /** Hairline height (head-local y) by azimuth a ∈ [0 front, 1 back] around the cranium centre. */
 const HAIRLINE: ReadonlyArray<readonly [number, number]> = [
-  [0.0, 0.086],
-  [0.15, 0.088],
-  [0.27, 0.078],
-  [0.37, 0.058],
+  [0.0, 0.085],
+  [0.09, 0.083],
+  [0.19, 0.074],
+  [0.28, 0.07],
+  [0.37, 0.056],
   [0.425, 0.016],
   [0.475, 0.006],
   [0.51, 0.04],
@@ -772,8 +786,9 @@ export function scalpAzimuth(hx: number, hz: number): number {
 
 /** 0..1 coverage of the scalp hair at a head-local point (soft hairline). */
 export function scalpHairMask(hx: number, hy: number, hz: number): number {
-  const line = hairlineY(scalpAzimuth(hx, hz));
-  return smoothstep(line - 0.003, line + 0.007, hy);
+  const a = scalpAzimuth(hx, hz);
+  const line = hairlineY(a) + 0.0035 * Math.sin(a * 47 + Math.sign(hx) * 1.7) + 0.0022 * Math.sin(a * 113 + 0.6);
+  return smoothstep(line - 0.007, line + 0.013, hy);
 }
 
 /* ---------------------------------------------------------------------------
@@ -922,7 +937,7 @@ function mirrored(surface: PolygonizedSurface): PolygonizedSurface {
 }
 
 const AO_STEPS = [0.01, 0.024, 0.045] as const;
-const ASSEMBLE_YIELD_EVERY = 400;
+const ASSEMBLE_YIELD_EVERY = 24;
 
 function* assembleSteps(name: GarmentName, pieces: readonly Piece[], aoField: ScalarField): Generator<void, SkinnedMeshData, void> {
   let vertexCount = 0;
@@ -1015,7 +1030,7 @@ function* assembleSteps(name: GarmentName, pieces: readonly Piece[], aoField: Sc
           const hz = rz - HEAD[2];
           mask[(v0 + v) * 2] = scalpHairMask(hx, hy, hz);
           const a = scalpAzimuth(hx, hz);
-          const jaw = smoothstep(0.004, -0.03, hy) * smoothstep(0.56, 0.42, a) * smoothstep(-0.12, -0.085, hy);
+          const jaw = smoothstep(-0.022, -0.045, hy) * smoothstep(0.56, 0.42, a) * smoothstep(-0.12, -0.085, hy);
           const lips = smoothstep(0.03, 0.02, Math.hypot(hx * 0.9, (hy + 0.046) * 2.2)) * smoothstep(0.075, 0.085, hz);
           mask[(v0 + v) * 2 + 1] = jaw * (1 - lips);
         }
@@ -1025,6 +1040,7 @@ function* assembleSteps(name: GarmentName, pieces: readonly Piece[], aoField: Sc
     for (let i = 0; i < s.indices.length; i += 1) indices[i0 + i] = s.indices[i] + v0;
     v0 += s.vertexCount;
     i0 += s.indices.length;
+    yield;
   }
   return {
     name,
@@ -1175,4 +1191,9 @@ export function buildCharacterMeshes(detail: CharacterDetailLevel): CharacterMes
 /** Releases memoised CPU-side mesh data (e.g. after a tier change). */
 export function clearCharacterMeshCache(): void {
   cache.clear();
+}
+
+/** Stores meshes built elsewhere (the build worker) so later builders of this detail level start complete. */
+export function primeCharacterMeshCache(meshes: CharacterMeshes): void {
+  cache.set(meshes.detail, meshes);
 }

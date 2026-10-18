@@ -14,19 +14,26 @@ import {
   SOCKET_SPECS,
   characterDetailForTier,
   createCharacterMeshBuilder,
+  primeCharacterMeshCache,
+  type CharacterDetailLevel,
   type CharacterMeshBuilder,
+  type CharacterMeshes,
   type GarmentName,
   type SkinnedMeshData,
 } from './characterGeometry';
-import { buildHairGeometry } from './characterHair';
+import { createHairBuilder, primeHairCache, type HairBuilder, type HairGeometryData } from './characterHair';
+import type { CharacterBuildRequest, CharacterBuildResponse } from './characterBuild.worker';
 import { createCharacterMaterials, type CharacterMaterialSet } from './characterMaterials';
 
 /* ==========================================================================
  * Procedural protagonist assembly (no React; usable from Node for checks).
  *
  * The rig (bones + sockets) exists immediately so the animator and the gear
- * system can bind to it on the first frame. The garment meshes are built in
- * time slices (`build(budgetMs)` each frame) and attached when complete:
+ * system can bind to it on the first frame. The garment meshes and the hair
+ * are built OFF the main thread in a module worker (characterBuild.worker)
+ * and attached on the first frame after they arrive; without Worker support,
+ * or if the worker fails, the same build runs on the main thread in time
+ * slices (`build(budgetMs)` each frame). Either way the result is:
  * four SkinnedMeshes (jacket, trousers, boots, skin — one draw call each)
  * sharing one Skeleton, plus the hair (two passes over one card geometry)
  * parented to the Head bone.
@@ -40,6 +47,54 @@ import { createCharacterMaterials, type CharacterMaterialSet } from './character
 
 /** Default world-space wind direction: from the next mountain (−z) toward the camera (+z), slightly from the left. */
 export const DEFAULT_WIND_DIRECTION = new THREE.Vector3(0.25, 0.05, 1).normalize();
+
+/** Build options (harnesses / tests may disable the worker to exercise the time-sliced path). */
+export const characterBuildSettings = {
+  useWorker: true,
+};
+
+interface WorkerBuild {
+  result: { meshes: CharacterMeshes; hair: HairGeometryData } | null;
+  failed: boolean;
+}
+
+/** One worker build per detail level per page (shared by every character instance, e.g. StrictMode remounts). */
+const workerBuilds = new Map<CharacterDetailLevel, WorkerBuild>();
+
+function requestWorkerBuild(detail: CharacterDetailLevel): WorkerBuild | null {
+  if (!characterBuildSettings.useWorker || typeof Worker === 'undefined') return null;
+  const existing = workerBuilds.get(detail);
+  if (existing) return existing;
+  const entry: WorkerBuild = { result: null, failed: false };
+  workerBuilds.set(detail, entry);
+  try {
+    const worker = new Worker(new URL('./characterBuild.worker.ts', import.meta.url), { type: 'module', name: 'protagonist-build' });
+    worker.onmessage = (event: MessageEvent<CharacterBuildResponse>) => {
+      const data = event.data;
+      if (data.ok) {
+        primeCharacterMeshCache(data.meshes);
+        primeHairCache(data.detail, data.hair);
+        entry.result = { meshes: data.meshes, hair: data.hair };
+      } else {
+        console.warn('[Protagonist] build worker failed; building on the main thread.', data.error);
+        entry.failed = true;
+      }
+      worker.terminate();
+    };
+    worker.onerror = (event: ErrorEvent) => {
+      event.preventDefault();
+      console.warn('[Protagonist] build worker unavailable; building on the main thread.', event.message);
+      entry.failed = true;
+      worker.terminate();
+    };
+    const request: CharacterBuildRequest = { detail };
+    worker.postMessage(request);
+  } catch (error) {
+    console.warn('[Protagonist] could not start the build worker; building on the main thread.', error);
+    entry.failed = true;
+  }
+  return entry;
+}
 
 /** Bounding sphere (Root space) that contains the character in any pose (arms overhead, crouched, hanging). */
 const POSE_BOUNDS = new THREE.Sphere(new THREE.Vector3(0, 0.95, 0), 1.4);
@@ -124,7 +179,9 @@ export function createProceduralCharacter(options: ProceduralCharacterOptions): 
 
   const materials: CharacterMaterialSet = createCharacterMaterials({ skinTone: options.skinTone });
   const hairMaterials: SilkyHairMaterials = createSilkyHairMaterials({ alphaToCoverage: tier >= 3 });
-  const builder: CharacterMeshBuilder = createCharacterMeshBuilder(detail);
+  const workerBuild = requestWorkerBuild(detail);
+  let builder: CharacterMeshBuilder | null = null;
+  let hairBuilder: HairBuilder | null = null;
   const skeleton = new THREE.Skeleton(skinBones, bindInverses(skeletonParts));
   const identity = new THREE.Matrix4();
   const meshes: Partial<Record<GarmentName | 'hairOpaque' | 'hairSoft', THREE.Mesh>> = {};
@@ -139,9 +196,7 @@ export function createProceduralCharacter(options: ProceduralCharacterOptions): 
   const windLocal = new THREE.Vector3();
   const rootQuat = new THREE.Quaternion();
 
-  function attach(): void {
-    const result = builder.result;
-    if (!result) return;
+  function attach(result: CharacterMeshes, hairData: HairGeometryData, builtBy: 'worker' | 'main'): void {
     const order: readonly GarmentName[] = ['jacket', 'trousers', 'boots', 'skin'];
     for (const name of order) {
       const data = result.meshes[name];
@@ -157,7 +212,6 @@ export function createProceduralCharacter(options: ProceduralCharacterOptions): 
       root.add(mesh);
       meshes[name] = mesh;
     }
-    const hairData = buildHairGeometry(detail);
     const hairGeometry = createHairCardGeometry(hairData);
     geometries.push(hairGeometry);
     const hairOpaque = new THREE.Mesh(hairGeometry, hairMaterials.opaque);
@@ -174,7 +228,7 @@ export function createProceduralCharacter(options: ProceduralCharacterOptions): 
     meshes.hairOpaque = hairOpaque;
     meshes.hairSoft = hairSoft;
     triangleCount = result.triangleCount + hairData.triangleCount;
-    root.userData.protagonist = { procedural: true, detail, triangleCount, buildMs: result.buildMs };
+    root.userData.protagonist = { procedural: true, detail, triangleCount, buildMs: result.buildMs, builtBy };
     ready = true;
   }
 
@@ -189,7 +243,17 @@ export function createProceduralCharacter(options: ProceduralCharacterOptions): 
     meshes,
     build(budgetMs: number): boolean {
       if (ready) return true;
-      if (builder.step(budgetMs)) attach();
+      if (workerBuild && !workerBuild.failed) {
+        if (workerBuild.result) attach(workerBuild.result.meshes, workerBuild.result.hair, 'worker');
+        return ready;
+      }
+      builder ??= createCharacterMeshBuilder(detail);
+      hairBuilder ??= createHairBuilder(detail);
+      const start = typeof performance !== 'undefined' ? performance.now() : Date.now();
+      if (!builder.step(budgetMs) || !builder.result) return false;
+      const spent = (typeof performance !== 'undefined' ? performance.now() : Date.now()) - start;
+      if (!hairBuilder.step(Math.max(0.5, budgetMs - spent)) || !hairBuilder.result) return false;
+      attach(builder.result, hairBuilder.result, 'main');
       return ready;
     },
     update(delta: number, time: number, wind: number, windDirection: THREE.Vector3 | null): void {

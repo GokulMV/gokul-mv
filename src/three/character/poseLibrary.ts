@@ -64,6 +64,9 @@ export interface BodyPose {
   /** World point the eyes look at, and how strongly the head follows it (0..1). */
   readonly gaze: THREE.Vector3;
   gazeWeight: number;
+  /** Outward normal of the rock the body leans on (zero when free) and how far the pelvis may move toward it. */
+  readonly wallNormal: THREE.Vector3;
+  wallRoom: number;
   readonly limbs: readonly [LimbPose, LimbPose, LimbPose, LimbPose];
 }
 
@@ -93,6 +96,8 @@ export function createBodyPose(): BodyPose {
     head: new THREE.Quaternion(),
     gaze: new THREE.Vector3(0, 1.6, 10),
     gazeWeight: 0,
+    wallNormal: new THREE.Vector3(),
+    wallRoom: 10,
     limbs: [createLimbPose(), createLimbPose(), createLimbPose(), createLimbPose()],
   };
 }
@@ -120,12 +125,21 @@ export function copyBodyPose(src: BodyPose, dst: BodyPose): BodyPose {
   dst.head.copy(src.head);
   dst.gaze.copy(src.gaze);
   dst.gazeWeight = src.gazeWeight;
+  dst.wallNormal.copy(src.wallNormal);
+  dst.wallRoom = src.wallRoom;
   for (let i = 0; i < 4; i += 1) copyLimb(src.limbs[i], dst.limbs[i]);
   return dst;
 }
 
+const _slerpB = new THREE.Quaternion();
+
 function slerpInto(a: THREE.Quaternion, b: THREE.Quaternion, w: number, out: THREE.Quaternion): void {
-  // slerpQuaternions is safe when `out` aliases `a`.
+  // Quaternion.slerpQuaternions copies `a` into `out` first, so an `out` that aliases `b` needs a copy of b.
+  if (out === b) {
+    _slerpB.copy(b);
+    out.slerpQuaternions(a, _slerpB, w);
+    return;
+  }
   out.slerpQuaternions(a, b, w);
 }
 
@@ -159,6 +173,8 @@ export function blendBodyPose(a: BodyPose, b: BodyPose, w: number, out: BodyPose
   slerpInto(a.head, b.head, w, out.head);
   out.gaze.lerpVectors(a.gaze, b.gaze, w);
   out.gazeWeight = a.gazeWeight + (b.gazeWeight - a.gazeWeight) * w;
+  out.wallNormal.lerpVectors(a.wallNormal, b.wallNormal, w);
+  out.wallRoom = a.wallRoom + (b.wallRoom - a.wallRoom) * w;
   for (let i = 0; i < 4; i += 1) blendLimb(a.limbs[i], b.limbs[i], w, out.limbs[i]);
   return out;
 }
@@ -206,19 +222,39 @@ export function limbFK(
   outUpper: THREE.Quaternion,
   outLower: THREE.Quaternion,
 ): void {
-  basisRotation(rest.upperAxis, rest.poleAxis, dir, bend, outUpper);
+  // Hinge in the parent frame: bend × dir (the rest hinge is pole × axis).
+  _hingeW.crossVectors(bend, dir);
+  if (_hingeW.lengthSq() < 1e-10) _hingeW.set(dir.y, -dir.x, 0).normalize();
+  _hingeW.normalize();
+  basisRotation(rest.upperAxis, rest.hingeAxis, dir, _hingeW, outUpper);
   outLower.setFromAxisAngle(rest.hingeAxis, flex);
 }
 
+const _hingeW = new THREE.Vector3();
+
 const _dir = new THREE.Vector3();
 const _bend = new THREE.Vector3();
+const _cross = new THREE.Vector3();
+
+/**
+ * Bend direction of a limb pointing along `dir`: `base` (the derivative of the direction with respect to
+ * flexion, i.e. perpendicular to the limb in its swing plane) rotated about the limb by `twist` radians.
+ * Continuous for every pose, unlike a fixed reference vector.
+ */
+function bendAround(dir: THREE.Vector3, base: THREE.Vector3, twist: number, out: THREE.Vector3): THREE.Vector3 {
+  out.copy(base).addScaledVector(dir, -base.dot(dir));
+  if (out.lengthSq() < 1e-12) out.set(dir.y, -dir.x, 0);
+  out.normalize();
+  _cross.crossVectors(dir, out);
+  return out.multiplyScalar(Math.cos(twist)).addScaledVector(_cross, Math.sin(twist)).normalize();
+}
 
 /**
  * Arm FK from intuitive angles (radians), mirrored per side:
  *  raise   — swing forward/up in the sagittal plane (0 = hanging, π/2 = pointing forward, π = overhead);
  *  spread  — swing out to the side (0 = at the side, π/2 = horizontal out);
  *  elbow   — elbow flexion (0 = straight);
- *  elbowOut — how far the elbow points outward instead of backward (0..1).
+ *  elbowOut — how far the elbow turns outward from its natural backward/downward direction (0..1 → 0..90°).
  */
 export function armFK(
   rest: LimbRest,
@@ -236,9 +272,9 @@ export function armFK(
   const ss = Math.sin(spread);
   // Direction: start hanging (0,−1,0), raise toward +Z, then spread toward ±X.
   _dir.set(side * ss, -cr * cs, sr * cs).normalize();
-  // Elbow: backward (−Z) blended toward outward (±X), kept perpendicular-ish to the arm.
-  _bend.set(side * elbowOut, -0.15, -(1 - elbowOut)).normalize();
-  if (Math.abs(_bend.dot(_dir)) > 0.97) _bend.set(side * 0.3, 0.2, -1).normalize();
+  // The elbow points opposite to the raise motion (back when hanging, down when forward, forward overhead).
+  _bend.set(0, -sr, -cr);
+  bendAround(_dir, _bend, side * elbowOut * (Math.PI / 2), _bend);
   limbFK(rest, _dir, _bend, elbow, outUpper, outLower);
 }
 
@@ -247,7 +283,7 @@ export function armFK(
  *  hipFlex — thigh forward/up (0 = straight down, π/2 = horizontal forward; negative = behind);
  *  hipOut  — thigh out to the side;
  *  knee    — knee flexion (0 = straight);
- *  kneeOut — knee turned out (0..1).
+ *  kneeOut — knee turned out (0..1 → 0..90°).
  */
 export function legFK(
   rest: LimbRest,
@@ -264,8 +300,9 @@ export function legFK(
   const co = Math.cos(hipOut);
   const so = Math.sin(hipOut);
   _dir.set(side * so, -cf * co, sf * co).normalize();
-  _bend.set(side * kneeOut, 0.1, 1 - kneeOut).normalize();
-  if (Math.abs(_bend.dot(_dir)) > 0.97) _bend.set(side * 0.3, -0.2, 1).normalize();
+  // The knee points along the flexion motion (forward when standing, up when the thigh is horizontal).
+  _bend.set(0, sf, cf);
+  bendAround(_dir, _bend, -side * kneeOut * (Math.PI / 2), _bend);
   limbFK(rest, _dir, _bend, knee, outUpper, outLower);
 }
 

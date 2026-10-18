@@ -1,4 +1,4 @@
-import { CRANIUM_CENTER, CRANIUM_RADII, HEAD_PIVOT, headSdf, scalpHairMask, smoothstep, type CharacterDetailLevel } from './characterGeometry';
+import { CRANIUM_CENTER, CRANIUM_RADII, scalpHairMask, scalpSdf, smoothstep, type CharacterDetailLevel } from './characterGeometry';
 
 /* ==========================================================================
  * Layered hair cards — PURE module (no React, no DOM; runs in Node).
@@ -49,9 +49,9 @@ export interface HairDetail {
 }
 
 const LAYERS_HIGH: readonly HairLayerSpec[] = [
-  { count: 300, length: 0.78, clearance: 0.0022, lift: 0.0022, width: 0.0125, twist: 0.08, minY: -1 },
-  { count: 250, length: 0.98, clearance: 0.0048, lift: 0.0045, width: 0.0135, twist: 0.16, minY: -0.02 },
-  { count: 150, length: 1.08, clearance: 0.0078, lift: 0.0095, width: 0.0145, twist: 0.32, minY: 0.045 },
+  { count: 360, length: 0.86, clearance: 0.002, lift: 0.0018, width: 0.0142, twist: 0.05, minY: -1 },
+  { count: 270, length: 0.98, clearance: 0.0042, lift: 0.0032, width: 0.015, twist: 0.08, minY: -0.06 },
+  { count: 140, length: 1.06, clearance: 0.006, lift: 0.0042, width: 0.016, twist: 0.08, minY: 0.04 },
 ];
 
 export const HAIR_DETAIL: Readonly<Record<CharacterDetailLevel, HairDetail>> = {
@@ -59,17 +59,17 @@ export const HAIR_DETAIL: Readonly<Record<CharacterDetailLevel, HairDetail>> = {
   medium: {
     segments: 5,
     layers: [
-      { ...LAYERS_HIGH[0], count: 200, width: 0.0145 },
-      { ...LAYERS_HIGH[1], count: 160, width: 0.0158 },
-      { ...LAYERS_HIGH[2], count: 100, width: 0.0165 },
+      { ...LAYERS_HIGH[0], count: 220, width: 0.0165 },
+      { ...LAYERS_HIGH[1], count: 180, width: 0.0175 },
+      { ...LAYERS_HIGH[2], count: 90, width: 0.018 },
     ],
   },
   low: {
     segments: 4,
     layers: [
-      { ...LAYERS_HIGH[0], count: 130, width: 0.017 },
-      { ...LAYERS_HIGH[1], count: 100, width: 0.019 },
-      { ...LAYERS_HIGH[2], count: 64, width: 0.02 },
+      { ...LAYERS_HIGH[0], count: 140, width: 0.019 },
+      { ...LAYERS_HIGH[1], count: 110, width: 0.021 },
+      { ...LAYERS_HIGH[2], count: 56, width: 0.022 },
     ],
   },
 };
@@ -106,10 +106,8 @@ function mulberry32(seed: number): () => number {
 
 const mix = (a: number, b: number, t: number): number => a + (b - a) * t;
 
-/** Head-local SDF of the skin (cranium, face, ears). */
-function headLocalSdf(x: number, y: number, z: number): number {
-  return headSdf(x + HEAD_PIVOT[0], y + HEAD_PIVOT[1], z + HEAD_PIVOT[2]);
-}
+/** Head-local SDF of the scalp the hair grows on (neck, cranium, forehead, ears). */
+const headLocalSdf = scalpSdf;
 
 const _g = new Float64Array(3);
 
@@ -125,16 +123,21 @@ function headNormal(x: number, y: number, z: number, out: Float64Array): void {
   out[2] = gz / l;
 }
 
-/** Pushes a head-local point to at least `clearance` above the skin (writes p). */
-function keepClear(p: Float64Array, clearance: number): void {
+/**
+ * Keeps a head-local point between `clearance` and `clearance + slack` above the skin (writes p): strands are
+ * pushed out of the scalp and pulled back onto it where a tangential step would leave the skull (no shelves).
+ */
+function hugScalp(p: Float64Array, clearance: number, slack: number): void {
   for (let i = 0; i < 3; i += 1) {
     const d = headLocalSdf(p[0], p[1], p[2]);
-    if (d >= clearance) return;
+    let move = 0;
+    if (d < clearance) move = clearance - d;
+    else if (d > clearance + slack) move = clearance + slack - d;
+    if (Math.abs(move) < 1e-5) return;
     headNormal(p[0], p[1], p[2], _g);
-    const push = clearance - d;
-    p[0] += _g[0] * push;
-    p[1] += _g[1] * push;
-    p[2] += _g[2] * push;
+    p[0] += _g[0] * move;
+    p[1] += _g[1] * move;
+    p[2] += _g[2] * move;
   }
 }
 
@@ -154,8 +157,8 @@ function combDirection(x: number, y: number, z: number, out: Float64Array): void
   let cz = -1;
   // Top: swept back and to the right (−x) from the part, lifted at the front; left of the part falls to the left.
   const sx = mix(-0.55, 0.6, leftOfPart);
-  const sy = mix(0.18 + 0.55 * front, -0.25, leftOfPart);
-  const sz = mix(-0.9 + 0.2 * front, -0.55, leftOfPart);
+  const sy = mix(0.1 + 0.28 * front, -0.25, leftOfPart);
+  const sz = mix(-1.0 + 0.1 * front, -0.55, leftOfPart);
   cx = mix(cx, sx, top);
   cy = mix(cy, sy, top);
   cz = mix(cz, sz, top);
@@ -169,7 +172,7 @@ function combDirection(x: number, y: number, z: number, out: Float64Array): void
   const wy = y - CROWN[1];
   const wz = z - CROWN[2];
   const wd = Math.hypot(wx, wy, wz);
-  const whorl = smoothstep(0.045, 0.012, wd);
+  const whorl = smoothstep(0.03, 0.008, wd) * 0.7;
   if (whorl > 0) {
     // Tangential swirl (clockwise seen from above) plus outward spread.
     const tx = -wz;
@@ -190,12 +193,12 @@ function styleLength(x: number, y: number, z: number): number {
   const front = smoothstep(0.0, 0.08, z);
   const low = smoothstep(0.035, -0.035, y);
   const nape = smoothstep(-0.06, -0.1, z) * low;
-  let l = mix(0.04, 0.078 + 0.024 * front, top);
-  l = mix(l, 0.022, low * 0.85);
-  l = mix(l, 0.017, nape);
+  let l = mix(0.052, 0.082 + 0.022 * front, top);
+  l = mix(l, 0.036, low * 0.85);
+  l = mix(l, 0.026, nape);
   // Side taper above the ears.
   const side = smoothstep(0.058, 0.075, Math.abs(x)) * (1 - top);
-  return mix(l, l * 0.7, side);
+  return mix(l, l * 0.85, side);
 }
 
 /* ---------------------------------------------------------------------------
@@ -204,10 +207,9 @@ function styleLength(x: number, y: number, z: number): number {
 
 const cache = new Map<CharacterDetailLevel, HairGeometryData>();
 
-/** Builds (memoised per detail level) the layered hair cards in head-local space. */
-export function buildHairGeometry(detail: CharacterDetailLevel): HairGeometryData {
-  const cached = cache.get(detail);
-  if (cached) return cached;
+const CARDS_PER_YIELD = 6;
+
+function* buildHairSteps(detail: CharacterDetailLevel): Generator<void, HairGeometryData, void> {
   const spec = HAIR_DETAIL[detail];
   const S = spec.segments;
   const positions: number[] = [];
@@ -230,7 +232,8 @@ export function buildHairGeometry(detail: CharacterDetailLevel): HairGeometryDat
   let maxY = -Infinity;
   let maxZ = -Infinity;
 
-  spec.layers.forEach((layer, layerIndex) => {
+  for (let layerIndex = 0; layerIndex < spec.layers.length; layerIndex += 1) {
+    const layer = spec.layers[layerIndex];
     const layerT = spec.layers.length > 1 ? layerIndex / (spec.layers.length - 1) : 0;
     // Oversample the sphere so roughly `count` roots survive the scalp mask.
     const samples = Math.round(layer.count * 2.6);
@@ -274,9 +277,11 @@ export function buildHairGeometry(detail: CharacterDetailLevel): HairGeometryDat
       const width = layer.width * (0.8 + 0.4 * rand());
 
       // Grow the strand.
-      pts[0] = p[0] + n[0] * clearance;
-      pts[1] = p[1] + n[1] * clearance;
-      pts[2] = p[2] + n[2] * clearance;
+      // Roots sit on the skin; each strand rises to its layer's clearance over the first third of its length.
+      const rootClear = 0.0008;
+      pts[0] = p[0] + n[0] * rootClear;
+      pts[1] = p[1] + n[1] * rootClear;
+      pts[2] = p[2] + n[2] * rootClear;
       nrm[0] = n[0];
       nrm[1] = n[1];
       nrm[2] = n[2];
@@ -294,7 +299,7 @@ export function buildHairGeometry(detail: CharacterDetailLevel): HairGeometryDat
         let dy = c[1] - n[1] * cn;
         let dz = c[2] - n[2] * cn;
         const dl = Math.hypot(dx, dy, dz) || 1;
-        const rise = (1 - t) * (0.12 + 0.35 * topness * layerT);
+        const rise = (1 - t) * (0.08 + 0.22 * topness * layerT);
         dx = dx / dl + n[0] * rise;
         dy = dy / dl + n[1] * rise;
         dz = dz / dl + n[2] * rise;
@@ -302,7 +307,10 @@ export function buildHairGeometry(detail: CharacterDetailLevel): HairGeometryDat
         p[0] = qx + (dx / l2) * ds;
         p[1] = qy + (dy / l2) * ds;
         p[2] = qz + (dz / l2) * ds;
-        keepClear(p, clearance + lift * t);
+        const target = rootClear + (clearance - rootClear) * smoothstep(0, 0.38, t) + lift * t;
+        // Strands below the skull's equator may hang free a little (gravity); elsewhere they hug the scalp.
+        const fringe = smoothstep(0.0, 0.07, p[2]) * topness * layerT;
+        hugScalp(p, target + 0.005 * fringe * t, 0.0015 + 0.004 * smoothstep(0.02, -0.04, p[1]) * t + 0.005 * fringe);
         pts[s * 3] = p[0];
         pts[s * 3 + 1] = p[1];
         pts[s * 3 + 2] = p[2];
@@ -351,7 +359,7 @@ export function buildHairGeometry(detail: CharacterDetailLevel): HairGeometryDat
         by = rby;
         bz = rbz;
         const t = s / S;
-        const w = width * (1 - 0.6 * Math.pow(t, 1.25)) * 0.5;
+        const w = width * (1 - 0.42 * Math.pow(t, 1.4)) * 0.5;
         for (let side = 0; side < 2; side += 1) {
           const sgn = side === 0 ? -1 : 1;
           const vx = pts[s * 3] + bx * w * sgn;
@@ -377,8 +385,9 @@ export function buildHairGeometry(detail: CharacterDetailLevel): HairGeometryDat
         const b1 = a0 + 3;
         indices.push(a0, b0, a1, b0, b1, a1);
       }
+      if (cardCount % CARDS_PER_YIELD === 0) yield;
     }
-  });
+  }
 
   const vertexCount = positions.length / 3;
   const cx = (minX + maxX) / 2;
@@ -401,6 +410,51 @@ export function buildHairGeometry(detail: CharacterDetailLevel): HairGeometryDat
     boundingCenter: [cx, cy, cz],
     boundingRadius: radius + 0.08,
   };
-  cache.set(detail, result);
   return result;
+}
+
+/** Incremental (time-sliceable) hair builder; memoised per detail level on completion. */
+export interface HairBuilder {
+  /** Advances the build for up to `budgetMs`; returns true once `result` is available. */
+  step(budgetMs: number): boolean;
+  readonly result: HairGeometryData | null;
+}
+
+function now(): number {
+  return typeof performance !== 'undefined' ? performance.now() : Date.now();
+}
+
+export function createHairBuilder(detail: CharacterDetailLevel): HairBuilder {
+  let result: HairGeometryData | null = cache.get(detail) ?? null;
+  const it = result ? null : buildHairSteps(detail);
+  return {
+    get result() {
+      return result;
+    },
+    step(budgetMs: number): boolean {
+      if (result || !it) return true;
+      const start = now();
+      for (;;) {
+        const r = it.next();
+        if (r.done) {
+          result = r.value;
+          cache.set(detail, result);
+          return true;
+        }
+        if (now() - start >= budgetMs) return false;
+      }
+    },
+  };
+}
+
+/** Stores hair built elsewhere (the build worker) so later builders of this detail level start complete. */
+export function primeHairCache(detail: CharacterDetailLevel, hair: HairGeometryData): void {
+  cache.set(detail, hair);
+}
+
+/** Builds (or returns the memoised) layered hair cards in head-local space synchronously. */
+export function buildHairGeometry(detail: CharacterDetailLevel): HairGeometryData {
+  const builder = createHairBuilder(detail);
+  builder.step(Number.POSITIVE_INFINITY);
+  return builder.result as HairGeometryData;
 }
