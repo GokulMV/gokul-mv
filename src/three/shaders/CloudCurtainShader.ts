@@ -47,6 +47,8 @@ uniform float uCount;
 uniform float uDissolve;
 uniform vec3 uSunView;
 uniform vec4 uFade;
+uniform vec3 uDolly;
+uniform vec2 uFollow;
 
 varying vec2 vUv;
 varying vec3 vViewPos;
@@ -65,6 +67,9 @@ void main() {
 
   vec3 center = aCenter;
   center.y += aPartTune.z * part;
+  // Opening dolly parallax: deeper layers drift forward with the camera, so
+  // the main bank stays ahead long enough to part while near puffs stream by.
+  center += uDolly * mix(uFollow.x, uFollow.y, layer);
 
   // Slow convective drift; deeper layers swing wider.
   float t = uTime * aMotion.x + aMotion.y;
@@ -85,6 +90,10 @@ void main() {
   // Depth fade: near-plane fade scales with the puff size so a cloud never
   // fills the screen as a flat sheet; far fade keeps distant puffs cheap.
   float nearFade = smoothstep(uFade.x + size * 0.06, uFade.y + size * 0.32, dist);
+  // Approach fade: a puff dissolves once it looms 1.5–2.8× larger than it
+  // framed the opening shot (flying through never shows a flat sheet).
+  float growth = max(layer * uPartDepth, 2.5) / max(dist, 1e-3);
+  nearFade *= 1.0 - smoothstep(1.5, 2.8, growth);
   float farFade = 1.0 - smoothstep(uFade.z, uFade.w, dist);
   // Adaptive-quality cross fade: instances beyond the damped count vanish softly.
   float rankFade = clamp(uCount - aPartTune.w, 0.0, 1.0);
@@ -186,11 +195,17 @@ vec2 warpField(vec2 p) {
   return w;
 }
 
-// Density of one puff: a dome sculpted into lobes, eroded by billows, with a
-// radial mask that reaches exactly zero before the quad's edge.
-float cloudDensity(vec2 nz, float r2, float bias) {
+// Low-frequency body of one puff: a dome sculpted into lobes with a
+// slightly flattened base. Positive where the puff is substantial.
+float cloudBody(vec2 nz, float r2, float h, float bias) {
   float dome = 1.0 - r2;
-  float body = dome * 1.3 + (nz.x - 0.5) * 2.3 - 0.36 + bias;
+  float base = smoothstep(-0.25, -0.95, h) * 0.22;
+  return dome * 1.2 + (nz.x - 0.5) * 2.8 - 0.3 - base + bias;
+}
+
+// Final density: the body eroded by billows, with a radial mask that reaches
+// exactly zero before the quad's edge.
+float cloudDensity(float body, vec2 nz, float r2) {
   float erosion = (1.0 - clamp(nz.y * 1.9, 0.0, 1.0)) * 0.34;
   float d = (body - erosion) / (1.0 - erosion * 0.5);
   float edge = 1.0 - smoothstep(0.62, 1.0, r2);
@@ -210,6 +225,7 @@ void main() {
   float seed = vInst.x;
   float part = vInst.z;
   float layer = vInst.w;
+  float h = dot(uv, vUpLocal);
 
   // Coverage thins as the curtain parts and erodes away during the dissolve.
   float bias = uCoverage - part * 0.14 - uDissolve * 0.9;
@@ -221,22 +237,29 @@ void main() {
   vec2 warpOffset = warp * 0.05 + flow;
 
   vec2 nz = cloudFbm(base + warpOffset);
-  float density = cloudDensity(nz, r2, bias);
+  float body = cloudBody(nz, r2, h, bias);
+  float density = cloudDensity(body, nz, r2);
   if (density < 0.002) discard;
 
   // ---- self-shadowing: march toward the sun in the quad's local frame ----
   vec2 sunDir = vSunLocal.xy;
   vec2 uvA = uv + sunDir * 0.1;
-  float dA = cloudDensity(cloudFbmLow(uvA * NOISE_FREQ + seedOffset + warpOffset), dot(uvA, uvA), bias);
+  float r2A = dot(uvA, uvA);
+  vec2 nzA = cloudFbmLow(uvA * NOISE_FREQ + seedOffset + warpOffset);
+  float dA = cloudDensity(cloudBody(nzA, r2A, dot(uvA, vUpLocal), bias), nzA, r2A);
   float opticalDepth = dA;
 #if CLOUD_SHADOW_TAPS > 1
   vec2 uvB = uv + sunDir * 0.28;
-  float dB = cloudDensity(cloudFbmLow(uvB * NOISE_FREQ + seedOffset + warpOffset), dot(uvB, uvB), bias);
-  opticalDepth += dB * 0.8;
+  float r2B = dot(uvB, uvB);
+  vec2 nzB = cloudFbmLow(uvB * NOISE_FREQ + seedOffset + warpOffset);
+  opticalDepth += cloudDensity(cloudBody(nzB, r2B, dot(uvB, vUpLocal), bias), nzB, r2B) * 0.8;
 #else
   opticalDepth *= 1.6;
 #endif
+  // Single scattering plus a softer multiple-scattering octave so dense
+  // cores stay luminous instead of turning into flat dark discs.
   float transmittance = exp(-opticalDepth * uShadowK);
+  float scattered = transmittance + exp(-opticalDepth * uShadowK * 0.25) * 0.3;
 
   // ---- pseudo-spherical normal of the puff for broad sun shading ----
   float rr = sqrt(r2);
@@ -250,24 +273,24 @@ void main() {
   float phase = clamp(henyeyGreenstein(cosTheta, 0.6) * 0.2 + henyeyGreenstein(cosTheta, -0.2) * 0.1, 0.0, 3.0);
 
   // Skylight from above, darker undersides, darker dense cores (powder).
-  float height = clamp(dot(uv, vUpLocal) * 0.5 + 0.5, 0.0, 1.0);
+  float height = clamp(h * 0.5 + 0.5, 0.0, 1.0);
   float powder = 1.0 - exp(-density * 3.0);
 
-  float sunLight = transmittance * wrapLight;
+  float sunLight = clamp(scattered * wrapLight, 0.0, 1.0);
   // Thin parts let skylight through, so they never go as dark as dense cores.
-  float shadowLevel = mix(0.3, 0.78, height) + (1.0 - powder) * 0.25;
+  float shadowLevel = mix(0.4, 0.85, height) + (1.0 - powder) * 0.2;
   vec3 shadowBody = uShadowColor * shadowLevel;
-  vec3 litBody = uLitColor * mix(vec3(1.0), uSunColor, 0.45) * 1.25;
-  vec3 color = mix(shadowBody, litBody, smoothstep(0.02, 0.7, sunLight));
+  vec3 litBody = uLitColor * mix(vec3(1.0), uSunColor, 0.45) * 1.22;
+  vec3 color = mix(shadowBody, litBody, smoothstep(0.04, 0.8, sunLight));
   color += uAmbientColor * (0.03 + 0.08 * height);
-  color += uSunColor * transmittance * phase * 0.25;
+  color += uSunColor * scattered * phase * 0.32;
 
-  // ---- silver lining: thin, sun-facing edges glow warm ----
-  float thin = 1.0 - smoothstep(0.0, 0.42, density);
-  float gradFacing = clamp((density - dA) * 5.0, 0.0, 1.0);
-  float rimFacing = smoothstep(0.3, 0.92, rr) * clamp(dot(uv / max(rr, 1e-3), sunDir), 0.0, 1.0);
-  float facing = max(gradFacing, rimFacing * 0.8);
-  float silver = thin * facing * (0.6 + phase * 1.5);
+  // ---- silver lining: thin, sun-facing fringes of substantial puffs ----
+  float thin = 1.0 - smoothstep(0.0, 0.5, density);
+  float rimFacing = smoothstep(0.25, 0.9, rr) * clamp(dot(uv / max(rr, 1e-3), sunDir), 0.0, 1.0);
+  float facing = clamp((density - dA) * 2.5 + rimFacing * 0.7, 0.0, 1.0);
+  float substantial = smoothstep(0.15, 0.65, body);
+  float silver = thin * facing * substantial * (0.55 + phase * 1.4);
   color += uLiningColor * silver * uLiningStrength;
 
   // Aerial perspective: deeper layers sink into the twilight haze.
@@ -311,6 +334,10 @@ export type CloudCurtainUniforms = {
   uSunView: THREE.IUniform<THREE.Vector3>;
   /** x near fade start, y near fade end, z far fade start, w far fade end. */
   uFade: THREE.IUniform<THREE.Vector4>;
+  /** Camera displacement from the opening eye (curtain space), 0 once camera-anchored. */
+  uDolly: THREE.IUniform<THREE.Vector3>;
+  /** Fraction of uDolly followed by the nearest (x) and deepest (y) layers. */
+  uFollow: THREE.IUniform<THREE.Vector2>;
   uLitColor: THREE.IUniform<THREE.Color>;
   uShadowColor: THREE.IUniform<THREE.Color>;
   uLiningColor: THREE.IUniform<THREE.Color>;
@@ -334,9 +361,11 @@ export function createCloudCurtainUniforms(noise: THREE.Texture): CloudCurtainUn
     uDensity: { value: 5.0 },
     uShadowK: { value: 1.3 },
     uDissolve: { value: 0 },
-    uLiningStrength: { value: 2.2 },
+    uLiningStrength: { value: 1.6 },
     uSunView: { value: SUN_DIRECTION.clone() },
     uFade: { value: new THREE.Vector4(0.35, 1.6, 70, 120) },
+    uDolly: { value: new THREE.Vector3() },
+    uFollow: { value: new THREE.Vector2(0.12, 0.72) },
     uLitColor: { value: new THREE.Color(PALETTE.cloudLit) },
     uShadowColor: { value: new THREE.Color(PALETTE.cloudShadow) },
     uLiningColor: { value: new THREE.Color(PALETTE.cloudLining) },

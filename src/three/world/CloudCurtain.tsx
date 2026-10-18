@@ -441,6 +441,7 @@ const _relativeQuaternion = new THREE.Quaternion();
 const _relativeScale = new THREE.Vector3();
 const _anchorPosition = new THREE.Vector3();
 const _anchorQuaternion = new THREE.Quaternion();
+const _cameraPosition = new THREE.Vector3();
 
 /* ---------------------------------------------------------------------------
  * Component
@@ -483,6 +484,10 @@ export function CloudCurtain(): JSX.Element {
         _anchorQuaternion.identity().slerp(_relativeQuaternion, s.anchor);
         mesh.matrixWorld.compose(_anchorPosition, _anchorQuaternion, UNIT_SCALE);
       }
+      // Opening dolly (world-anchored phase only): how far the camera has moved
+      // from the opening eye, consumed by the per-layer parallax follow.
+      _cameraPosition.setFromMatrixPosition(cameraRef.current.matrixWorld);
+      system.uniforms.uDolly.value.subVectors(_cameraPosition, OPENING_EYE).multiplyScalar(1 - s.anchor);
       system.uniforms.uSunView.value.copy(SUN_DIRECTION).transformDirection(renderCamera.matrixWorldInverse);
     };
     return () => {
