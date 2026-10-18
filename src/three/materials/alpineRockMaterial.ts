@@ -75,9 +75,43 @@ export type AlpineRockMaterial = THREE.MeshStandardMaterial & {
   userData: { rockUniforms: AlpineRockUniforms };
 };
 
+/* Hash and value noise, shared by the vertex and fragment stages. */
+const NOISE_COMMON = /* glsl */ `
+float rockHash13( vec3 p3 ) {
+	p3 = fract( p3 * 0.1031 );
+	p3 += dot( p3, p3.zyx + 31.32 );
+	return fract( ( p3.x + p3.y ) * p3.z );
+}
+
+/* 3D value noise in [0, 1]. */
+float rockValue3( vec3 p ) {
+	vec3 i = floor( p );
+	vec3 f = fract( p );
+	vec3 u = f * f * ( 3.0 - 2.0 * f );
+	float a = rockHash13( i );
+	float b = rockHash13( i + vec3( 1.0, 0.0, 0.0 ) );
+	float c = rockHash13( i + vec3( 0.0, 1.0, 0.0 ) );
+	float d = rockHash13( i + vec3( 1.0, 1.0, 0.0 ) );
+	float e = rockHash13( i + vec3( 0.0, 0.0, 1.0 ) );
+	float f1 = rockHash13( i + vec3( 1.0, 0.0, 1.0 ) );
+	float g = rockHash13( i + vec3( 0.0, 1.0, 1.0 ) );
+	float h = rockHash13( i + vec3( 1.0, 1.0, 1.0 ) );
+	return mix( mix( mix( a, b, u.x ), mix( c, d, u.x ), u.y ), mix( mix( e, f1, u.x ), mix( g, h, u.x ), u.y ), u.z );
+}
+`;
+
+/*
+ * Low-frequency fields (features of 5–35 units) are evaluated per vertex and
+ * interpolated: x = macro tone, y = fractured-zone mask, z = joint warp,
+ * w = iron staining; vRockSnowLow = large-scale snow noise.
+ */
 const VERTEX_PARS = /* glsl */ `
+uniform float uPatternScale;
 varying vec3 vRockPos;
 varying vec3 vRockNormal;
+varying vec4 vRockLow;
+varying float vRockSnowLow;
+${NOISE_COMMON}
 #ifdef ROCK_VERTEX_AO
 attribute float aOcclusion;
 varying float vRockAO;
@@ -91,6 +125,16 @@ varying float vRockCurv;
 const VERTEX_MAIN = /* glsl */ `
 vRockPos = ( modelMatrix * vec4( transformed, 1.0 ) ).xyz;
 vRockNormal = normalize( mat3( modelMatrix ) * objectNormal );
+{
+	vec3 lowP = vRockPos * uPatternScale;
+	vRockLow = vec4(
+		rockValue3( lowP * 0.028 ) * 0.6 + rockValue3( lowP * 0.1 + 11.0 ) * 0.4,
+		rockValue3( lowP * 0.05 + vec3( 2.0, -4.0, 1.0 ) ),
+		rockValue3( lowP * 0.045 ),
+		rockValue3( lowP * 0.07 + vec3( 3.0, 1.0, -7.0 ) )
+	);
+	vRockSnowLow = rockValue3( lowP * 0.19 + 3.0 );
+}
 #ifdef ROCK_VERTEX_AO
 vRockAO = aOcclusion;
 #endif
@@ -114,39 +158,20 @@ uniform vec3 uSnowColor;
 uniform vec3 uSnowShadow;
 varying vec3 vRockPos;
 varying vec3 vRockNormal;
+varying vec4 vRockLow;
+varying float vRockSnowLow;
 #ifdef ROCK_VERTEX_AO
 varying float vRockAO;
 #endif
 #ifdef ROCK_VERTEX_CURVATURE
 varying float vRockCurv;
 #endif
-
-float rockHash13( vec3 p3 ) {
-	p3 = fract( p3 * 0.1031 );
-	p3 += dot( p3, p3.zyx + 31.32 );
-	return fract( ( p3.x + p3.y ) * p3.z );
-}
+${NOISE_COMMON}
 
 vec3 rockHash33( vec3 p3 ) {
 	p3 = fract( p3 * vec3( 0.1031, 0.1030, 0.0973 ) );
 	p3 += dot( p3, p3.yxz + 33.33 );
 	return fract( ( p3.xxy + p3.yxx ) * p3.zyx );
-}
-
-/* 3D value noise in [0, 1]. */
-float rockValue3( vec3 p ) {
-	vec3 i = floor( p );
-	vec3 f = fract( p );
-	vec3 u = f * f * ( 3.0 - 2.0 * f );
-	float a = rockHash13( i );
-	float b = rockHash13( i + vec3( 1.0, 0.0, 0.0 ) );
-	float c = rockHash13( i + vec3( 0.0, 1.0, 0.0 ) );
-	float d = rockHash13( i + vec3( 1.0, 1.0, 0.0 ) );
-	float e = rockHash13( i + vec3( 0.0, 0.0, 1.0 ) );
-	float f1 = rockHash13( i + vec3( 1.0, 0.0, 1.0 ) );
-	float g = rockHash13( i + vec3( 0.0, 1.0, 1.0 ) );
-	float h = rockHash13( i + vec3( 1.0, 1.0, 1.0 ) );
-	return mix( mix( mix( a, b, u.x ), mix( c, d, u.x ), u.y ), mix( mix( e, f1, u.x ), mix( g, h, u.x ), u.y ), u.z );
 }
 
 /* 3D value noise with analytic derivatives: ( value in [0, 1], d/dx, d/dy, d/dz ). */
@@ -238,11 +263,11 @@ void rockJointSet( vec3 p, vec3 pn, float sp, float warp, float openAt, float se
 /*
  * Fracture facets: jittered 3D cells. Returns the distance along the surface
  * to the nearest cell boundary; id1 / id2 are the two nearest cells and toEdge
- * the tangent direction pointing at the boundary. Below the high tier the
- * search covers only the 2x2x2 cells around the nearest lattice corner (with a
- * smaller jitter to match).
+ * the tangent direction pointing at the boundary. With wide set it searches
+ * the 27 cells around the point (large jitter, irregular cells); otherwise only
+ * the 2x2x2 cells around the nearest lattice corner (smaller jitter to match).
  */
-float rockFacets( vec3 p, vec3 invScale, vec3 n, out vec3 id1, out vec3 id2, out vec3 toEdge ) {
+float rockFacets( vec3 p, vec3 invScale, vec3 n, bool wide, out vec3 id1, out vec3 id2, out vec3 toEdge ) {
 	vec3 q = p * invScale;
 	float d1 = 1e9;
 	float d2 = 1e9;
@@ -250,21 +275,18 @@ float rockFacets( vec3 p, vec3 invScale, vec3 n, out vec3 id1, out vec3 id2, out
 	vec3 c2 = q + 1.0;
 	id1 = floor( q );
 	id2 = id1;
-	#if ROCK_QUALITY < 2
-		vec3 b = floor( q - 0.5 );
-		for ( int k = 0; k <= 1; k ++ ) {
-			for ( int j = 0; j <= 1; j ++ ) {
-				for ( int i = 0; i <= 1; i ++ ) {
-					vec3 g = b + vec3( float( i ), float( j ), float( k ) );
-					vec3 c = g + 0.3 + 0.4 * rockHash33( g );
-	#else
-		vec3 b = floor( q );
-		for ( int k = - 1; k <= 1; k ++ ) {
-			for ( int j = - 1; j <= 1; j ++ ) {
-				for ( int i = - 1; i <= 1; i ++ ) {
-					vec3 g = b + vec3( float( i ), float( j ), float( k ) );
-					vec3 c = g + 0.12 + 0.76 * rockHash33( g );
-	#endif
+	// wide: the 27 cells around the point (large jitter); otherwise the 8 cells around the nearest lattice corner.
+	vec3 b = wide ? floor( q ) - 1.0 : floor( q - 0.5 );
+	int span = wide ? 3 : 2;
+	float jitter = wide ? 0.76 : 0.4;
+	for ( int k = 0; k < 3; k ++ ) {
+		if ( k >= span ) break;
+		for ( int j = 0; j < 3; j ++ ) {
+			if ( j >= span ) break;
+			for ( int i = 0; i < 3; i ++ ) {
+				if ( i >= span ) break;
+				vec3 g = b + vec3( float( i ), float( j ), float( k ) );
+				vec3 c = g + 0.5 - 0.5 * jitter + jitter * rockHash33( g );
 				vec3 r = c - q;
 				float d = dot( r, r );
 				if ( d < d1 ) {
@@ -322,10 +344,10 @@ const FRAGMENT_SURFACE = /* glsl */ `
 	// Joints, facets and relief fade out with distance: far rock (flanks, skirt) skips them entirely.
 	if ( rockBlockFade > 0.0 ) {
 		// Fractured zones carry many open joints; elsewhere the granite is massive.
-		float rockFracZone = smoothstep( 0.3, 0.7, rockValue3( rockP * 0.05 + vec3( 2.0, -4.0, 1.0 ) ) );
+		float rockFracZone = smoothstep( 0.3, 0.7, vRockLow.y );
 		float rockOpenAt = mix( 0.64, 0.4, rockFracZone );
 		// Low-frequency warp that bends the joint planes and varies their spacing.
-		float rockWarp = rockValue3( rockP * 0.045 ) - 0.5 + ( rockValue3( rockP * 0.4 + 9.0 ) - 0.5 ) * 0.05;
+		float rockWarp = vRockLow.z - 0.5 + ( rockValue3( rockP * 0.4 + 9.0 ) - 0.5 ) * 0.05;
 
 		// ---- Joints: two steep sets (vertical jointing) and gently dipping sheeting joints.
 		rockJointSet( rockP, vec3( 0.86, 0.0, 0.51 ), 3.1, rockWarp * 1.6, rockOpenAt, 0.14, 1.0, rockN, rockPx, rockLineFade, rockBlockFade, rockOff, rockCrack );
@@ -346,7 +368,7 @@ const FRAGMENT_SURFACE = /* glsl */ `
 			vec3 fId1;
 			vec3 fId2;
 			vec3 fTo;
-			float fe = rockFacets( rockP, vec3( 1.0 / 3.8, 1.0 / 5.0, 1.0 / 3.8 ), rockN, fId1, fId2, fTo );
+			float fe = rockFacets( rockP, vec3( 1.0 / 3.8, 1.0 / 5.0, 1.0 / 3.8 ), rockN, ROCK_QUALITY > 1, fId1, fId2, fTo );
 			vec3 tilt = rockHash33( fId1 * 1.37 + 4.1 ) * 2.0 - 1.0;
 			// The 2x2x2 search below the high tier gives more regular cells: keep their tilt subtler.
 			#if ROCK_QUALITY < 2
@@ -380,7 +402,7 @@ const FRAGMENT_SURFACE = /* glsl */ `
 			vec3 cId1;
 			vec3 cId2;
 			vec3 cTo;
-			float ce = rockFacets( rockP + vec3( 13.1, -7.3, 5.9 ), vec3( 1.0 / 0.7, 1.0 / 0.9, 1.0 / 0.7 ), rockN, cId1, cId2, cTo );
+			float ce = rockFacets( rockP + vec3( 13.1, -7.3, 5.9 ), vec3( 1.0 / 0.7, 1.0 / 0.9, 1.0 / 0.7 ), rockN, false, cId1, cId2, cTo );
 			vec3 tilt = rockHash33( cId1 * 1.91 - 2.3 ) * 2.0 - 1.0;
 			rockOff += tilt * 0.07 * rockChipFade;
 			float cOpen = step( 0.93, rockHash13( cId1 + cId2 + vec3( 0.37, 0.71, 0.13 ) ) );
@@ -402,13 +424,11 @@ const FRAGMENT_SURFACE = /* glsl */ `
 	vec3 rockBumped = normalize( rockN + uBumpStrength * rockOffT );
 
 	// ---- Albedo.
-	float rockM1 = rockValue3( rockP * 0.028 );
-	float rockM2 = rockValue3( rockP * 0.1 + 11.0 );
-	float rockMacro = rockM1 * 0.6 + rockM2 * 0.4;
+	float rockMacro = vRockLow.x;
 	vec3 rockAlbedo = mix( uGraniteDark, uGranite, smoothstep( 0.2, 0.55, rockMacro ) );
 	rockAlbedo = mix( rockAlbedo, uGraniteLight, smoothstep( 0.45, 0.8, rockMacro ) * 0.85 );
 	rockAlbedo *= 1.0 + rockTone;
-	float rockIron = smoothstep( 0.6, 0.85, rockValue3( rockP * 0.07 + vec3( 3.0, 1.0, -7.0 ) ) );
+	float rockIron = smoothstep( 0.6, 0.85, vRockLow.w );
 	rockAlbedo = mix( rockAlbedo, uGraniteWarm, rockIron * 0.5 );
 	// Weathering mottling at a few metres.
 	rockAlbedo *= 0.86 + 0.24 * rockValue3( rockP * 0.45 + 2.0 );
@@ -432,7 +452,7 @@ const FRAGMENT_SURFACE = /* glsl */ `
 	rockAlbedo *= 1.0 - 0.55 * rockCrack;
 
 	// ---- Snow: up-facing (after the facet tilt), more with altitude, broken up by noise.
-	float rockSnowNoise = rockValue3( rockP * 0.19 + 3.0 ) * 0.62 + rockValue3( rockP * 0.74 - 9.0 ) * 0.38;
+	float rockSnowNoise = vRockSnowLow * 0.62 + rockValue3( rockP * 0.74 - 9.0 ) * 0.38;
 	float rockAlt = smoothstep( uSnowLine - 70.0, uSnowLine + 8.0, vRockPos.y );
 	float rockUp = mix( rockN.y, rockBumped.y, 0.4 );
 	float rockSnowEdge = mix( 0.84, 0.6, rockAlt * uSnowAmount ) + ( rockSnowNoise - 0.5 ) * 0.3 - 0.12 * rockCavity + 0.16 * rockConvex;
