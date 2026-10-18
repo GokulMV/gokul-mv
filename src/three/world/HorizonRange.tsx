@@ -182,16 +182,16 @@ interface Ridge {
 /** Radius over which ridge crests are rounded (anti-aliasing of the sharp V). */
 const CREST_ROUND = 0.7;
 /** Valley floor the range rises from (deep in the valley mist, out of frame). */
-const FLOOR_Y = -86;
+const FLOOR_Y = -62;
 /** Quads entirely below this are always hidden under mist and below frame. */
-const CULL_Y = -78;
+const CULL_Y = -55;
 
 /** Heightfield extent (the flanking wings taper to the floor before the edges). */
 export const HORIZON_EXTENT = {
   x0: -440,
   x1: 440,
   z0: -350,
-  z1: -130,
+  z1: -100,
 } as const;
 
 const S = NEXT_MOUNTAIN.summit;
@@ -211,29 +211,29 @@ const HERO_RIDGES: readonly RidgeDef[] = [
       [43, 8, -177],
       [57, -40, -163],
     ],
-    cross: 1.75,
-    flatten: 150,
+    cross: 1.9,
+    flatten: 420,
   },
   // East skyline ridge with the broad, snowy east shoulder.
   {
     points: [S, [20, 107, -240], [44, 92, -244], [66, 85, -241], [88, 72, -234], [110, 44, -224], [134, 4, -212], [160, -40, -198]],
-    cross: 1.6,
-    flatten: 160,
+    cross: 1.8,
+    flatten: 420,
   },
   // West skyline ridge with its fore-summit.
   {
     points: [S, [-18, 105, -241], [-40, 91, -247], [-60, 86.5, -250], [-80, 74, -246], [-104, 45, -236], [-130, 6, -222], [-156, -40, -206]],
-    cross: 1.6,
-    flatten: 160,
+    cross: 1.8,
+    flatten: 420,
   },
   // North ridge, falling away behind the summit.
-  { points: [S, [4, 100, -262], [10, 64, -292], [14, 8, -318], [16, -40, -336]], cross: 1.6, flatten: 160 },
+  { points: [S, [4, 100, -262], [10, 64, -292], [14, 8, -318], [16, -40, -336]], cross: 1.75, flatten: 420 },
   // South-west buttress off the west ridge.
-  { points: [[-40, 91, -247], [-46, 72, -228], [-53, 47, -210], [-61, 16, -194], [-72, -30, -177]], cross: 1.9, flatten: 140 },
+  { points: [[-40, 91, -247], [-46, 72, -228], [-53, 47, -210], [-61, 16, -194], [-72, -30, -177]], cross: 2.05, flatten: 380 },
   // Front-left rib between the journey ridge and the SW buttress.
-  { points: [[-6, 104, -231], [-13, 82, -216], [-19, 60, -204], [-26, 33, -192], [-35, -8, -179]], cross: 2.0, flatten: 130 },
+  { points: [[-6, 104, -231], [-13, 82, -216], [-19, 60, -204], [-26, 33, -192], [-35, -8, -179]], cross: 2.15, flatten: 380 },
   // East-face rib off the east ridge.
-  { points: [[44, 92, -244], [57, 72, -229], [70, 48, -215], [84, 17, -202], [99, -30, -188]], cross: 1.95, flatten: 130 },
+  { points: [[44, 92, -244], [57, 72, -229], [70, 48, -215], [84, 17, -202], [99, -30, -188]], cross: 2.1, flatten: 380 },
 ];
 
 interface FlankSpec {
@@ -247,37 +247,76 @@ interface FlankSpec {
   rot: number;
   cross: number;
   seed: number;
+  /** Optional summit ridge: half-length and azimuth (multi-top massif instead of a lone spire). */
+  crestHalf?: number;
+  crestAngle?: number;
 }
 
 /** Eight flanking peaks, lower than the hero, spread wide and overlapping in depth. */
 const FLANKS: readonly FlankSpec[] = [
-  { x: -104, y: 78, z: -186, reach: 78, arms: 3, rot: 0.35, cross: 1.75, seed: 11 },
-  { x: 114, y: 84, z: -192, reach: 82, arms: 3, rot: -0.4, cross: 1.7, seed: 23 },
-  { x: -162, y: 100, z: -258, reach: 95, arms: 4, rot: 0.2, cross: 1.6, seed: 37 },
-  { x: 168, y: 106, z: -256, reach: 98, arms: 4, rot: -0.15, cross: 1.6, seed: 41 },
-  { x: -236, y: 88, z: -214, reach: 88, arms: 3, rot: 0.6, cross: 1.65, seed: 53 },
-  { x: 240, y: 75, z: -198, reach: 82, arms: 3, rot: -0.7, cross: 1.7, seed: 67 },
-  { x: -322, y: 104, z: -252, reach: 100, arms: 4, rot: 0.1, cross: 1.55, seed: 71 },
-  { x: 326, y: 92, z: -238, reach: 95, arms: 3, rot: -0.3, cross: 1.6, seed: 89 },
+  { x: -104, y: 78, z: -186, reach: 80, arms: 4, rot: 0.35, cross: 1.75, seed: 11, crestHalf: 22, crestAngle: 1.25 },
+  { x: 114, y: 84, z: -192, reach: 84, arms: 4, rot: -0.4, cross: 1.7, seed: 23, crestHalf: 18, crestAngle: -1.1 },
+  { x: -162, y: 100, z: -258, reach: 95, arms: 5, rot: 0.2, cross: 1.6, seed: 37 },
+  { x: 168, y: 106, z: -256, reach: 98, arms: 5, rot: -0.15, cross: 1.6, seed: 41, crestHalf: 16, crestAngle: 1.4 },
+  { x: -236, y: 88, z: -214, reach: 88, arms: 4, rot: 0.6, cross: 1.65, seed: 53, crestHalf: 26, crestAngle: 1.5 },
+  { x: 240, y: 75, z: -198, reach: 82, arms: 4, rot: -0.7, cross: 1.7, seed: 67, crestHalf: 24, crestAngle: -1.3 },
+  { x: -322, y: 104, z: -252, reach: 100, arms: 5, rot: 0.1, cross: 1.55, seed: 71 },
+  { x: 326, y: 92, z: -238, reach: 95, arms: 4, rot: -0.3, cross: 1.6, seed: 89, crestHalf: 20, crestAngle: 1.2 },
 ];
 
 function flankRidgeDefs(f: FlankSpec): RidgeDef[] {
   const rand = mulberry32(f.seed * 7919 + 13);
   const defs: RidgeDef[] = [];
   const drop = f.y - FLOOR_Y;
-  const fractions = [0.16, 0.38, 0.66, 1];
+  const fractions = [0.14, 0.34, 0.6, 1];
+  // Summit ridge with notches and secondary tops (multi-top massifs).
+  const anchors: P3[] = [[f.x, f.y, f.z]];
+  if (f.crestHalf && f.crestAngle !== undefined) {
+    const ca = f.crestAngle;
+    const half = f.crestHalf;
+    const ux = Math.sin(ca);
+    const uz = Math.cos(ca);
+    const a: P3 = [f.x - ux * half, f.y - 9 - 6 * rand(), f.z - uz * half];
+    const b: P3 = [f.x + ux * half * 0.8, f.y - 6 - 5 * rand(), f.z + uz * half * 0.8];
+    const notchA: P3 = [f.x - ux * half * 0.5, f.y - 14 - 4 * rand(), f.z - uz * half * 0.5];
+    const notchB: P3 = [f.x + ux * half * 0.4, f.y - 12 - 4 * rand(), f.z + uz * half * 0.4];
+    defs.push({ points: [a, notchA, [f.x, f.y, f.z], notchB, b], cross: f.cross * 1.2, flatten: 360 });
+    anchors.push(a, b);
+  }
   for (let a = 0; a < f.arms; a += 1) {
-    const theta = f.rot + (a / f.arms) * TAU + (rand() - 0.5) * 0.7;
-    const len = f.reach * (0.72 + 0.5 * rand());
-    const bend = (rand() - 0.5) * 0.6;
-    const heights = [0.1 + 0.07 * rand(), 0.3 + 0.1 * rand(), 0.6 + 0.1 * rand(), 1.02];
-    const points: P3[] = [[f.x, f.y, f.z]];
+    const theta = f.rot + (a / f.arms) * TAU + (rand() - 0.5) * 0.8;
+    const len = f.reach * (0.62 + 0.6 * rand());
+    const bend = (rand() - 0.5) * 0.9;
+    // Some arms carry a shoulder / secondary summit, others drop straight away.
+    const shoulder = rand() < 0.55;
+    const heights = shoulder
+      ? [0.14 + 0.06 * rand(), 0.2 + 0.08 * rand(), 0.55 + 0.12 * rand(), 1.02]
+      : [0.1 + 0.08 * rand(), 0.34 + 0.12 * rand(), 0.66 + 0.1 * rand(), 1.02];
+    const anchor = anchors[a % anchors.length];
+    const aDrop = anchor[1] - FLOOR_Y;
+    const points: P3[] = [anchor];
     for (let k = 0; k < fractions.length; k += 1) {
       const ang = theta + bend * fractions[k];
       const r = len * fractions[k];
-      points.push([f.x + Math.sin(ang) * r, f.y - drop * heights[k], f.z + Math.cos(ang) * r]);
+      points.push([anchor[0] + Math.sin(ang) * r, anchor[1] - aDrop * heights[k], anchor[2] + Math.cos(ang) * r]);
     }
-    defs.push({ points, cross: f.cross * (0.88 + 0.26 * rand()), flatten: 170 });
+    defs.push({ points, cross: f.cross * (0.92 + 0.3 * rand()), flatten: 360 + 120 * rand() });
+    // A short spur branching off the arm breaks up the cone silhouette.
+    if (rand() < 0.7) {
+      const from = points[2];
+      const spurAng = theta + (rand() < 0.5 ? -1 : 1) * (0.7 + 0.5 * rand());
+      const spurLen = len * (0.3 + 0.25 * rand());
+      const spurDrop = drop * (0.35 + 0.2 * rand());
+      defs.push({
+        points: [
+          from,
+          [from[0] + Math.sin(spurAng) * spurLen * 0.5, from[1] - spurDrop * 0.4, from[2] + Math.cos(spurAng) * spurLen * 0.5],
+          [from[0] + Math.sin(spurAng) * spurLen, from[1] - spurDrop, from[2] + Math.cos(spurAng) * spurLen],
+        ],
+        cross: f.cross * (1.05 + 0.3 * rand()),
+        flatten: 340,
+      });
+    }
   }
   return defs;
 }
@@ -393,12 +432,14 @@ function edgeMask(x: number, z: number): number {
   const dSide = Math.min(x - E.x0, E.x1 - x);
   const dBack = z - E.z0;
   const dFront = E.z1 - z;
-  return smoothstep(0, 85, dSide) * smoothstep(0, 40, dBack) * smoothstep(0, 22, dFront);
+  return smoothstep(0, 85, dSide) * smoothstep(0, 40, dBack) * smoothstep(0, 32, dFront);
 }
 
 /** Large-form height of the range (before erosion detail). Pure and deterministic. */
 export function horizonBaseHeight(x: number, z: number): number {
-  const dS = Math.hypot(x - S[0], z - S[2]);
+  const sdx = x - S[0];
+  const sdz = z - S[2];
+  const dS = Math.sqrt(sdx * sdx + sdz * sdz);
   // Arêtes meet in a crisp point: almost no blending right at the summit.
   const kSummit = 1 + 4 * smoothstep(0, 34, dS);
   let ridges = -1e9;
@@ -411,9 +452,11 @@ export function horizonBaseHeight(x: number, z: number): number {
   for (let f = 0; f < FLANK_RUNTIME.length; f += 1) {
     const fr = FLANK_RUNTIME[f];
     if (Math.abs(x - fr.spec.x) > fr.bound || Math.abs(z - fr.spec.z) > fr.bound) continue;
-    const dP = Math.hypot(x - fr.spec.x, z - fr.spec.z);
+    const pdx = x - fr.spec.x;
+    const pdz = z - fr.spec.z;
+    const dP = Math.sqrt(pdx * pdx + pdz * pdz);
     const kPeak = 1 + 3.5 * smoothstep(0, 24, dP);
-    let fh = fr.spec.y - 20 - (1.35 * dP) / (1 + dP / 200);
+    let fh = fr.spec.y - 34 - (1.3 * dP) / (1 + dP / 200);
     for (let i = 0; i < fr.ridges.length; i += 1) {
       fh = smax(fh, ridgeHeight(fr.ridges[i], x, z), kPeak);
     }
@@ -438,12 +481,12 @@ interface ShelfDef {
 }
 
 const SHELF_DEFS: readonly ShelfDef[] = [
-  { x: -27, z: -219, rx: 15, rz: 10, lift: 4, tilt: 0.42 },
-  { x: 30, z: -224, rx: 14, rz: 10, lift: 4, tilt: 0.4 },
-  { x: -62, z: -236, rx: 18, rz: 11, lift: 3.5, tilt: 0.35 },
-  { x: 70, z: -233, rx: 16, rz: 11, lift: 3.5, tilt: 0.35 },
-  { x: 11, z: -207, rx: 9, rz: 7, lift: 2.5, tilt: 0.3 },
-  { x: -84, z: -214, rx: 12, rz: 9, lift: 3, tilt: 0.4 },
+  { x: -27, z: -219, rx: 16, rz: 10, lift: 1.6, tilt: 0.34 },
+  { x: 30, z: -224, rx: 15, rz: 10, lift: 1.6, tilt: 0.34 },
+  { x: -62, z: -236, rx: 18, rz: 11, lift: 1.5, tilt: 0.3 },
+  { x: 70, z: -233, rx: 16, rz: 11, lift: 1.5, tilt: 0.3 },
+  { x: 11, z: -207, rx: 9, rz: 7, lift: 1.2, tilt: 0.26 },
+  { x: -84, z: -214, rx: 12, rz: 9, lift: 1.4, tilt: 0.32 },
 ];
 
 interface Shelf extends ShelfDef {
@@ -478,9 +521,9 @@ function shelfAt(x: number, z: number, h: number): void {
     const surface = s.y0 - s.tilt * along;
     const above = surface - h;
     if (above <= 0) continue;
-    const b = above * (1 - smoothstep(9, 14, above)) * m;
+    const b = above * (1 - smoothstep(3.5, 6, above)) * m;
     if (b > bulge) bulge = b;
-    const gm = m * smoothstep(0.3, 2.5, above) * (1 - smoothstep(12, 15, above));
+    const gm = m * smoothstep(0.2, 1.5, above) * (1 - smoothstep(5, 7.5, above));
     if (gm > mask) mask = gm;
   }
   shelfScratch.bulge = bulge;
@@ -491,7 +534,9 @@ function summitDetailMask(x: number, z: number): number {
   let m = 1;
   for (let i = 0; i < SUMMITS.length; i += 1) {
     const s = SUMMITS[i];
-    const d = Math.hypot(x - s.x, z - s.z);
+    const dx = x - s.x;
+    const dz = z - s.z;
+    const d = Math.sqrt(dx * dx + dz * dz);
     if (d < s.radius) m = Math.min(m, smoothstep(2, s.radius, d));
   }
   return m;
@@ -514,11 +559,11 @@ function detailHeight(
   crest: number,
   octaves: number,
 ): number {
-  const slope = Math.hypot(gx, gz);
+  const slope = Math.sqrt(gx * gx + gz * gz);
   const amp0 =
-    5.4 *
+    5.8 *
     smoothstep(0.2, 0.95, slope) *
-    smoothstep(-82, -48, base) *
+    smoothstep(-58, -30, base) *
     summitDetailMask(x, z) *
     (1 - 0.8 * crest);
   if (amp0 < 1e-3) return 0;
@@ -529,21 +574,21 @@ function detailHeight(
   let freq = 1 / 26;
   for (let o = 0; o < octaves; o += 1) {
     // Perpendicular of the accumulated gradient: stripes run down the fall line.
-    const len = Math.hypot(ax, az) || 1;
+    const len = Math.sqrt(ax * ax + az * az) || 1;
     const k = Math.min(1.35, Math.max(0.65, len)) / len;
     erosion(x * freq, z * freq, az * k, -ax * k, erosionOut);
     // Biased toward carving: gullies cut in, ribs stay near the large form.
     h += (erosionOut[0] - 0.4) * amp;
     ax += erosionOut[1] * amp * freq * TAU * 0.35;
     az += erosionOut[2] * amp * freq * TAU * 0.35;
-    amp *= 0.46;
+    amp *= 0.56;
     freq *= 2.05;
   }
   const r1 = 1 - Math.abs(noise2(x * 0.045 + 3.1, z * 0.045 - 1.7));
   const r2 = 1 - Math.abs(noise2(x * 0.1 - 5.3, z * 0.1 + 2.9));
   const rough = (r1 * r1 - 0.45) * 1.1 + (r2 * r2 - 0.45) * 0.45;
   const broad = noise2(x * 0.013 - 7.7, z * 0.013 + 1.9) * 4.5;
-  return h + (rough + broad) * (amp0 / 5.4);
+  return h + (rough + broad) * (amp0 / 5.8);
 }
 
 /* ---------------------------------------------------------------------------
@@ -560,10 +605,10 @@ export interface HorizonDetail {
 }
 
 const DETAIL_BY_TIER: Readonly<Record<GpuTier, HorizonDetail>> = {
-  3: { scale: 1, octaves: 4, shadowSteps: 56 },
-  2: { scale: 1.38, octaves: 4, shadowSteps: 48 },
-  1: { scale: 1.95, octaves: 3, shadowSteps: 40 },
-  0: { scale: 2.75, octaves: 3, shadowSteps: 32 },
+  3: { scale: 1, octaves: 3, shadowSteps: 44 },
+  2: { scale: 1.38, octaves: 3, shadowSteps: 40 },
+  1: { scale: 1.95, octaves: 3, shadowSteps: 34 },
+  0: { scale: 2.75, octaves: 2, shadowSteps: 28 },
 };
 
 export function horizonDetailForTier(tier: GpuTier): HorizonDetail {
@@ -578,7 +623,7 @@ function spacingX(x: number): number {
 
 /** Row spacing: finest over the faces seen from the climb (z ≈ -250 … -158). */
 function spacingZ(z: number): number {
-  if (z > -158) return 0.75 * (1 + (z + 158) / 18);
+  if (z > -158) return 0.75 * (1 + (z + 158) / 14);
   if (z >= -250) return 0.75;
   return 0.75 * (1 + (-250 - z) / 40);
 }
@@ -630,6 +675,7 @@ export interface HorizonBuildStats {
 }
 
 export interface HorizonHeightMap {
+  /** RG8: R = ground dilated horizontally (soft contact), G = raw ground height (pooling). */
   data: Uint8Array;
   width: number;
   height: number;
@@ -657,17 +703,266 @@ export const horizonBuildSettings = {
 
 const now = (): number => (typeof performance !== 'undefined' ? performance.now() : Date.now());
 
-const SUN_H_LEN = Math.hypot(SUN_DIRECTION.x, SUN_DIRECTION.z);
+const SUN_H_LEN = Math.sqrt(SUN_DIRECTION.x * SUN_DIRECTION.x + SUN_DIRECTION.z * SUN_DIRECTION.z);
 const SUN_HX = SUN_DIRECTION.x / SUN_H_LEN;
 const SUN_HZ = SUN_DIRECTION.z / SUN_H_LEN;
 const SUN_TAN = SUN_DIRECTION.y / SUN_H_LEN;
 
-const AO_DIRS = 8;
+const AO_DIRS = 6;
 /** Grid steps either side used to measure crestness of the large form. */
 const CREST_STEP = 4;
-const AO_RADII = [4, 11, 26, 52] as const;
-const MIST_MAP_W = 256;
-const MIST_MAP_H = 64;
+const AO_RADII = [5, 16, 42] as const;
+const MIST_MAP_W = 512;
+const MIST_MAP_H = 128;
+/** Horizontal reach (world units) of the mist's soft contact with steep faces. */
+const MIST_DILATE = 9;
+
+/** Working state of one build. Per-row work lives in plain functions (fully optimisable, no boxing). */
+interface BuildGrid {
+  xs: Float64Array;
+  zs: Float64Array;
+  nx: number;
+  nz: number;
+  base: Float32Array;
+  height: Float32Array;
+  glacier: Float32Array;
+  tableX: Float32Array;
+  tableZ: Float32Array;
+}
+
+const SAMPLE_RES = 4;
+
+/** Bilinear height lookup on the graded grid (floor outside). */
+function sampleGrid(g: BuildGrid, x: number, z: number): number {
+  const E = HORIZON_EXTENT;
+  if (x <= E.x0 || x >= E.x1 || z <= E.z0 || z >= E.z1) return FLOOR_Y - 10;
+  const fx = g.tableX[Math.round((x - E.x0) * SAMPLE_RES)];
+  const fz = g.tableZ[Math.round((z - E.z0) * SAMPLE_RES)];
+  let i = Math.floor(fx);
+  let k = Math.floor(fz);
+  if (i > g.nx - 2) i = g.nx - 2;
+  if (k > g.nz - 2) k = g.nz - 2;
+  const tx = fx - i;
+  const tz = fz - k;
+  const h = g.height;
+  const row = k * g.nx + i;
+  const a = h[row];
+  const b = h[row + 1];
+  const c = h[row + g.nx];
+  const d = h[row + g.nx + 1];
+  return (a + (b - a) * tx) * (1 - tz) + (c + (d - c) * tx) * tz;
+}
+
+function baseRow(g: BuildGrid, k: number): void {
+  const z = g.zs[k];
+  const row = k * g.nx;
+  for (let i = 0; i < g.nx; i += 1) g.base[row + i] = horizonBaseHeight(g.xs[i], z);
+}
+
+function detailRow(g: BuildGrid, k: number, octaves: number): void {
+  const { xs, zs, nx, nz, base } = g;
+  const z = zs[k];
+  const k0 = Math.max(0, k - 1);
+  const k1 = Math.min(nz - 1, k + 1);
+  const ka = Math.max(0, k - CREST_STEP);
+  const kb = Math.min(nz - 1, k + CREST_STEP);
+  const sz = (zs[kb] - zs[ka]) * 0.5;
+  for (let i = 0; i < nx; i += 1) {
+    const i0 = Math.max(0, i - 1);
+    const i1 = Math.min(nx - 1, i + 1);
+    const idx = k * nx + i;
+    const gx = (base[k * nx + i1] - base[k * nx + i0]) / (xs[i1] - xs[i0]);
+    const gz = (base[k1 * nx + i] - base[k0 * nx + i]) / (zs[k1] - zs[k0]);
+    const b = base[idx];
+    const x = xs[i];
+    // Crestness: how sharply the large form falls away on both sides (≈ cross slope on an arête).
+    const ia = Math.max(0, i - CREST_STEP);
+    const ib = Math.min(nx - 1, i + CREST_STEP);
+    const sx = (xs[ib] - xs[ia]) * 0.5;
+    const convexX = sx > 0 ? (b - (base[k * nx + ia] + base[k * nx + ib]) * 0.5) / sx : 0;
+    const convexZ = sz > 0 ? (b - (base[ka * nx + i] + base[kb * nx + i]) * 0.5) / sz : 0;
+    const convex = Math.max(convexX, convexZ, (convexX + convexZ) * 0.75);
+    const crest = smoothstep(0.25, 1.1, convex);
+    shelfAt(x, z, b);
+    const glacier = shelfScratch.mask;
+    const d = detailHeight(x, z, gx, gz, b, crest, octaves);
+    g.height[idx] = b + d * (1 - 0.6 * glacier) + shelfScratch.bulge;
+    g.glacier[idx] = glacier;
+  }
+}
+
+/** Writes positions + normals for row k; returns the index of the row's highest vertex. */
+function normalRow(g: BuildGrid, k: number, positions: Float32Array, normals: Float32Array): number {
+  const { xs, zs, nx, nz, height } = g;
+  const k0 = Math.max(0, k - 1);
+  const k1 = Math.min(nz - 1, k + 1);
+  let best = k * nx;
+  for (let i = 0; i < nx; i += 1) {
+    const i0 = Math.max(0, i - 1);
+    const i1 = Math.min(nx - 1, i + 1);
+    const idx = k * nx + i;
+    const h = height[idx];
+    if (h > height[best]) best = idx;
+    const dhdx = (height[k * nx + i1] - height[k * nx + i0]) / (xs[i1] - xs[i0]);
+    const dhdz = (height[k1 * nx + i] - height[k0 * nx + i]) / (zs[k1] - zs[k0]);
+    const inv = 1 / Math.sqrt(dhdx * dhdx + 1 + dhdz * dhdz);
+    positions[idx * 3] = xs[i];
+    positions[idx * 3 + 1] = h;
+    positions[idx * 3 + 2] = zs[k];
+    normals[idx * 3] = -dhdx * inv;
+    normals[idx * 3 + 1] = inv;
+    normals[idx * 3 + 2] = -dhdz * inv;
+  }
+  return best;
+}
+
+const AO_COS = Float64Array.from({ length: AO_DIRS }, (_, d) => Math.cos((d / AO_DIRS) * TAU + 0.2));
+const AO_SIN = Float64Array.from({ length: AO_DIRS }, (_, d) => Math.sin((d / AO_DIRS) * TAU + 0.2));
+
+/** Bakes sun visibility, ambient occlusion, concavity and the glacier mask for row k. */
+function bakeRow(g: BuildGrid, k: number, bake: Uint8Array, shadowSteps: number): void {
+  const E = HORIZON_EXTENT;
+  const { xs, zs, nx, height } = g;
+  const z = zs[k];
+  for (let i = 0; i < nx; i += 1) {
+    const idx = k * nx + i;
+    const x = xs[i];
+    const h = height[idx];
+    const out = idx * 4;
+    if (h < CULL_Y - 6) {
+      bake[out] = 128;
+      bake[out + 1] = 90;
+      bake[out + 2] = 140;
+      bake[out + 3] = 0;
+      continue;
+    }
+
+    // Soft cast shadow toward the sun (penumbra widens with distance).
+    let vis = 1;
+    let t = 1.5;
+    for (let s = 0; s < shadowSteps; s += 1) {
+      const sx = x + SUN_HX * t;
+      const sz = z + SUN_HZ * t;
+      if (sx <= E.x0 || sx >= E.x1 || sz <= E.z0 || sz >= E.z1) break;
+      const ray = h + 0.8 + SUN_TAN * t;
+      const v = (7 * (ray - sampleGrid(g, sx, sz))) / t;
+      if (v < vis) vis = v;
+      if (vis <= 0 || ray > 125) break;
+      t += Math.max(1.6, t * 0.1);
+    }
+    vis = vis < 0 ? 0 : vis > 1 ? 1 : vis;
+    vis = vis * vis * (3 - 2 * vis);
+
+    // Horizon-based ambient occlusion.
+    let occ = 0;
+    for (let d = 0; d < AO_DIRS; d += 1) {
+      let maxTan = 0;
+      for (let r = 0; r < AO_RADII.length; r += 1) {
+        const radius = AO_RADII[r];
+        const tan = (sampleGrid(g, x + AO_COS[d] * radius, z + AO_SIN[d] * radius) - h) / radius;
+        if (tan > maxTan) maxTan = tan;
+      }
+      occ += maxTan / Math.sqrt(1 + maxTan * maxTan);
+    }
+    const ao = Math.max(0.12, 1 - (occ / AO_DIRS) * 1.15);
+
+    // Concavity at gully scale (positive = gully, negative = rib / crest).
+    const lap4 =
+      (sampleGrid(g, x + 4, z) + sampleGrid(g, x - 4, z) + sampleGrid(g, x, z + 4) + sampleGrid(g, x, z - 4)) * 0.25 - h;
+    const lap12 =
+      (sampleGrid(g, x + 12, z) + sampleGrid(g, x - 12, z) + sampleGrid(g, x, z + 12) + sampleGrid(g, x, z - 12)) * 0.25 -
+      h;
+    const conc = Math.max(-0.5, Math.min(0.5, lap4 * 0.2 + lap12 * 0.05));
+
+    bake[out] = Math.round(vis * 255);
+    bake[out + 1] = Math.round(ao * 255);
+    bake[out + 2] = Math.round((0.5 + conc) * 255);
+    bake[out + 3] = Math.round(g.glacier[idx] * 255);
+  }
+}
+
+/** Emits row k's triangles (diagonal along the smaller height step keeps arêtes crisp). Returns the new write offset; culled quads are counted in cullCount[0]. */
+function indexRow(g: BuildGrid, k: number, indices: Uint32Array, offset: number, cullCount: Uint32Array): number {
+  const { nx, height } = g;
+  let n = offset;
+  for (let i = 0; i < nx - 1; i += 1) {
+    const a = k * nx + i;
+    const b = a + 1;
+    const c = a + nx;
+    const d = c + 1;
+    const ha = height[a];
+    const hb = height[b];
+    const hc = height[c];
+    const hd = height[d];
+    if (ha < CULL_Y && hb < CULL_Y && hc < CULL_Y && hd < CULL_Y) {
+      cullCount[0] += 1;
+      continue;
+    }
+    if (Math.abs(ha - hd) < Math.abs(hb - hc)) {
+      indices[n++] = a;
+      indices[n++] = c;
+      indices[n++] = d;
+      indices[n++] = a;
+      indices[n++] = d;
+      indices[n++] = b;
+    } else {
+      indices[n++] = a;
+      indices[n++] = c;
+      indices[n++] = b;
+      indices[n++] = b;
+      indices[n++] = c;
+      indices[n++] = d;
+    }
+  }
+  return n;
+}
+
+function mistRawRow(g: BuildGrid, j: number, raw: Float32Array): void {
+  const F = VALLEY_MIST_FIELD;
+  const z = F.z0 + ((j + 0.5) / MIST_MAP_H) * (F.z1 - F.z0);
+  for (let i = 0; i < MIST_MAP_W; i += 1) {
+    const x = F.x0 + ((i + 0.5) / MIST_MAP_W) * (F.x1 - F.x0);
+    raw[i + j * MIST_MAP_W] = Math.max(sampleGrid(g, x, z), skirtHeight(x, z));
+  }
+}
+
+function encodeMistHeight(v: number): number {
+  const e = ((v - MIST_HEIGHT_ENCODING.min) / MIST_HEIGHT_ENCODING.range) * 255;
+  return Math.max(0, Math.min(255, Math.round(e)));
+}
+
+/** Separable max filter (horizontal reach in texels rx, rz) → RG8 (R dilated, G raw). */
+function packMistMap(raw: Float32Array, rx: number, rz: number): Uint8Array {
+  const pass = new Float32Array(raw.length);
+  for (let j = 0; j < MIST_MAP_H; j += 1) {
+    for (let i = 0; i < MIST_MAP_W; i += 1) {
+      let m = -1e9;
+      const a = Math.max(0, i - rx);
+      const b = Math.min(MIST_MAP_W - 1, i + rx);
+      for (let t = a; t <= b; t += 1) {
+        const v = raw[t + j * MIST_MAP_W];
+        if (v > m) m = v;
+      }
+      pass[i + j * MIST_MAP_W] = m;
+    }
+  }
+  const data = new Uint8Array(MIST_MAP_W * MIST_MAP_H * 2);
+  for (let j = 0; j < MIST_MAP_H; j += 1) {
+    const a = Math.max(0, j - rz);
+    const b = Math.min(MIST_MAP_H - 1, j + rz);
+    for (let i = 0; i < MIST_MAP_W; i += 1) {
+      let m = -1e9;
+      for (let t = a; t <= b; t += 1) {
+        const v = pass[i + t * MIST_MAP_W];
+        if (v > m) m = v;
+      }
+      const o = (i + j * MIST_MAP_W) * 2;
+      data[o] = encodeMistHeight(m);
+      data[o + 1] = encodeMistHeight(raw[i + j * MIST_MAP_W]);
+    }
+  }
+  return data;
+}
 
 function* buildHorizon(detail: HorizonDetail): Generator<void, HorizonBuildResult, void> {
   const start = now();
@@ -677,217 +972,71 @@ function* buildHorizon(detail: HorizonDetail): Generator<void, HorizonBuildResul
   const nx = xs.length;
   const nz = zs.length;
   const count = nx * nz;
+  const g: BuildGrid = {
+    xs,
+    zs,
+    nx,
+    nz,
+    base: new Float32Array(count),
+    height: new Float32Array(count),
+    glacier: new Float32Array(count),
+    tableX: indexTable(xs, SAMPLE_RES),
+    tableZ: indexTable(zs, SAMPLE_RES),
+  };
 
   // 1. Large forms.
-  const base = new Float32Array(count);
   for (let k = 0; k < nz; k += 1) {
-    const z = zs[k];
-    const row = k * nx;
-    for (let i = 0; i < nx; i += 1) base[row + i] = horizonBaseHeight(xs[i], z);
+    baseRow(g, k);
     if ((k & 3) === 3) yield;
   }
 
   // 2. Erosion detail + hanging glaciers.
-  const height = new Float32Array(count);
-  const glacier = new Float32Array(count);
   for (let k = 0; k < nz; k += 1) {
-    const z = zs[k];
-    const k0 = Math.max(0, k - 1);
-    const k1 = Math.min(nz - 1, k + 1);
-    for (let i = 0; i < nx; i += 1) {
-      const i0 = Math.max(0, i - 1);
-      const i1 = Math.min(nx - 1, i + 1);
-      const idx = k * nx + i;
-      const gx = (base[k * nx + i1] - base[k * nx + i0]) / (xs[i1] - xs[i0]);
-      const gz = (base[k1 * nx + i] - base[k0 * nx + i]) / (zs[k1] - zs[k0]);
-      const b = base[idx];
-      const x = xs[i];
-      // Crestness: how sharply the large form falls away on both sides (≈ cross slope on an arête).
-      const ia = Math.max(0, i - CREST_STEP);
-      const ib = Math.min(nx - 1, i + CREST_STEP);
-      const ka = Math.max(0, k - CREST_STEP);
-      const kb = Math.min(nz - 1, k + CREST_STEP);
-      const sx = (xs[ib] - xs[ia]) * 0.5;
-      const sz = (zs[kb] - zs[ka]) * 0.5;
-      const convexX = sx > 0 ? (b - (base[k * nx + ia] + base[k * nx + ib]) * 0.5) / sx : 0;
-      const convexZ = sz > 0 ? (b - (base[ka * nx + i] + base[kb * nx + i]) * 0.5) / sz : 0;
-      const crest = smoothstep(0.25, 1.1, Math.max(convexX, convexZ, (convexX + convexZ) * 0.75));
-      shelfAt(x, z, b);
-      const g = shelfScratch.mask;
-      const d = detailHeight(x, z, gx, gz, b, crest, detail.octaves);
-      height[idx] = b + d * (1 - 0.8 * g) + shelfScratch.bulge;
-      glacier[idx] = g;
-    }
+    detailRow(g, k, detail.octaves);
     if ((k & 1) === 1) yield;
   }
 
-  // 3. Normals from the final heights.
+  // 3. Positions and normals from the final heights.
   const positions = new Float32Array(count * 3);
   const normals = new Float32Array(count * 3);
   let peakIdx = 0;
   for (let k = 0; k < nz; k += 1) {
-    const k0 = Math.max(0, k - 1);
-    const k1 = Math.min(nz - 1, k + 1);
-    for (let i = 0; i < nx; i += 1) {
-      const i0 = Math.max(0, i - 1);
-      const i1 = Math.min(nx - 1, i + 1);
-      const idx = k * nx + i;
-      const h = height[idx];
-      if (h > height[peakIdx]) peakIdx = idx;
-      const dhdx = (height[k * nx + i1] - height[k * nx + i0]) / (xs[i1] - xs[i0]);
-      const dhdz = (height[k1 * nx + i] - height[k0 * nx + i]) / (zs[k1] - zs[k0]);
-      const inv = 1 / Math.sqrt(dhdx * dhdx + 1 + dhdz * dhdz);
-      positions[idx * 3] = xs[i];
-      positions[idx * 3 + 1] = h;
-      positions[idx * 3 + 2] = zs[k];
-      normals[idx * 3] = -dhdx * inv;
-      normals[idx * 3 + 1] = inv;
-      normals[idx * 3 + 2] = -dhdz * inv;
-    }
+    const best = normalRow(g, k, positions, normals);
+    if (g.height[best] > g.height[peakIdx]) peakIdx = best;
     if ((k & 15) === 15) yield;
   }
 
-  // Bilinear sampler over the graded grid.
-  const RES = 4;
-  const tableX = indexTable(xs, RES);
-  const tableZ = indexTable(zs, RES);
-  const sample = (x: number, z: number): number => {
-    if (x <= E.x0 || x >= E.x1 || z <= E.z0 || z >= E.z1) return FLOOR_Y - 10;
-    const fx = tableX[Math.round((x - E.x0) * RES)];
-    const fz = tableZ[Math.round((z - E.z0) * RES)];
-    let i = Math.floor(fx);
-    let k = Math.floor(fz);
-    if (i > nx - 2) i = nx - 2;
-    if (k > nz - 2) k = nz - 2;
-    const tx = fx - i;
-    const tz = fz - k;
-    const a = height[k * nx + i];
-    const b = height[k * nx + i + 1];
-    const c = height[(k + 1) * nx + i];
-    const d = height[(k + 1) * nx + i + 1];
-    return (a + (b - a) * tx) * (1 - tz) + (c + (d - c) * tx) * tz;
-  };
-
-  // 4. Bake sun visibility, ambient occlusion, concavity and glacier mask.
+  // 4. Baked lighting data.
   const bake = new Uint8Array(count * 4);
-  const aoCos = new Float64Array(AO_DIRS);
-  const aoSin = new Float64Array(AO_DIRS);
-  for (let d = 0; d < AO_DIRS; d += 1) {
-    aoCos[d] = Math.cos((d / AO_DIRS) * TAU + 0.2);
-    aoSin[d] = Math.sin((d / AO_DIRS) * TAU + 0.2);
-  }
   for (let k = 0; k < nz; k += 1) {
-    const z = zs[k];
-    for (let i = 0; i < nx; i += 1) {
-      const idx = k * nx + i;
-      const x = xs[i];
-      const h = height[idx];
-      const out = idx * 4;
-      if (h < CULL_Y - 6) {
-        bake[out] = 128;
-        bake[out + 1] = 90;
-        bake[out + 2] = 140;
-        bake[out + 3] = 0;
-        continue;
-      }
-
-      // Soft cast shadow toward the sun (penumbra widens with distance).
-      let vis = 1;
-      let t = 1.5;
-      for (let s = 0; s < detail.shadowSteps; s += 1) {
-        const sx = x + SUN_HX * t;
-        const sz = z + SUN_HZ * t;
-        if (sx <= E.x0 || sx >= E.x1 || sz <= E.z0 || sz >= E.z1) break;
-        const ray = h + 0.8 + SUN_TAN * t;
-        const terrain = sample(sx, sz);
-        const v = (7 * (ray - terrain)) / t;
-        if (v < vis) vis = v;
-        if (vis <= 0) break;
-        if (ray > 125) break;
-        t += Math.max(1.4, t * 0.085);
-      }
-      vis = vis < 0 ? 0 : vis > 1 ? 1 : vis;
-      vis = vis * vis * (3 - 2 * vis);
-
-      // Horizon-based ambient occlusion.
-      let occ = 0;
-      for (let d = 0; d < AO_DIRS; d += 1) {
-        let maxTan = 0;
-        for (let r = 0; r < AO_RADII.length; r += 1) {
-          const radius = AO_RADII[r];
-          const tan = (sample(x + aoCos[d] * radius, z + aoSin[d] * radius) - h) / radius;
-          if (tan > maxTan) maxTan = tan;
-        }
-        occ += maxTan / Math.sqrt(1 + maxTan * maxTan);
-      }
-      const ao = Math.max(0.12, 1 - (occ / AO_DIRS) * 1.15);
-
-      // Concavity at gully scale (positive = gully, negative = rib / crest).
-      const lap4 = (sample(x + 4, z) + sample(x - 4, z) + sample(x, z + 4) + sample(x, z - 4)) * 0.25 - h;
-      const lap12 = (sample(x + 12, z) + sample(x - 12, z) + sample(x, z + 12) + sample(x, z - 12)) * 0.25 - h;
-      const conc = Math.max(-0.5, Math.min(0.5, lap4 * 0.2 + lap12 * 0.05));
-
-      bake[out] = Math.round(vis * 255);
-      bake[out + 1] = Math.round(ao * 255);
-      bake[out + 2] = Math.round((0.5 + conc) * 255);
-      bake[out + 3] = Math.round(glacier[idx] * 255);
-    }
+    bakeRow(g, k, bake, detail.shadowSteps);
     if ((k & 1) === 1) yield;
   }
 
-  // 5. Triangles (diagonal along the smaller height step keeps arêtes crisp).
-  const quads = (nx - 1) * (nz - 1);
-  const indexScratch = new Uint32Array(quads * 6);
+  // 5. Triangles.
+  const indexScratch = new Uint32Array((nx - 1) * (nz - 1) * 6);
+  const culled = new Uint32Array(1);
   let n = 0;
-  let culled = 0;
   for (let k = 0; k < nz - 1; k += 1) {
-    for (let i = 0; i < nx - 1; i += 1) {
-      const a = k * nx + i;
-      const b = a + 1;
-      const c = a + nx;
-      const d = c + 1;
-      const ha = height[a];
-      const hb = height[b];
-      const hc = height[c];
-      const hd = height[d];
-      if (ha < CULL_Y && hb < CULL_Y && hc < CULL_Y && hd < CULL_Y) {
-        culled += 1;
-        continue;
-      }
-      if (Math.abs(ha - hd) < Math.abs(hb - hc)) {
-        indexScratch[n++] = a;
-        indexScratch[n++] = c;
-        indexScratch[n++] = d;
-        indexScratch[n++] = a;
-        indexScratch[n++] = d;
-        indexScratch[n++] = b;
-      } else {
-        indexScratch[n++] = a;
-        indexScratch[n++] = c;
-        indexScratch[n++] = b;
-        indexScratch[n++] = b;
-        indexScratch[n++] = c;
-        indexScratch[n++] = d;
-      }
-    }
+    n = indexRow(g, k, indexScratch, n, culled);
     if ((k & 31) === 31) yield;
   }
 
-  // 6. Terrain height map for the valley mist's soft contact (range + skirt).
+  // 6. Terrain height maps for the valley mist (range + skirt): G = raw ground
+  //    height (pooling), R = ground dilated by MIST_DILATE world units, so a
+  //    sheet fades out near steep faces too (a cheap horizontal distance field).
   const F = VALLEY_MIST_FIELD;
-  const mistData = new Uint8Array(MIST_MAP_W * MIST_MAP_H);
   const W = F.x1 - F.x0;
   const D = F.z1 - F.z0;
+  const raw = new Float32Array(MIST_MAP_W * MIST_MAP_H);
   for (let j = 0; j < MIST_MAP_H; j += 1) {
-    const z = F.z0 + ((j + 0.5) / MIST_MAP_H) * D;
-    for (let i = 0; i < MIST_MAP_W; i += 1) {
-      const x = F.x0 + ((i + 0.5) / MIST_MAP_W) * W;
-      const ground = Math.max(sample(x, z), skirtHeight(x, z));
-      const enc = ((ground - MIST_HEIGHT_ENCODING.min) / MIST_HEIGHT_ENCODING.range) * 255;
-      mistData[i + j * MIST_MAP_W] = Math.max(0, Math.min(255, Math.round(enc)));
-    }
+    mistRawRow(g, j, raw);
     if ((j & 7) === 7) yield;
   }
+  const rx = Math.max(1, Math.round((MIST_DILATE / W) * MIST_MAP_W));
+  const rz = Math.max(1, Math.round((MIST_DILATE / D) * MIST_MAP_H));
+  const mistData = packMistMap(raw, rx, rz);
+  yield;
 
   // 7. Geometry.
   const geometry = new THREE.BufferGeometry();
@@ -903,7 +1052,7 @@ function* buildHorizon(detail: HorizonDetail): Generator<void, HorizonBuildResul
     rows: nz,
     vertices: count,
     triangles: n / 3,
-    culledQuads: culled,
+    culledQuads: culled[0],
     buildMs: now() - start,
     peak: [positions[peakIdx * 3], positions[peakIdx * 3 + 1], positions[peakIdx * 3 + 2]],
   };
@@ -985,7 +1134,7 @@ export function HorizonRange(): JSX.Element {
   const resources = useMemo(() => {
     const noise = createTileableNoiseTexture(256, 8, 0x0be5a11);
     const peakMaterial = createHorizonPeakMaterial(noise, horizonShaderQualityFor(tier));
-    const placeholder = new THREE.DataTexture(new Uint8Array([0]), 1, 1, THREE.RedFormat, THREE.UnsignedByteType);
+    const placeholder = new THREE.DataTexture(new Uint8Array([0, 0]), 1, 1, THREE.RGFormat, THREE.UnsignedByteType);
     placeholder.needsUpdate = true;
     const mistMaterial = createValleyMistMaterial(noise, placeholder, tier >= 2 ? 1 : 0);
     const mistGeometry = createValleyMistGeometry(maxLayers);
@@ -1055,7 +1204,7 @@ export function HorizonRange(): JSX.Element {
         g.add(mesh);
         s.mesh = mesh;
         const hm = result.heightMap;
-        const texture = new THREE.DataTexture(hm.data, hm.width, hm.height, THREE.RedFormat, THREE.UnsignedByteType);
+        const texture = new THREE.DataTexture(hm.data, hm.width, hm.height, THREE.RGFormat, THREE.UnsignedByteType);
         texture.magFilter = THREE.LinearFilter;
         texture.minFilter = THREE.LinearFilter;
         texture.wrapS = THREE.ClampToEdgeWrapping;

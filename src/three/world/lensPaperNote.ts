@@ -267,7 +267,7 @@ const ruleY = (k: number): number => PAPER_RULES.first + PAPER_RULES.spacing * k
 const onRule = (k: number): number => ruleY(k) - 4;
 
 const LEFT = 112;
-const VALUE_X = 236;
+const VALUE_X = 232;
 const RIGHT = 704;
 
 /** Hand-drawn doodle: the climbed peak (flag planted) and the far bigger next mountain. */
@@ -304,16 +304,16 @@ export function buildLensNote(contact: ContactDetails, profile: Profile): LensNo
   });
   add({ key: 'heading', text: 'If found — let’s talk.', family: 'hand', size: 54, x: LEFT - 4, baseline: onRule(1), maxWidth: RIGHT - LEFT, rotation: -0.022 });
   add({ key: 'name', text: profile.name.toUpperCase(), family: 'type', size: 34, weight: 700, x: LEFT, baseline: onRule(3), maxWidth: RIGHT - LEFT });
-  add({ key: 'headline', text: profile.headline, family: 'type', size: 19, x: LEFT, baseline: onRule(4), maxWidth: RIGHT - LEFT, opacity: 0.78 });
+  add({ key: 'headline', text: profile.headline, family: 'type', size: 20, x: LEFT, baseline: onRule(4), maxWidth: RIGHT - LEFT, opacity: 0.8 });
 
   let row = 6;
   const detail = (key: string, label: string, value: string, href: string | null, external: boolean, ariaLabel: string | null) => {
-    add({ key: `${key}-label`, text: label, family: 'type', size: 14.5, x: LEFT, baseline: onRule(row), color: NOTE_INK.faded, opacity: 0.8 });
+    add({ key: `${key}-label`, text: label, family: 'type', size: 15.5, x: LEFT, baseline: onRule(row), color: NOTE_INK.faded, opacity: 0.8 });
     add({
       key,
       text: value,
       family: 'type',
-      size: 23,
+      size: 26,
       x: VALUE_X,
       baseline: onRule(row),
       maxWidth: RIGHT - VALUE_X,

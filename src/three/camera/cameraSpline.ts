@@ -30,8 +30,9 @@ import { CAMERA_CLIP, ENDING, HORIZON_AIM } from '../world/worldLayout';
  *
  * Subject tracking: keyframes made with trackKey() aim at the climber —
  * subjectAt(p) = protagonistPositionAt(p) + [0, 1.2, 0], lightly smoothed (a
- * 5-tap binomial filter over ±0.005 progress, tabulated at load removes the velocity kinks at the
- * route's phase boundaries). Between two tracked keyframes the spline direction
+ * 5-tap binomial filter over ±0.005 progress, tabulated once at load, removes
+ * the velocity kinks at the route's phase boundaries; the deviation from the
+ * raw route stays < 0.4 units). Between two tracked keyframes the spline direction
  * is blended towards the live subject direction by a monotone-interpolated
  * track weight, so the climber stays centred through jumps the keyframes alone
  * could only approximate. At tracked keyframes the two coincide exactly.
@@ -285,13 +286,13 @@ export const CAMERA_KEYFRAMES: readonly CameraKeyframe[] = [
 
   /* Scene 8 (0.86–0.92) — over-the-shoulder reveal of the next mountain. */
   key(0.885, 7, 'over the shoulder — next mountain', [-1.2, 56.7, -32.2], HORIZON_AIM, {
-    portraitPosition: [-0.14, 56.85, -31.6],
+    portraitPosition: [-0.14, 57.0, -30.9],
   }),
   key(0.905, 7, 'over the shoulder — breathe in', [-1.1, 56.71, -32.35], HORIZON_AIM, {
-    portraitPosition: [-0.13, 56.86, -31.72],
+    portraitPosition: [-0.13, 57.0, -31.0],
   }),
   key(0.92, 8, 'last pull begins', [-0.98, 56.72, -32.45], HORIZON_AIM, {
-    portraitPosition: [-0.12, 56.86, -31.8],
+    portraitPosition: [-0.12, 56.99, -31.06],
   }),
 
   /* 0.92–0.945 — the last pull: standing before the next big mountain. Held to 1.0. */
@@ -605,9 +606,12 @@ export const CAMERA_RIG_TIMING = {
   /** Handheld breathing fades out over this window and is exactly zero from `handheldOff`. */
   handheldFadeStart: 0.895,
   handheldOff: 0.915,
-  /** The paper hits the lens: tiny damped pitch nudge (< 0.5°). */
-  impactStart: ENDING.paperStick - 0.003,
-  impactPeak: ENDING.paperStick + 0.001,
-  impactEnd: ENDING.paperStick + 0.011,
-  impactPitchDeg: 0.3,
+  /**
+   * The paper hits the lens when progress crosses this going forward: a tiny
+   * time-based pitch knock (peak `impactPitchDeg` < 0.5° after
+   * `impactRiseSeconds`, then decaying), damped like everything else.
+   */
+  impactAt: ENDING.paperStick,
+  impactPitchDeg: 0.45,
+  impactRiseSeconds: 0.09,
 } as const;

@@ -106,9 +106,14 @@ export function lensPaperPhaseAt(progress: number): LensPaperPhase {
 /** Distance in front of the near plane where the glass is. */
 const REST_GAP = 0.4;
 const REST_HEIGHT_FRACTION = 0.76;
+/** Narrow (portrait) screens are width-bound: give the sheet a little more of the width. */
 const REST_WIDTH_FRACTION = 0.86;
+const REST_WIDTH_FRACTION_NARROW = 0.9;
 const REST_TILT = -0.042;
-const HALO_MARGIN = 0.22;
+const HALO_MARGIN = 0.3;
+const HALO_STRENGTH = 0.45;
+/** Edge sag (fraction of the height) as the sheet bows into the slap. */
+const BOW = 0.1;
 const TWO_PI = Math.PI * 2;
 
 const lerp = THREE.MathUtils.lerp;
@@ -118,8 +123,8 @@ const ORIGIN = new THREE.Vector3(...ENDING.paperOrigin);
 /** The gust first lifts the sheet up and back over the climber's shoulder. */
 const GUST_LIFT = new THREE.Vector3(0.35, 1.25, 1.1);
 
-const BACKLIGHT_SUNSET = new THREE.Color('#F7D9BC');
-const BACKLIGHT_CLOUD = new THREE.Color('#EEF1F6');
+const BACKLIGHT_SUNSET = new THREE.Color('#F7DCC2');
+const BACKLIGHT_CLOUD = new THREE.Color('#F3EEE6');
 
 /** Smooth 0 → 1 wind gusts (two beating sines). */
 const gustAt = (time: number, a: number, b: number): number =>
@@ -311,7 +316,8 @@ export function LensPaper(): JSX.Element {
     const d = near + REST_GAP;
     const halfH = d * tanHalf;
     const halfW = halfH * aspect;
-    const h = Math.min(REST_HEIGHT_FRACTION * 2 * halfH, (REST_WIDTH_FRACTION * 2 * halfW) / PAPER_ASPECT);
+    const widthFraction = aspect < 0.8 ? REST_WIDTH_FRACTION_NARROW : REST_WIDTH_FRACTION;
+    const h = Math.min(REST_HEIGHT_FRACTION * 2 * halfH, (widthFraction * 2 * halfW) / PAPER_ASPECT);
     const w = h * PAPER_ASPECT;
     u.uSize.value.set(w, h);
     w0.rest.set(0, 0.004 * halfH, -d);
@@ -372,11 +378,15 @@ export function LensPaper(): JSX.Element {
         w0.pos.y += dist * env * (0.025 * Math.sin(t * 23 + 1.9) + 0.006 * Math.sin(s.time * 5.9 + 1.3));
 
         // Tumble: one back-flip, a yaw swing and a roll, settling face-on.
-        const settle = 1 - smoothstep(0.55, 0.96, t);
+        const settle = 1 - smoothstep(0.72, 0.98, t);
+        const approach = smoothstep(0.6, 0.85, t) * (1 - smoothstep(0.86, 1, t));
         w0.euler.set(
-          -TWO_PI * smootherstep(0.1, 0.8, t) + 0.3 * Math.sin(t * 17 + 0.4) * (1 - t) * env + 0.1 * Math.sin(s.time * 5.1) * env,
-          0.75 * Math.sin(t * 7.2 + 0.3) * settle + 0.08 * Math.sin(s.time * 4.3 + 1) * env,
-          REST_TILT * smoothstep(0.6, 1, t) + 0.6 * Math.sin(t * 5.1 + 0.2) * (1 - smoothstep(0.5, 0.95, t)),
+          -TWO_PI * smootherstep(0.08, 0.72, t) +
+            0.35 * Math.sin(t * 17 + 0.4) * env * (1 - smoothstep(0.7, 0.95, t)) +
+            0.1 * Math.sin(s.time * 5.1) * env -
+            0.55 * approach,
+          0.8 * Math.sin(t * 7.2 + 0.3) * settle + 0.08 * Math.sin(s.time * 4.3 + 1) * env,
+          REST_TILT * smoothstep(0.7, 1, t) + 0.7 * Math.sin(t * 5.1 + 0.2) * (1 - smoothstep(0.68, 0.97, t)),
         );
 
         // Unfold: the second fold opens first, then the first; the first crease
@@ -386,39 +396,40 @@ export function LensPaper(): JSX.Element {
         fold1 = Math.max(fold1, 0.22 * (1 - smoothstep(0.8, 0.97, t)));
 
         // Flex in the air, then bow (edges trailing) just before the slap.
-        const flex = smoothstep(0.3, 0.5, t) * (1 - smoothstep(0.8, 0.96, t));
-        const bow = 0.075 * smoothstep(0.74, 0.96, t);
-        bendX = 0.11 * Math.sin(t * 15 + 0.6 + s.time * 1.5) * flex + bow;
-        bendY = 0.07 * Math.sin(t * 12 + 2 + s.time * 1.1) * flex + bow * 0.7;
-        waveAmp = 0.04 * smoothstep(0.3, 0.55, t) * (1 - smoothstep(0.82, 0.98, t));
+        const flex = smoothstep(0.25, 0.45, t) * (1 - smoothstep(0.88, 0.98, t));
+        const bow = BOW * smoothstep(0.8, 0.97, t);
+        bendX = 0.2 * Math.sin(t * 15 + 0.6 + s.time * 1.5) * flex + bow;
+        bendY = 0.13 * Math.sin(t * 12 + 2 + s.time * 1.1) * flex + bow * 0.7;
+        waveAmp = 0.065 * smoothstep(0.3, 0.5, t) * (1 - smoothstep(0.88, 0.99, t));
         u.uWaveDir.value.set(Math.cos(t * 3 + 0.9), Math.sin(t * 3 + 0.9));
         squash = smoothstep(0.06, 0.3, t);
       }
     } else if (phase === 'stuck') {
       const settle = 1 - smoothstep(E.paperStick, E.paperStick + 0.0014, p);
       contact = 1 - settle;
-      haloStrength = 0.4 * (1 - settle);
+      haloStrength = HALO_STRENGTH * (1 - settle);
       if (!reduce) {
-        bendX = 0.075 * settle;
-        bendY = 0.0525 * settle;
+        bendX = BOW * settle;
+        bendY = BOW * 0.7 * settle;
         const k = s.impactAmp * Math.exp(-s.impactAge * 5.5);
         impact = 0.03 * k;
         scalePulse = 1 + 0.02 * s.impactAmp * Math.exp(-s.impactAge * 9) * Math.cos(s.impactAge * 22);
         w0.pos.y -= 0.01 * h * s.impactAmp * Math.exp(-s.impactAge * 10) * Math.sin(s.impactAge * 30);
         const lift = 1 - settle;
         const anticipation = 0.11 * smoothstep(E.paperHoldEnd - 0.009, E.paperHoldEnd, p);
+        // TL, TR, BR, BL — the bottom-left is dog-eared from the pack.
         u.uCornerLift.value.set(
-          lift * (0.01 + 0.012 * gustAt(s.time, 1.9, 0.3)),
-          lift * (0.016 + 0.02 * gustAt(s.time, 2.3, 1.1)) + anticipation,
-          lift * (0.006 + 0.01 * gustAt(s.time, 1.6, 2.4)),
-          lift * (0.022 + 0.014 * gustAt(s.time, 2.1, 3.3)),
+          lift * (0.018 + 0.016 * gustAt(s.time, 1.9, 0.3)),
+          lift * (0.03 + 0.026 * gustAt(s.time, 2.3, 1.1)) + anticipation,
+          lift * (0.012 + 0.014 * gustAt(s.time, 1.6, 2.4)),
+          lift * (0.07 + 0.025 * gustAt(s.time, 2.1, 3.3)),
         );
-        ripple = 0.004 * lift;
+        ripple = 0.005 * lift;
       }
     } else if (phase === 'peel') {
       const t = remap(p, E.paperHoldEnd, E.paperPeelEnd);
       contact = 1 - smoothstep(0.2, 0.7, t);
-      haloStrength = 0.4 * (1 - smoothstep(0, 0.45, t));
+      haloStrength = HALO_STRENGTH * (1 - smoothstep(0, 0.45, t));
       if (reduce) {
         opacity = 1 - smoothstep(0, 0.6, t);
         w0.pos.x -= 0.15 * halfW * t;
@@ -437,7 +448,7 @@ export function LensPaper(): JSX.Element {
         );
         w0.euler.set(0.5 * exit, -1.3 * exit, REST_TILT + 0.9 * exit);
         const fadeCorners = 1 - smoothstep(0, 0.2, t);
-        u.uCornerLift.value.set(0.015 * fadeCorners, 0.11 * fadeCorners, 0.01 * fadeCorners, 0.025 * fadeCorners);
+        u.uCornerLift.value.set(0.02 * fadeCorners, 0.11 * fadeCorners, 0.015 * fadeCorners, 0.055 * fadeCorners);
         ripple = 0.004 * fadeCorners;
         opacity = 1 - smoothstep(0.9, 1, t);
       }
@@ -472,9 +483,9 @@ export function LensPaper(): JSX.Element {
     u.uInk.value = lensPaperState.overlayMounted ? 1 - s.textOpacity : 1;
     u.uSunView.value.copy(SUN_DIRECTION).transformDirection(camera.matrixWorldInverse);
     u.uSunIntensity.value = lerp(1.45, 0.3, cloudIn);
-    u.uAmbient.value = lerp(0.8, 0.95, cloudIn);
+    u.uAmbient.value = lerp(0.75, 0.62, cloudIn);
     u.uBackLight.value.copy(w0.backLight.copy(BACKLIGHT_SUNSET).multiplyScalar(0.95).lerp(BACKLIGHT_CLOUD, cloudIn));
-    if (cloudIn > 0) u.uBackLight.value.multiplyScalar(lerp(1, 1.2, cloudIn));
+    if (cloudIn > 0) u.uBackLight.value.multiplyScalar(lerp(1, 1.25, cloudIn));
     state.gl.getDrawingBufferSize(w0.resolution);
     u.uResolution.value.copy(w0.resolution);
 
@@ -491,7 +502,7 @@ export function LensPaper(): JSX.Element {
     parts.haloLocal.compose(w0.haloPos, w0.haloQuat, w0.haloScale);
     hu.uPaperSize.value.set(w, h);
     hu.uHaloSize.value.set(w + 2 * margin, h + 2 * margin);
-    hu.uSoftness.value = 0.12 * h;
+    hu.uSoftness.value = 0.2 * h;
     hu.uStrength.value = haloStrength;
     hu.uExposure.value = sceneFx.exposure;
 

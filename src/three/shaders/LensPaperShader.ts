@@ -242,8 +242,8 @@ void main() {
   float cloud = fbm(pu * 0.006 + 4.0);
   float tooth = vnoise(pu * 0.85) - 0.5;
   float strands = fibres(pu) * detail;
-  vec3 albedo = uPaper * (0.97 + 0.07 * (formation - 0.5) + 0.03 * (cloud - 0.5) + detail * 0.022 * tooth);
-  albedo *= 1.0 + 0.028 * strands - 0.012 * detail * fibres(pu * 1.7 + 9.0);
+  vec3 albedo = uPaper * (0.975 + 0.045 * (formation - 0.5) + 0.025 * (cloud - 0.5) + detail * 0.022 * tooth);
+  albedo *= 1.0 + 0.03 * strands - 0.014 * detail * fibres(pu * 1.7 + 9.0);
 
   // Handling grime and wear along the edges and the torn top.
   float edgeDist = min(-box, pu.y - tear);
@@ -253,11 +253,12 @@ void main() {
   // Quarter-fold creases: worn fibres along the fold, light on one flank.
   float cx = pu.x - CREASE_X;
   float cy = pu.y - CREASE_Y;
-  float lineV = exp(-abs(cx) / 1.3);
-  float lineH = exp(-abs(cy) / 1.3);
-  float wear = (lineV + lineH) * (0.55 + 0.45 * vnoise(pu * vec2(0.3, 0.3)));
-  albedo *= 1.0 - 0.07 * wear;
-  float relief = 0.035 * (sign(cx) * exp(-abs(cx) / 9.0) + sign(cy) * exp(-abs(cy) / 9.0)) * (front ? 1.0 : -1.0);
+  float creaseAA = max(1.4, aa);
+  float lineV = exp(-abs(cx) / creaseAA);
+  float lineH = exp(-abs(cy) / creaseAA);
+  float wear = (lineV + lineH) * (0.5 + 0.5 * vnoise(pu * vec2(0.35, 0.35)));
+  albedo *= 1.0 - 0.11 * wear;
+  float relief = 0.05 * (sign(cx) * exp(-abs(cx) / 16.0) + sign(cy) * exp(-abs(cy) / 16.0)) * (front ? 1.0 : -1.0);
 
   // Printed rules and the margin (both sides of the sheet).
   float ry = pf.y - RULE_FIRST;
@@ -284,12 +285,14 @@ void main() {
   float ndl = dot(N, L);
   vec3 hemi = mix(uGround, uSky, clamp(N.y * 0.5 + 0.5, 0.0, 1.0));
   vec3 direct = uSunColor * uSunIntensity * max(ndl, 0.0);
-  float thickness = 0.72 + 0.56 * formation + 0.1 * strands;
+  float thickness = 0.86 + 0.28 * formation + 0.08 * strands;
   vec3 through = (uSunColor * uSunIntensity * max(-ndl, 0.0) * 0.55 + uBackLight) * (uTransmission / thickness);
+  // Pressed on the lens, the sheet glows a little more towards the bright sky above.
+  through *= mix(1.0, 0.9 + 0.2 * vUv.y, uContact);
   vec3 col = albedo * (hemi * uAmbient + direct) + albedo * through * (1.0 - 0.9 * inkA);
 
   // Corners lifted off the glass tilt out of the light and fall into soft shade.
-  col *= 1.0 - 0.3 * smoothstep(0.0, 0.06, vLift) * uContact;
+  col *= 1.0 - 0.45 * smoothstep(0.0, 0.09, vLift) * uContact;
   col *= 1.0 + relief;
 
   // The glass in front: a faint diagonal sheen across the pressed sheet.
@@ -325,8 +328,8 @@ void main() {
   vec2 halfSize = uPaperSize * 0.5;
   vec2 d = abs(p) - (halfSize - 0.02 * uPaperSize.y);
   float sdf = length(max(d, 0.0)) + min(max(d.x, d.y), 0.0) - 0.02 * uPaperSize.y;
-  float a = 1.0 - smoothstep(-0.25 * uSoftness, uSoftness, sdf);
-  a = a * a * uStrength;
+  float a = 1.0 - smoothstep(-0.2 * uSoftness, uSoftness, sdf);
+  a = pow(a, 1.6) * uStrength;
   gl_FragColor = vec4(uColor * uExposure, a);
   #include <colorspace_fragment>
 }
@@ -391,7 +394,7 @@ export function createLensPaperUniforms(ink: THREE.Texture | null): LensPaperUni
     uSunView: { value: new THREE.Vector3(0.7, 0.45, -0.25) },
     uSunColor: { value: new THREE.Color('#FFD9A8') },
     uSunIntensity: { value: 1.4 },
-    uSky: { value: new THREE.Color('#9DB4D8') },
+    uSky: { value: new THREE.Color('#C9D5E8') },
     uGround: { value: new THREE.Color('#1A1F2B') },
     uAmbient: { value: 0.6 },
     uBackLight: { value: new THREE.Color(0, 0, 0) },

@@ -5,64 +5,91 @@ import { PATH_PHASES, WAYPOINTS, protagonistPositionAt } from '../protagonistPat
 /* ==========================================================================
  * Terrain geometry — PURE module (no React, no DOM; runs in Node).
  *
- * The climbable massif is a signed distance field (negative = inside rock):
- *   ground  : a large heightfield mountain body (ridges, valleys, carved gorges)
- *   masses  : base-camp mesa, Company-1 cliff buttress, Company-2 pillar and
- *             the summit pyramid — each shaped directly from the climb route so
- *             the rock face sits just behind the climber and every standing
- *             waypoint has a surface right under the feet.
- *   detail  : world-space FBM / ridged ribs / stepped strata displacement,
- *             suppressed close to the route so clearances stay controlled.
+ * ONE continuous granite mountain, described as a signed distance field
+ * (negative = inside rock) and polygonised with naive surface nets:
  *
- * Inside a bounded "massif domain" the field is polygonised with naive surface
- * nets on a sparse brick grid (only bricks near the surface are evaluated).
- * Outside the domain the ground heightfield continues as a graded-resolution
- * skirt mesh that overlaps the domain edge slightly, so there are no cracks.
+ *   ground   a heightfield for the mountain's lower body, its radiating
+ *            ridges and the valleys / flanking ranges (also the far skirt);
+ *   front    the stepped front face carved into the mountain: the base-camp
+ *            shoulder, the Company-1 cliff with the ledge-1 terrace, the upper
+ *            buttress, the ledge-2 shelf and the mid-face pillar. Every face
+ *            that is climbed is shaped directly from the climb route so the
+ *            rock sits just behind the climber and every standing waypoint has
+ *            a surface under the feet;
+ *   chasms   chasm 1, a deep cleft cut into the face (open to the south-east,
+ *            closed behind, misty floor), and chasm 2, a deeper gorge between
+ *            the pillar and the summit pyramid (closed by rock walls at both
+ *            ends, abyss below the leap);
+ *   summit   the faceted summit pyramid whose south face carries the catch lip
+ *            and the scramble, topped by a tiny standing platform;
+ *   detail   world-space strata / jointing / FBM displacement, suppressed close
+ *            to the route so the clearances stay exact.
  *
- * Everything is deterministic (fixed seeds) and built once per detail level.
+ * Two surface-net passes: a fine one over the climb ("detail domain") and a
+ * coarse one over the whole massif whose surface is tucked just under the fine
+ * one where they overlap. Beyond the massif the ground heightfield continues as
+ * a graded-resolution skirt mesh. Vertices close to the route are projected
+ * onto the exact iso-surface. Deterministic (fixed seeds); built once per
+ * detail level, optionally time-sliced.
  * ========================================================================== */
 
 export type TerrainDetail = 'high' | 'medium' | 'low';
 
 export interface TerrainPiece {
-  /** Stable name, e.g. `massif-1-0-2` or `skirt`. */
+  /** Stable name, e.g. `massif-1-0-2`, `flank-0-1-1` or `skirt`. */
   name: string;
   /** World-space, indexed geometry with `position`, `normal` and `aOcclusion` (0..1). */
   geometry: THREE.BufferGeometry;
-  kind: 'massif' | 'skirt';
+  /** massif = fine climb detail, flank = coarse outer massif, skirt = far heightfield. */
+  kind: 'massif' | 'flank' | 'skirt';
   triangles: number;
 }
 
 /** World-space Y of the rock surface directly under each standing waypoint. */
 export const STANDING_SURFACE_Y = {
   baseCamp: 0,
-  firstLedge: 17.75,
-  chasmOneLanding: 21.92,
-  chasmOneTop: 31.85,
-  summit: 54.9,
+  firstLedge: 17.97,
+  chasmOneLanding: 21.97,
+  chasmOneTop: 31.97,
+  summit: 54.97,
 } as const;
 
-/** Bounds of the finely polygonised massif (outside it only the skirt exists). */
-export const MASSIF_DOMAIN = {
-  x0: -28,
-  x1: 28,
-  y0: -40,
+/** Top of the one-handed catch lip on the summit pyramid (Scene 6). */
+export const CATCH_LIP_Y = 40;
+
+/** Bounds of the fine (climb-detail) surface-net pass. */
+export const MASSIF_DETAIL_DOMAIN = {
+  x0: -24,
+  x1: 24,
+  y0: -26,
   y1: 58,
-  z0: -62,
-  z1: 18,
+  z0: -48,
+  z1: 17,
+} as const;
+
+/** Bounds of the whole polygonised massif (outside it only the skirt exists). */
+export const MASSIF_DOMAIN = {
+  x0: -50,
+  x1: 50,
+  y0: -66,
+  y1: 58,
+  z0: -98,
+  z1: 36,
 } as const;
 
 /** Extent of the outer skirt heightfield (fully fogged at its edges). */
 export const SKIRT_EXTENT = {
-  x0: -460,
-  x1: 460,
-  z0: -430,
-  z1: 300,
+  x0: -470,
+  x1: 470,
+  z0: -440,
+  z1: 310,
 } as const;
 
 interface DetailConfig {
-  /** Surface-net cell size (world units). */
+  /** Fine surface-net cell size (world units). */
   cell: number;
+  /** Coarse (outer massif) cell size. */
+  outerCell: number;
   /** Include the finest displacement octave. */
   fineNoise: boolean;
   /** Skirt grid spacing next to the massif domain. */
@@ -74,9 +101,9 @@ interface DetailConfig {
 }
 
 const DETAIL_CONFIG: Readonly<Record<TerrainDetail, DetailConfig>> = {
-  high: { cell: 0.3, fineNoise: true, skirtNear: 0.75, skirtGrowth: 1.045, aoSpacing: 1.9 },
-  medium: { cell: 0.42, fineNoise: true, skirtNear: 1.05, skirtGrowth: 1.06, aoSpacing: 2.1 },
-  low: { cell: 0.62, fineNoise: false, skirtNear: 1.6, skirtGrowth: 1.085, aoSpacing: 2.5 },
+  high: { cell: 0.3, outerCell: 0.8, fineNoise: true, skirtNear: 1.8, skirtGrowth: 1.05, aoSpacing: 2.0 },
+  medium: { cell: 0.42, outerCell: 1.05, fineNoise: true, skirtNear: 2.4, skirtGrowth: 1.065, aoSpacing: 2.3 },
+  low: { cell: 0.62, outerCell: 1.45, fineNoise: false, skirtNear: 3.2, skirtGrowth: 1.09, aoSpacing: 2.8 },
 };
 
 /** Terrain detail for a GPU tier (tier 0 never renders WebGL; it maps to low). */
@@ -106,6 +133,13 @@ function smin(a: number, b: number, k: number): number {
 function smax(a: number, b: number, k: number): number {
   const h = Math.max(k - Math.abs(a - b), 0) / k;
   return Math.max(a, b) + h * h * k * 0.25;
+}
+
+/** Intersection of two distance fields with the convex edge rounded to radius r. */
+function roundMax(a: number, b: number, r: number): number {
+  const ua = a + r > 0 ? a + r : 0;
+  const ub = b + r > 0 ? b + r : 0;
+  return Math.min(-r, Math.max(a, b)) + Math.sqrt(ua * ua + ub * ub);
 }
 
 function mulberry32(seed: number): () => number {
@@ -309,7 +343,73 @@ function routeX(t: RouteTable, y: number): number {
 }
 
 /* ==========================================================================
- * Ground / skirt heightfield — the mountain body.
+ * Chasm frames
+ * ========================================================================== */
+
+/* Chasm 1: `n` runs along the jump (ledge 1 → ledge 2), `a` along the cleft
+ * towards its mouth (south-east, front-right). Origin = jump midpoint. */
+const J1_LEN = Math.hypot(WAYPOINTS.chasmOneLanding[0] - WAYPOINTS.firstLedge[0], WAYPOINTS.chasmOneLanding[2] - WAYPOINTS.firstLedge[2]);
+const C1N_X = (WAYPOINTS.chasmOneLanding[0] - WAYPOINTS.firstLedge[0]) / J1_LEN;
+const C1N_Z = (WAYPOINTS.chasmOneLanding[2] - WAYPOINTS.firstLedge[2]) / J1_LEN;
+const C1A_X = -C1N_Z;
+const C1A_Z = C1N_X;
+const C1_OX = (WAYPOINTS.firstLedge[0] + WAYPOINTS.chasmOneLanding[0]) / 2;
+const C1_OZ = (WAYPOINTS.firstLedge[2] + WAYPOINTS.chasmOneLanding[2]) / 2;
+
+/* Chasm 2: `n` runs along the leap (pillar top → catch), `a` along the gorge
+ * towards the north-east. Origin = leap midpoint. */
+const J2_LEN = Math.hypot(WAYPOINTS.chasmTwoCatch[0] - WAYPOINTS.chasmOneTop[0], WAYPOINTS.chasmTwoCatch[2] - WAYPOINTS.chasmOneTop[2]);
+const C2N_X = (WAYPOINTS.chasmTwoCatch[0] - WAYPOINTS.chasmOneTop[0]) / J2_LEN;
+const C2N_Z = (WAYPOINTS.chasmTwoCatch[2] - WAYPOINTS.chasmOneTop[2]) / J2_LEN;
+const C2A_X = -C2N_Z;
+const C2A_Z = C2N_X;
+const C2_OX = (WAYPOINTS.chasmOneTop[0] + WAYPOINTS.chasmTwoCatch[0]) / 2;
+const C2_OZ = (WAYPOINTS.chasmOneTop[2] + WAYPOINTS.chasmTwoCatch[2]) / 2;
+
+const cleftA = (x: number, z: number): number => C1A_X * (x - C1_OX) + C1A_Z * (z - C1_OZ);
+const cleftN = (x: number, z: number): number => C1N_X * (x - C1_OX) + C1N_Z * (z - C1_OZ);
+const gorgeA = (x: number, z: number): number => C2A_X * (x - C2_OX) + C2A_Z * (z - C2_OZ);
+const gorgeN = (x: number, z: number): number => C2N_X * (x - C2_OX) + C2N_Z * (z - C2_OZ);
+
+const CLEFT_HALF_WIDTH = 3.0;
+const CLEFT_BACK_A = -3.6;
+const CLEFT_MOUTH_A = 21;
+const CLEFT_FLOOR_Y = -8;
+const GORGE_A0 = -2.5;
+const GORGE_A1 = 6.5;
+const GORGE_EDGE_N = -6.0;
+const GORGE_FLOOR_Y = -14;
+
+/**
+ * Where the chasms are, for mist / effects placement. Frames are in the xz
+ * plane: `axis` runs along the chasm (towards its open/far end), `across`
+ * along the jump. All values world units.
+ */
+export const CHASM_LAYOUT = {
+  chasmOne: {
+    origin: [C1_OX, C1_OZ] as const,
+    axis: [C1A_X, C1A_Z] as const,
+    across: [C1N_X, C1N_Z] as const,
+    halfWidth: CLEFT_HALF_WIDTH,
+    backA: CLEFT_BACK_A,
+    mouthA: CLEFT_MOUTH_A,
+    /** Floor height at the jump line; it rises toward the back and falls toward the mouth. */
+    floorY: CLEFT_FLOOR_Y,
+  },
+  chasmTwo: {
+    origin: [C2_OX, C2_OZ] as const,
+    axis: [C2A_X, C2A_Z] as const,
+    across: [C2N_X, C2N_Z] as const,
+    a0: GORGE_A0,
+    a1: GORGE_A1,
+    /** Pillar-side wall position along `across`; the pyramid wall is ~+7.2. */
+    nearEdge: GORGE_EDGE_N,
+    floorY: GORGE_FLOOR_Y,
+  },
+} as const;
+
+/* ==========================================================================
+ * Ground heightfield — the mountain's lower body, ridges, valleys and skirt.
  * ========================================================================== */
 
 interface RidgeSpec {
@@ -320,41 +420,24 @@ interface RidgeSpec {
 }
 
 const RIDGES: readonly RidgeSpec[] = [
-  // South-west arête: frames base camp on the left and climbs to the summit shoulder.
-  { points: [[-7, 31, -33], [-24, 9, -17], [-58, -30, 10], [-130, -92, 46]], cross: 1.2 },
-  // South-east spur beyond the first canyon.
-  { points: [[9, 26, -31], [31, 3, -21], [70, -38, 2], [140, -95, 34]], cross: 1.25 },
-  // North ridge falling toward the horizon reveal (seen from the summit).
-  { points: [[1, 27, -49], [8, -2, -82], [18, -48, -124], [26, -100, -176]], cross: 1.15 },
-  // North-west and north-east shoulders.
-  { points: [[-10, 24, -45], [-46, -12, -76], [-110, -76, -112]], cross: 1.3 },
-  { points: [[12, 23, -43], [52, -14, -70], [118, -82, -104]], cross: 1.3 },
-  // Southern spur that supports the base-camp outcrop.
-  { points: [[0, -9, 9], [1, -27, 30], [-7, -62, 72], [-12, -104, 124]], cross: 1.3 },
+  // South-west arête: continues the summit pyramid's west edge down past the upper buttress.
+  { points: [[-7.5, 37, -29], [-13, 31, -22], [-20, 20, -14], [-31, 5, -3], [-52, -22, 14], [-100, -74, 48]], cross: 1.35 },
+  // South-east arête: from the pyramid's east edge over the pillar's shoulder and down.
+  { points: [[7.5, 37, -29], [12.5, 31, -21], [17.5, 23, -13], [27, 9, -2], [50, -20, 14], [100, -74, 48]], cross: 1.35 },
+  // North, north-west and north-east ridges (seen from the summit).
+  { points: [[0, 40, -44], [2, 29, -58], [6, 2, -88], [12, -45, -135]], cross: 1.3 },
+  { points: [[-6, 40, -41], [-20, 23, -54], [-50, -15, -86], [-95, -66, -120]], cross: 1.35 },
+  { points: [[6, 40, -41], [21, 23, -53], [52, -15, -84], [100, -66, -118]], cross: 1.35 },
+  // West and east shoulders.
+  { points: [[-9, 36, -36], [-27, 16, -38], [-60, -22, -44], [-120, -72, -52]], cross: 1.4 },
+  { points: [[9, 36, -36], [27, 16, -36], [60, -22, -40], [120, -72, -50]], cross: 1.4 },
+  // Southern spur under the base-camp shoulder.
+  { points: [[0, -7, 9], [0, -15, 20], [-3, -40, 48], [-8, -90, 110]], cross: 1.3 },
   // Far flanking ranges that give the valleys depth.
   { points: [[-150, -40, -40], [-210, -10, -150], [-260, -30, -260]], cross: 0.9 },
   { points: [[160, -45, -30], [230, -15, -140], [290, -35, -250]], cross: 0.9 },
 ];
 
-interface GorgeCapsule {
-  ax: number;
-  az: number;
-  bx: number;
-  bz: number;
-  r: number;
-}
-
-/** Horizontal footprints carved down to the misty gorge floor. */
-const GORGES: readonly GorgeCapsule[] = [
-  // Chasm 1 slot canyon, opening to the south-east.
-  { ax: -3.5, az: -15.8, bx: 15, bz: -0.4, r: 2.3 },
-  // Chasm 2 abyss between the pillar and the summit massif, running west.
-  { ax: -13, az: -21.5, bx: 8.5, bz: -21.5, r: 4.6 },
-  // Join between the two around the pillar's north-west foot.
-  { ax: 1, az: -17, bx: 4, bz: -22, r: 2.6 },
-];
-
-const GORGE_FLOOR = -27;
 const VALLEY_FLOOR = -118;
 
 function ridgeHeight(r: RidgeSpec, x: number, z: number): number {
@@ -376,21 +459,6 @@ function ridgeHeight(r: RidgeSpec, x: number, z: number): number {
   return best;
 }
 
-function gorgeDistance(x: number, z: number): number {
-  let best = 1e9;
-  for (let i = 0; i < GORGES.length; i += 1) {
-    const g = GORGES[i];
-    const abx = g.bx - g.ax;
-    const abz = g.bz - g.az;
-    const t = clamp(((x - g.ax) * abx + (z - g.az) * abz) / (abx * abx + abz * abz), 0, 1);
-    const dx = x - (g.ax + abx * t);
-    const dz = z - (g.az + abz * t);
-    const d = Math.sqrt(dx * dx + dz * dz) - g.r;
-    if (d < best) best = d;
-  }
-  return best;
-}
-
 /** Ridged 2D fbm in [0, ~1]. */
 function ridged2(x: number, z: number, octaves: number): number {
   let sum = 0;
@@ -408,122 +476,220 @@ function ridged2(x: number, z: number, octaves: number): number {
 }
 
 /**
- * Height of the mountain body / outer skirt at (x, z). Shared by the skirt mesh
- * and the massif field so both agree exactly along the domain edge.
+ * Height of the mountain's lower body / outer skirt at (x, z). Shared by the
+ * skirt mesh and both massif passes so they agree along the domain edges.
  */
 export function skirtHeight(x: number, z: number): number {
-  // Broad cone centred under the summit.
-  const cx = x;
-  const cz = z + 36;
-  const r = Math.sqrt(cx * cx + cz * cz);
-  let h = 34 - 1.15 * r + 0.0009 * r * r;
+  // Broad, concave cone centred just behind the summit; the south (front) falls away faster.
+  const dz = z + 40;
+  const zs = dz > 0 ? dz * 1.3 : dz;
+  const r = Math.sqrt(x * x + zs * zs);
+  let h = 44 - 1.18 * r + 0.0026 * r * r;
 
   for (let i = 0; i < RIDGES.length; i += 1) {
-    h = smax(h, ridgeHeight(RIDGES[i], x, z), 7);
+    h = smax(h, ridgeHeight(RIDGES[i], x, z), 6);
   }
 
-  // Erosion-like detail: big gullies, then finer ribs. Calmer inside the massif core.
-  const core = smoothstep(18, 46, r);
+  // Erosion-like detail: big gullies, then finer ribs. Calmer near the climb.
+  const core = smoothstep(16, 44, Math.sqrt(x * x + (z + 14) * (z + 14)));
   const big = ridged2(x * 0.021, z * 0.021, 3) - 0.42;
   const mid = noise2(x * 0.071 + 3.1, z * 0.071 - 7.7);
   const fine = noise2(x * 0.19 - 1.7, z * 0.19 + 4.4);
-  h += (0.35 + 0.65 * core) * (big * 16 + mid * 3.2) + fine * (0.6 + 0.4 * core);
+  h += (0.3 + 0.7 * core) * (big * 15 + mid * 3) + fine * (0.6 + 0.4 * core);
 
   // Valley floors far below, softly levelled.
-  h = smax(h, VALLEY_FLOOR + noise2(x * 0.012, z * 0.012) * 6, 14);
-
-  // Carve the gorges between the climbing blocks down into the mist.
-  const g = gorgeDistance(x, z);
-  if (g < 22) {
-    h = smin(h, GORGE_FLOOR + Math.max(0, g) * 2.7 + noise2(x * 0.3, z * 0.3) * 0.8, 5);
-  }
-  return h;
+  return smax(h, VALLEY_FLOOR + noise2(x * 0.012, z * 0.012) * 6, 14);
 }
 
 /* ==========================================================================
- * Massif masses
+ * The front face — stepped blocks carved into the mountain's south side.
+ * Each block is { z < faceZ(x, y) } ∩ { y < topY(x, z) } with a rounded
+ * edge; west blocks stop east of the cleft, east blocks west of it.
  * ========================================================================== */
-
-/** Chasm-1 jump direction (ledge 1 → ledge 2) in xz, and the canyon centre. */
-const JX = 5 / Math.hypot(5, 6);
-const JZ = -6 / Math.hypot(5, 6);
-const CANYON_CX = 2.5;
-const CANYON_CZ = -11;
-
-function canyonHalfWidth(y: number): number {
-  return Math.max(1.05, 3 - 0.075 * Math.max(0, 15 - y));
-}
-
-function canyonCoord(x: number, z: number): number {
-  return JX * (x - CANYON_CX) + JZ * (z - CANYON_CZ);
-}
 
 const SY = STANDING_SURFACE_Y;
 
-/** Lip positions (z) of the faces right in front of each standing waypoint. */
-const LEDGE_ONE_LIP_Z = WAYPOINTS.firstLedge[2] + 0.24;
-const PILLAR_LIP_Z = WAYPOINTS.chasmOneTop[2] + 0.2;
+/** Front-edge positions just in front of each standing waypoint (the lips). */
+const LEDGE_ONE_LIP_Z = WAYPOINTS.firstLedge[2] + 0.05;
+const PILLAR_LIP_Z = WAYPOINTS.chasmOneTop[2] + 0.05;
 const SUMMIT_LIP_Z = WAYPOINTS.summit[2] + 0.05;
+/** Face behind the catch point (the climber hangs 0.62 in front of it). */
+const CATCH_LIP_Z = WAYPOINTS.chasmTwoCatch[2] - 0.62;
 
-/** Face of the Company-1 wall: z of the rock surface at (x, y). */
+/* ---- Base-camp shoulder ------------------------------------------------- */
+
+const CAMP_CX = 0;
+const CAMP_CZ = 1.5;
+const CAMP_AX = 7.6;
+const CAMP_AZ = 5.7;
+
+function baseCampTopY(x: number, z: number): number {
+  const dStand = Math.sqrt(x * x + (z - 0.8) * (z - 0.8));
+  const flat = smoothstep(3.0, 4.6, dStand);
+  const ex = (x - CAMP_CX) / CAMP_AX;
+  const ez = (z - CAMP_CZ) / CAMP_AZ;
+  const el = Math.sqrt(ex * ex + ez * ez);
+  const rim = smoothstep(0.72, 0.97, el) * (0.12 + 0.34 * (0.5 + 0.5 * noise2(x * 0.6 + 3.3, z * 0.6 - 1.1)));
+  return flat * (0.1 * noise2(x * 0.38 + 4, z * 0.38) + rim);
+}
+
+function baseCampSdf(x: number, y: number, z: number): number {
+  const ex = (x - CAMP_CX) / CAMP_AX;
+  const ez = (z - CAMP_CZ) / CAMP_AZ;
+  const plan = (Math.sqrt(ex * ex + ez * ez) - 1) * 6.2;
+  const depth = y < 0 ? -y : 0;
+  const side = plan - 0.42 * Math.min(depth, 14) - 0.95 * Math.max(0, depth - 14);
+  return roundMax(side, y - baseCampTopY(x, z), 0.45);
+}
+
+/* ---- Company-1 cliff (lower face) with the ledge-1 terrace -------------- */
+
 function cliffOneFaceZ(x: number, y: number): number {
   const yc = Math.min(y, SY.firstLedge);
-  let z = routeZ(ROUTE_ASCENT, yc) - 0.8;
-  // The face swings forward into a crisp lip just in front of the standing point.
-  z += (LEDGE_ONE_LIP_Z - z) * smoothstep(17.0, 17.45, y);
-  // Plan shape: recedes toward the canyon arête on the right, steps forward on the left.
-  if (x > 1.5) z -= 0.055 * (x - 1.5) * (x - 1.5);
-  if (x < -1.8) z += Math.min(3.4, 0.34 * (-1.8 - x));
+  let z = routeZ(ROUTE_ASCENT, yc) - 0.75;
+  // Converges onto a crisp lip just in front of the standing point.
+  z += (LEDGE_ONE_LIP_Z - z) * smoothstep(15.0, 17.3, y);
+  // Plan shape: turns to face south-east toward the cleft, steps forward on the west.
+  if (x > 1.2) {
+    const e = x - 1.2;
+    z -= 0.3 * e + 0.03 * e * e;
+  }
+  if (x < -3.0) z += Math.min(3.6, 0.45 * (-3.0 - x));
   return z;
 }
 
 function cliffOneTopY(x: number): number {
-  return SY.firstLedge + Math.max(0, -x - 1.9) * 0.95;
+  return SY.firstLedge + (x < -3.4 ? Math.min(10, 1.6 * (-3.4 - x)) : 0);
 }
 
-function mesaSdf(x: number, y: number, z: number): number {
-  const ex = x / 7.4;
-  const ez = (z - 2.7) / 4.6;
-  const el = Math.sqrt(ex * ex + ez * ez);
-  // Steep rocky rim that flares out with depth.
-  const side = (el - 1) * 5.4 - Math.min(Math.max(0, -y), 14) * 0.48;
-  // Flat standing area, gentle undulation, raised rocky rim.
-  const dStand = Math.sqrt(x * x + (z - 0.6) * (z - 0.6));
-  const flatMask = smoothstep(2.2, 3.8, dStand);
-  const rim = smoothstep(0.66, 0.98, el) * (0.22 + 0.3 * (0.5 + 0.5 * noise2(x * 0.7, z * 0.7)));
-  const undulate = 0.07 * noise2(x * 0.45 + 4, z * 0.45);
-  const top = y - flatMask * (undulate + rim);
-  return smax(side, top, 0.55);
+function cliffOneSdf(x: number, y: number, z: number, n1: number): number {
+  const top = cliffOneTopY(x);
+  let d = roundMax((z - cliffOneFaceZ(x, y)) * 0.92, y - top, 0.26);
+  d = Math.max(d, n1 - 1.5, -(x + 19) - 0.3 * Math.max(0, top - y));
+  return d;
 }
 
-function cliffOneSdf(x: number, y: number, z: number): number {
-  const face = (z - cliffOneFaceZ(x, y)) * 0.9;
-  const back = canyonCoord(x, z) + canyonHalfWidth(y);
-  const west = -(x + 15.5);
-  const body = Math.max(face, back, west);
-  return smax(body, y - cliffOneTopY(x), 0.14);
+/* ---- Upper buttress above ledge 1 -------------------------------------- */
+
+function upperFaceZ(x: number, y: number): number {
+  let z = -10.3 - 0.28 * Math.max(0, y - 18);
+  if (x > 0.5) z -= 0.3 * (x - 0.5);
+  if (x < -4) z += Math.min(2.6, 0.32 * (-4 - x));
+  return z;
 }
 
-function pillarFaceZ(y: number): number {
+function upperTopY(x: number, z: number): number {
+  return 26.5 + 0.45 * Math.max(0, -x - 1.5) + 0.22 * Math.max(0, -z - 16);
+}
+
+function upperSdf(x: number, y: number, z: number, n1: number): number {
+  const top = upperTopY(x, z);
+  let d = roundMax((z - upperFaceZ(x, y)) * 0.95, y - top, 0.6);
+  d = Math.max(d, n1 - 1.5, -(x + 19) - 0.3 * Math.max(0, top - y), -(z + 36));
+  return d;
+}
+
+/* ---- Ledge-2 shelf (the lower spur east of the cleft) ------------------ */
+
+function shelfFrontZ(x: number, y: number): number {
+  return -12.45 + 0.1 * (x - 5) + 0.32 * Math.max(0, 21.2 - y);
+}
+
+function shelfTopY(x: number): number {
+  return SY.chasmOneLanding - (x > 7.8 ? 1.3 * (x - 7.8) : 0);
+}
+
+function shelfSdf(x: number, y: number, z: number, n1: number): number {
+  let d = roundMax((z - shelfFrontZ(x, y)) * 0.95, y - shelfTopY(x), 0.3);
+  d = Math.max(d, -1.5 - n1, x - 19 - 0.3 * Math.max(0, 22 - y), -(z + 36));
+  return d;
+}
+
+/* ---- Mid-face pillar (Company 2) --------------------------------------- */
+
+function pillarFaceZ(x: number, y: number): number {
   const yc = clamp(y, ROUTE_PILLAR.y0, SY.chasmOneTop);
-  const z = routeZ(ROUTE_PILLAR, yc) - 0.56;
-  return z + (PILLAR_LIP_Z - z) * smoothstep(31.2, 31.6, y);
+  let z = routeZ(ROUTE_PILLAR, yc) - 0.55;
+  z += (PILLAR_LIP_Z - z) * smoothstep(29.6, 31.4, y);
+  if (x > 5.6) z -= 0.24 * (x - 5.6);
+  if (x < 4.3) z -= 0.3 * (4.3 - x);
+  return z;
 }
 
-function pillarSdf(x: number, y: number, z: number): number {
-  const canyonBack = canyonHalfWidth(y) - canyonCoord(x, z);
-  const dx = x - 5.7;
-  const dz = z + 15.9;
-  const radius = 2.9 + 0.12 * Math.max(0, SY.chasmOneLanding - y);
-  const circ = Math.sqrt(dx * dx + dz * dz) - radius;
-  const lower = Math.max(circ, canyonBack, y - SY.chasmOneLanding);
-
-  const face = (z - pillarFaceZ(y)) * 0.95;
-  const sideX = Math.abs(x - 5.1) - 2.0;
-  const back = -(z + 19.6);
-  const tower = Math.max(face, sideX, back, y - SY.chasmOneTop, 20.5 - y);
-  return smin(lower, tower, 0.22);
+function pillarTopY(x: number, z: number): number {
+  // Rises toward the summit pyramid (the south-east arête), falls away to the east.
+  const rise = 0.5 * Math.max(0, 0.4 * (x - 6.5) + 0.9 * (-z - 17));
+  return SY.chasmOneTop + rise - 1.1 * Math.max(0, x - 11);
 }
+
+function pillarSdf(x: number, y: number, z: number, n1: number): number {
+  const top = pillarTopY(x, z);
+  let d = roundMax((z - pillarFaceZ(x, y)) * 0.95, y - top, 0.26);
+  d = Math.max(d, -1.5 - n1, x - 20 - 0.35 * Math.max(0, top - y), -(z + 36));
+  return d;
+}
+
+/** All front-face blocks (negative inside), or a large value far away. */
+function frontComplex(x: number, y: number, z: number): number {
+  if (x < -30 || x > 30 || z < -40 || z > 30 || y > 44) return 1e3;
+  const n1 = cleftN(x, z);
+  let d = 1e3;
+  if (z > -8 && y < 3) d = baseCampSdf(x, y, z);
+  if (y < 30) d = smin(d, cliffOneSdf(x, y, z, n1), 0.7);
+  if (z < -6) d = smin(d, upperSdf(x, y, z, n1), 0.9);
+  if (z < -6 && y < 26) d = smin(d, shelfSdf(x, y, z, n1), 0.6);
+  if (z < -10) d = smin(d, pillarSdf(x, y, z, n1), 0.8);
+  // The summit pyramid's flank facets bound the face: its arêtes frame the climb.
+  return smax(d, pyramidFlanks(x, y, z), 0.9);
+}
+
+/* ==========================================================================
+ * Chasm carves (negative inside the empty space).
+ * ========================================================================== */
+
+function cleftFloorY(a: number): number {
+  return a >= 0 ? Math.max(-34, CLEFT_FLOOR_Y - 2.4 * a) : CLEFT_FLOOR_Y - 3.6 * a;
+}
+
+function cleftCarve(x: number, y: number, z: number): number {
+  const a = cleftA(x, z);
+  const n = cleftN(x, z);
+  let w = CLEFT_HALF_WIDTH;
+  if (y < 16) w = Math.max(0.95, w - 0.075 * (16 - y));
+  if (y > 25) w += 0.14 * (y - 25);
+  if (a > 2) w += 0.2 * (a - 2);
+  // Capsule in plan: a rounded back end, open toward the mouth.
+  const aStart = CLEFT_BACK_A + w;
+  const da = a < aStart ? aStart - a : 0;
+  const plan = Math.sqrt(da * da + n * n) - w;
+  return Math.max(plan, a - CLEFT_MOUTH_A, cleftFloorY(a) - y);
+}
+
+function gorgeCarve(x: number, y: number, z: number): number {
+  const a = gorgeA(x, z);
+  const n = gorgeN(x, z);
+  // The pillar-side wall leans back with depth (V-shaped gorge); the pyramid
+  // restores its own catch wall afterwards, so the far side reaches well past it.
+  const nLo = GORGE_EDGE_N + 0.12 * Math.max(0, 31 - y);
+  const nHi = 14;
+  const rc = 2.6;
+  const ca = (GORGE_A0 + GORGE_A1) / 2;
+  const ha = (GORGE_A1 - GORGE_A0) / 2;
+  const cn = (nLo + nHi) / 2;
+  const hn = (nHi - nLo) / 2;
+  const qa = Math.abs(a - ca) - ha + rc;
+  const qn = Math.abs(n - cn) - hn + rc;
+  const ox = qa > 0 ? qa : 0;
+  const oy = qn > 0 ? qn : 0;
+  const plan = Math.sqrt(ox * ox + oy * oy) + Math.min(Math.max(qa, qn), 0) - rc;
+  const end = Math.max(0, Math.abs(a - 1.5) - 2.6);
+  const floor = GORGE_FLOOR_Y + 4.2 * end * end;
+  return Math.max(plan, floor - y);
+}
+
+/* ==========================================================================
+ * Summit pyramid
+ * ========================================================================== */
 
 interface PyramidPlane {
   nx: number;
@@ -532,15 +698,15 @@ interface PyramidPlane {
   d: number;
 }
 
-/** Facets of the summit pyramid: outward horizontal direction, slope angle, offset at the top. */
+/** Facets: outward horizontal direction, slope angle (deg), offset at the platform height. */
 const PYRAMID: readonly PyramidPlane[] = (
   [
-    [0.98, -0.2, 64, 0.72],
-    [0.5, -0.87, 70, 0.66],
-    [-0.55, -0.83, 68, 0.62],
-    [-0.97, 0.1, 61, 0.66],
-    [-0.72, 0.7, 56, 2.8],
-    [0.74, 0.67, 59, 2.0],
+    [1.0, -0.06, 62, 0.9],
+    [0.4, -0.92, 64, 0.9],
+    [-0.4, -0.92, 64, 0.9],
+    [-1.0, -0.06, 61, 0.9],
+    [0.74, 0.67, 52, 1.7],
+    [-0.74, 0.67, 54, 1.7],
   ] as const
 ).map(([hx, hz, deg, r0]) => {
   const l = Math.hypot(hx, hz);
@@ -548,43 +714,50 @@ const PYRAMID: readonly PyramidPlane[] = (
   const sx = (hx / l) * Math.sin(a);
   const sz = (hz / l) * Math.sin(a);
   const cy = Math.cos(a);
-  // Plane through the point at horizontal distance r0 from the summit axis at the platform height.
-  const px = (hx / l) * r0;
+  const px = WAYPOINTS.summit[0] + (hx / l) * r0;
   const pz = WAYPOINTS.summit[2] + (hz / l) * r0;
   const py = SY.summit;
   return { nx: sx, ny: cy, nz: sz, d: -(sx * px + cy * py + sz * pz) };
 });
 
+/** South face of the pyramid: the catch wall below the lip, the scramble face above. */
 function summitFaceZ(x: number, y: number): number {
   let z: number;
-  const lipY = WAYPOINTS.chasmTwoCatch[1];
-  const lipZ = routeZ(ROUTE_SCRAMBLE, lipY) - 0.55;
-  if (y >= lipY) {
-    z = routeZ(ROUTE_SCRAMBLE, Math.min(y, 54.75)) - 0.55;
-    z += (SUMMIT_LIP_Z - z) * smoothstep(53.9, 54.75, y);
+  let xr: number;
+  if (y >= CATCH_LIP_Y) {
+    const yc = Math.min(y, SY.summit);
+    xr = routeX(ROUTE_SCRAMBLE, yc);
+    z = routeZ(ROUTE_SCRAMBLE, yc) - 0.62;
+    z += (SUMMIT_LIP_Z - z) * smoothstep(53.2, 54.6, y);
   } else {
-    // Undercut directly below the catch lip, then a sheer wall that flares at its foot.
-    z = lipZ - 0.42 * smoothstep(lipY, lipY - 1.4, y) + 0.3 * clamp(26 - y, 0, 20);
+    xr = WAYPOINTS.chasmTwoCatch[0];
+    // Small undercut below the lip, then a sheer wall that flares toward its foot.
+    z = CATCH_LIP_Z - 0.45 * smoothstep(CATCH_LIP_Y, CATCH_LIP_Y - 1.3, y) + 0.2 * clamp(24 - y, 0, 34);
   }
-  if (x > 1.8) z -= 0.18 * (x - 1.8) * (x - 1.8);
-  if (x < -5.4) z -= 0.15 * (-5.4 - x) * (-5.4 - x);
+  const dx = x - xr;
+  if (dx > 2.4) z -= 0.08 * (dx - 2.4) * (dx - 2.4);
+  if (dx < -2.8) z -= 0.08 * (-2.8 - dx) * (-2.8 - dx);
   return z;
 }
 
-function summitSdf(x: number, y: number, z: number): number {
-  let d = y - SY.summit;
+/** Max over the pyramid's flank facets (everything but its south face). */
+function pyramidFlanks(x: number, y: number, z: number): number {
+  let d = -1e9;
   for (let i = 0; i < PYRAMID.length; i += 1) {
     const p = PYRAMID[i];
     const s = p.nx * x + p.ny * y + p.nz * z + p.d;
     if (s > d) d = s;
   }
-  const south = (z - summitFaceZ(x, y)) * 0.86;
-  return Math.max(d, south);
+  return d;
 }
 
-/* ---------------------------------------------------------------------------
+function summitSdf(x: number, y: number, z: number): number {
+  return Math.max(pyramidFlanks(x, y, z), roundMax((z - summitFaceZ(x, y)) * 0.86, y - SY.summit, 0.25));
+}
+
+/* ==========================================================================
  * Detail displacement and its suppression near the route.
- * ------------------------------------------------------------------------- */
+ * ========================================================================== */
 
 interface StandSpot {
   x: number;
@@ -597,11 +770,11 @@ const STAND_SPOTS: readonly StandSpot[] = [
   { x: WAYPOINTS.firstLedge[0], y: SY.firstLedge, z: WAYPOINTS.firstLedge[2] },
   { x: WAYPOINTS.chasmOneLanding[0], y: SY.chasmOneLanding, z: WAYPOINTS.chasmOneLanding[2] },
   { x: WAYPOINTS.chasmOneTop[0], y: SY.chasmOneTop, z: WAYPOINTS.chasmOneTop[2] },
-  { x: WAYPOINTS.chasmTwoCatch[0], y: WAYPOINTS.chasmTwoCatch[1] - 0.2, z: WAYPOINTS.chasmTwoCatch[2] - 0.5 },
+  { x: WAYPOINTS.chasmTwoCatch[0], y: CATCH_LIP_Y - 0.2, z: CATCH_LIP_Z },
   { x: WAYPOINTS.summit[0], y: SY.summit, z: WAYPOINTS.summit[2] },
 ];
 
-/** 0 → no displacement (standing spots), ~0.22 along climbing lines, 1 → full detail. */
+/** 0 → no displacement (standing spots), ~0.2 along climbing lines, 1 → full detail. */
 function detailMask(x: number, y: number, z: number): number {
   let dRoute = 1e9;
   if (y > -1.5 && y < 19.5) {
@@ -630,33 +803,50 @@ function detailMask(x: number, y: number, z: number): number {
       if (d < dStand) dStand = d;
     }
   }
-  const routeAmp = 0.22 + 0.78 * smoothstep(1.0, 3.6, dRoute);
-  const standAmp = smoothstep(1.5, 3.8, dStand);
+  const routeAmp = 0.2 + 0.8 * smoothstep(1.0, 3.6, dRoute);
+  const standAmp = smoothstep(1.4, 3.8, dStand);
   return Math.min(routeAmp, standAmp);
 }
 
 /** Upper bound of |displacement| (used to skip the noise far from any rock). */
-const MAX_DISPLACEMENT = 2.9;
+const MAX_DISPLACEMENT = 2.7;
 
 function displacement(x: number, y: number, z: number, fine: boolean): number {
   // Buttress-scale undulation.
-  const n1 = noise3(x * 0.082, y * 0.082, z * 0.082) + 0.5 * noise3(x * 0.19 + 5.2, y * 0.19, z * 0.19 - 1.3);
-  // Vertical ribs and grooves (granite jointing).
-  const rr = noise3(x * 0.41 + 11.3, y * 0.085, z * 0.41 - 4.2);
-  const rib = 1 - Math.abs(rr);
-  // Stepped strata: quick inward step (ledge) then a slow outward lean.
-  const u = y * 0.68 + n1 * 0.9;
+  const n1 = noise3(x * 0.07, y * 0.07, z * 0.07) + 0.5 * noise3(x * 0.16 + 5.2, y * 0.16, z * 0.16 - 1.3);
+  // Vertical jointing: ribs and gullies.
+  const rr = noise3(x * 0.33 + 11.3, y * 0.06, z * 0.33 - 4.2);
+  const joint = 1 - Math.abs(rr);
+  // Stepped strata: a quick inward step (a ledge that holds snow) then a slow outward lean.
+  const u = y * 0.55 + n1 * 0.8;
   const f = u - Math.floor(u);
-  const saw = f < 0.3 ? f / 0.3 : (1 - f) / 0.7;
-  const strataAmp = 0.34 * smoothstep(-0.35, 0.45, noise3(x * 0.05 + 3, y * 0.035, z * 0.05));
-  let d = 1.3 * n1 + 0.8 * (rib * rib - 0.42) + strataAmp * (saw - 0.5) * 2;
-  if (fine) d += 0.2 * noise3(x * 0.95 - 2.1, y * 0.95, z * 0.95 + 7.7);
+  const saw = f < 0.22 ? f / 0.22 : (1 - f) / 0.78;
+  const strataAmp = 0.42 * smoothstep(-0.3, 0.4, noise3(x * 0.045 + 3, y * 0.03, z * 0.045));
+  // Vertical block jointing along a rotated horizontal axis (granite sheeting).
+  const v = (x * 0.8 + z * 0.6) * 0.42 + n1 * 0.7;
+  const g = v - Math.floor(v);
+  const blocks = g < 0.18 ? g / 0.18 : (1 - g) / 0.82;
+  const blockAmp = 0.3 * smoothstep(-0.2, 0.5, noise3(x * 0.05 - 7, y * 0.05, z * 0.05 + 2));
+  let d = 1.05 * n1 + 0.7 * (joint * joint - 0.45) + strataAmp * (saw - 0.5) * 2 + blockAmp * (blocks - 0.5) * 2;
+  if (fine) d += 0.16 * noise3(x * 0.9 - 2.1, y * 0.9, z * 0.9 + 7.7);
   return d;
 }
 
 /* ==========================================================================
  * The field
  * ========================================================================== */
+
+interface Box {
+  x0: number;
+  x1: number;
+  y0: number;
+  y1: number;
+  z0: number;
+  z1: number;
+}
+
+const DI: Box = MASSIF_DETAIL_DOMAIN;
+const DO: Box = MASSIF_DOMAIN;
 
 interface GroundCache {
   x0: number;
@@ -687,6 +877,13 @@ function* buildGroundCache(x0: number, z0: number, h: number, nx: number, nz: nu
     }
   }
   return { x0, z0, h, nx, nz, height, slope };
+}
+
+function* buildCacheForBox(box: Box, spacing: number, pad: number): Generator<void, GroundCache, void> {
+  const padCells = Math.ceil(pad / spacing);
+  const nx = Math.ceil((box.x1 - box.x0) / spacing) + padCells * 2 + 1;
+  const nz = Math.ceil((box.z1 - box.z0) / spacing) + padCells * 2 + 1;
+  return yield* buildGroundCache(box.x0 - padCells * spacing, box.z0 - padCells * spacing, spacing, nx, nz);
 }
 
 function groundTerm(cache: GroundCache | null, x: number, y: number, z: number): number {
@@ -720,43 +917,58 @@ function groundTerm(cache: GroundCache | null, x: number, y: number, z: number):
   return (y - hh) * ss;
 }
 
-const D = MASSIF_DOMAIN;
-
-function massField(x: number, y: number, z: number, fine: boolean): number {
-  let m = 1e9;
-  // Base camp mesa.
-  if (x > -19 && x < 19 && z > -8 && z < 17 && y < 4) m = mesaSdf(x, y, z);
-  // Company-1 buttress.
-  if (x > -20 && x < 16 && z > -26 && z < 9 && y < 36) m = smin(m, cliffOneSdf(x, y, z), 0.75);
-  // Company-2 pillar.
-  if (x > -6 && x < 18 && z > -26 && z < -6 && y < 35) m = Math.min(m, pillarSdf(x, y, z));
-  // Summit massif.
-  if (z < -16) m = smin(m, summitSdf(x, y, z), 1.1);
-
-  // Masses melt into the ground body near the domain edge so the skirt can take over.
-  const edge = Math.min(x - D.x0, D.x1 - x, z - D.z0, D.z1 - z);
-  if (edge < 5) m += (5 - edge) * 3;
-
-  if (m < MAX_DISPLACEMENT + 1.2 && m > -(MAX_DISPLACEMENT + 1.2)) {
-    const mask = detailMask(x, y, z);
-    if (mask > 0) m += displacement(x, y, z, fine) * mask;
-  }
-  return m;
+/** Horizontal distance inside the massif domain (negative outside). */
+function massifEdge(x: number, z: number): number {
+  return Math.min(x - DO.x0, DO.x1 - x, z - DO.z0, DO.z1 - z);
 }
 
-function fieldAt(cache: GroundCache | null, x: number, y: number, z: number, fine: boolean): number {
-  const g = groundTerm(cache, x, y, z);
-  const m = massField(x, y, z, fine);
-  return smin(g, m, 2.4);
+/** How far a point lies inside the detail domain (negative outside). */
+function insideDetail(x: number, y: number, z: number): number {
+  return Math.min(x - DI.x0, DI.x1 - x, z - DI.z0, DI.z1 - z, y - DI.y0);
 }
+
+/** Width of the band at the massif edge over which the 3D rock hands over to the ground heightfield. */
+const EDGE_FADE = 8;
 
 /**
- * Signed distance (approximate, negative inside rock) of the climbable massif
- * at a world position, at full detail. Useful for placing effects near rock.
+ * The mountain field at a point. `g` is the ground term already evaluated
+ * there (cached or exact); `fine` adds the finest displacement octave.
+ */
+function composeField(g: number, x: number, y: number, z: number, fine: boolean): number {
+  const edge = massifEdge(x, z);
+  if (edge <= 0) return g;
+  let f = smin(g, frontComplex(x, y, z), 1.6);
+  if (x > -14 && x < 26 && z > -24 && z < 12 && y < 46) f = smax(f, -cleftCarve(x, y, z), 0.35);
+  if (x > -14 && x < 20 && z > -40 && z < -6 && y < 46) f = smax(f, -gorgeCarve(x, y, z), 0.5);
+  f = smin(f, summitSdf(x, y, z), 1.0);
+  let fade = 1;
+  if (edge < EDGE_FADE) {
+    fade = smoothstep(1, EDGE_FADE, edge);
+    f = g + (f - g) * fade;
+  }
+  if (f < MAX_DISPLACEMENT + 1.2 && f > -(MAX_DISPLACEMENT + 1.2)) {
+    const mask = detailMask(x, y, z) * fade;
+    if (mask > 0) f += displacement(x, y, z, fine) * mask;
+  }
+  return f;
+}
+
+let sdfCache: GroundCache | null = null;
+
+/**
+ * Signed distance (approximate, negative inside rock) of the mountain at a
+ * world position, at full detail. Useful for placing effects near rock. The
+ * first call builds a 0.5-unit ground lookup over the massif (~50k samples).
  */
 export function mountainSdf(x: number, y: number, z: number): number {
-  if (x < D.x0 || x > D.x1 || z < D.z0 || z > D.z1) return groundTerm(null, x, y, z);
-  return fieldAt(null, x, y, z, true);
+  if (!sdfCache) {
+    const steps = buildCacheForBox(DO, 0.5, 10);
+    let r = steps.next();
+    while (!r.done) r = steps.next();
+    sdfCache = r.value;
+  }
+  const inCache = x > DO.x0 - 9 && x < DO.x1 + 9 && z > DO.z0 - 9 && z < DO.z1 + 9;
+  return composeField(groundTerm(inCache ? sdfCache : null, x, y, z), x, y, z, true);
 }
 
 /* ==========================================================================
@@ -767,6 +979,8 @@ const BRICK = 8;
 const BRICK_CELLS = BRICK * BRICK * BRICK;
 /** Conservative Lipschitz bound of the field, used for the seeding march. */
 const LIPSCHITZ = 2.4;
+
+type ScalarField = (x: number, y: number, z: number) => number;
 
 interface SurfaceMesh {
   positions: Float32Array;
@@ -801,22 +1015,16 @@ class GrowableU32 {
   constructor(capacity: number) {
     this.data = new Uint32Array(capacity);
   }
-  push(a: number): void {
-    if (this.length + 1 > this.data.length) this.grow();
-    this.data[this.length] = a;
-    this.length += 1;
-  }
   push3(a: number, b: number, c: number): void {
-    if (this.length + 3 > this.data.length) this.grow();
+    if (this.length + 3 > this.data.length) {
+      const next = new Uint32Array(this.data.length * 2);
+      next.set(this.data);
+      this.data = next;
+    }
     this.data[this.length] = a;
     this.data[this.length + 1] = b;
     this.data[this.length + 2] = c;
     this.length += 3;
-  }
-  private grow(): void {
-    const next = new Uint32Array(this.data.length * 2);
-    next.set(this.data);
-    this.data = next;
   }
 }
 
@@ -841,13 +1049,13 @@ const FACE_DK = [0, 0, 0, 0, -1, 1] as const;
  * to cell. Field values are evaluated lazily once per grid point and stored in
  * sparse 8³ bricks, so the cost scales with surface area, not volume.
  */
-function* polygonise(cache: GroundCache, cell: number, fine: boolean): Generator<void, SurfaceMesh, void> {
-  const x0 = D.x0;
-  const y0 = D.y0;
-  const z0 = D.z0;
-  const nx = Math.ceil((D.x1 - D.x0) / cell);
-  const ny = Math.ceil((D.y1 - D.y0) / cell);
-  const nz = Math.ceil((D.z1 - D.z0) / cell);
+function* polygonise(box: Box, cell: number, field: ScalarField): Generator<void, SurfaceMesh, void> {
+  const x0 = box.x0;
+  const y0 = box.y0;
+  const z0 = box.z0;
+  const nx = Math.ceil((box.x1 - box.x0) / cell);
+  const ny = Math.ceil((box.y1 - box.y0) / cell);
+  const nz = Math.ceil((box.z1 - box.z0) / cell);
   const nbx = (nx >> 3) + 1;
   const nby = (ny >> 3) + 1;
   const nbz = (nz >> 3) + 1;
@@ -876,7 +1084,7 @@ function* polygonise(cache: GroundCache, cell: number, fine: boolean): Generator
     const vals = brickValues[s];
     let v = vals[local];
     if (v !== v) {
-      v = fieldAt(cache, x0 + i * cell, y0 + j * cell, z0 + k * cell, fine);
+      v = field(x0 + i * cell, y0 + j * cell, z0 + k * cell);
       // Never exactly zero: keeps the sign test unambiguous.
       if (v === 0) v = 1e-6;
       vals[local] = v;
@@ -896,13 +1104,13 @@ function* polygonise(cache: GroundCache, cell: number, fine: boolean): Generator
     for (let i = 0; i <= nx; i += seedStride) {
       const x = x0 + i * cell;
       const z = z0 + k * cell;
-      let y = D.y1;
+      let y = box.y1;
       let prevY = y;
-      let f = fieldAt(cache, x, y, z, fine);
-      while (f > 0 && y > D.y0) {
+      let f = field(x, y, z);
+      while (f > 0 && y > box.y0) {
         prevY = y;
         y -= Math.max(cell, (f / LIPSCHITZ) * 0.9);
-        f = fieldAt(cache, x, Math.max(D.y0, y), z, fine);
+        f = field(x, Math.max(box.y0, y), z);
       }
       if (f > 0) continue;
       // Exact crossing on the grid column between prevY and y.
@@ -1051,8 +1259,43 @@ function* polygonise(cache: GroundCache, cell: number, fine: boolean): Generator
   const positions = pos.data.slice(0, pos.length);
   const indices = idx.data.slice(0, idx.length);
   const normals = new Float32Array(vertexCount * 3);
-  accumulateNormals(positions, indices, normals);
   return { positions, normals, indices, vertexCount, triangleCount: indices.length / 3 };
+}
+
+/**
+ * Pulls the vertices close to the climb route exactly onto the iso-surface
+ * (two Newton steps), so ledges and lips sit where the route expects them.
+ */
+function* projectNearRoute(mesh: SurfaceMesh, field: ScalarField, maxStep: number): Generator<void, number, void> {
+  const p = mesh.positions;
+  const e = 0.03;
+  let moved = 0;
+  for (let v = 0; v < mesh.vertexCount; v += 1) {
+    if ((v & 4095) === 4095) yield;
+    let x = p[v * 3];
+    let y = p[v * 3 + 1];
+    let z = p[v * 3 + 2];
+    if (detailMask(x, y, z) >= 0.999) continue;
+    for (let it = 0; it < 2; it += 1) {
+      const f = field(x, y, z);
+      const gx = (field(x + e, y, z) - field(x - e, y, z)) / (2 * e);
+      const gy = (field(x, y + e, z) - field(x, y - e, z)) / (2 * e);
+      const gz = (field(x, y, z + e) - field(x, y, z - e)) / (2 * e);
+      const g2 = gx * gx + gy * gy + gz * gz;
+      if (g2 < 1e-8) break;
+      let s = f / g2;
+      const len = Math.abs(s) * Math.sqrt(g2);
+      if (len > maxStep) s *= maxStep / len;
+      x -= s * gx;
+      y -= s * gy;
+      z -= s * gz;
+    }
+    p[v * 3] = x;
+    p[v * 3 + 1] = y;
+    p[v * 3 + 2] = z;
+    moved += 1;
+  }
+  return moved;
 }
 
 function accumulateNormals(positions: Float32Array, indices: Uint32Array, normals: Float32Array): void {
@@ -1105,12 +1348,12 @@ interface CoarseField {
 
 function* buildCoarseField(cache: GroundCache, spacing: number): Generator<void, CoarseField, void> {
   const pad = 8;
-  const x0 = D.x0 - pad;
-  const y0 = D.y0;
-  const z0 = D.z0 - pad;
-  const nx = Math.ceil((D.x1 - D.x0 + pad * 2) / spacing);
-  const ny = Math.ceil((D.y1 + 10 - D.y0) / spacing);
-  const nz = Math.ceil((D.z1 - D.z0 + pad * 2) / spacing);
+  const x0 = DO.x0 - pad;
+  const y0 = DO.y0;
+  const z0 = DO.z0 - pad;
+  const nx = Math.ceil((DO.x1 - DO.x0 + pad * 2) / spacing);
+  const ny = Math.ceil((DO.y1 + 10 - DO.y0) / spacing);
+  const nz = Math.ceil((DO.z1 - DO.z0 + pad * 2) / spacing);
   const data = new Float32Array((nx + 1) * (ny + 1) * (nz + 1));
   let o = 0;
   for (let k = 0; k <= nz; k += 1) {
@@ -1119,8 +1362,7 @@ function* buildCoarseField(cache: GroundCache, spacing: number): Generator<void,
       const y = y0 + j * spacing;
       for (let i = 0; i <= nx; i += 1) {
         const x = x0 + i * spacing;
-        const inside = x >= D.x0 && x <= D.x1 && z >= D.z0 && z <= D.z1;
-        data[o] = inside ? fieldAt(cache, x, y, z, false) : groundTerm(cache, x, y, z);
+        data[o] = composeField(groundTerm(cache, x, y, z), x, y, z, false);
         o += 1;
       }
     }
@@ -1183,9 +1425,9 @@ function* bakeOcclusion(
       const s = sampleCoarse(f, px + nx * dist, py + ny * dist, pz + nz * dist) - base;
       occ += AO_TAPS[t][1] * clamp((dist * 0.82 - s) / dist, 0, 1);
     }
-    // Overhang undersides and deep gorge floors see less sky.
-    const skyBias = 0.06 * clamp(-ny, 0, 1) + 0.12 * smoothstep(-6, -26, py);
-    ao[v] = clamp(1 - occ * 1.25 - skyBias, 0.18, 1);
+    // Overhang undersides and deep chasm floors see less sky.
+    const skyBias = 0.06 * clamp(-ny, 0, 1) + 0.12 * smoothstep(-4, -26, py);
+    ao[v] = clamp(1 - occ * 1.2 - skyBias, 0.2, 1);
   }
   return ao;
 }
@@ -1194,38 +1436,59 @@ function* bakeOcclusion(
  * Chunking (frustum / shadow culling) with globally consistent normals.
  * ========================================================================== */
 
-const CHUNK_XZ = 18.7;
-const CHUNK_Y = 33;
+interface ChunkSpec {
+  box: Box;
+  sizeXZ: number;
+  sizeY: number;
+  prefix: string;
+  kind: 'massif' | 'flank';
+  /** Optional triangle filter (receives the three vertex indices). */
+  keep: ((a: number, b: number, c: number) => boolean) | null;
+}
 
-function* chunkSurface(mesh: SurfaceMesh, ao: Float32Array): Generator<void, TerrainPiece[], void> {
-  const { positions, normals, indices } = mesh;
-  const cnx = Math.ceil((D.x1 - D.x0) / CHUNK_XZ);
-  const cny = Math.ceil((D.y1 - D.y0) / CHUNK_Y);
-  const cnz = Math.ceil((D.z1 - D.z0) / CHUNK_XZ);
+function* chunkSurface(
+  positions: Float32Array,
+  normals: Float32Array,
+  indices: Uint32Array,
+  ao: Float32Array,
+  spec: ChunkSpec,
+): Generator<void, TerrainPiece[], void> {
+  const { box } = spec;
+  const cnx = Math.ceil((box.x1 - box.x0) / spec.sizeXZ);
+  const cny = Math.ceil((box.y1 - box.y0) / spec.sizeY);
+  const cnz = Math.ceil((box.z1 - box.z0) / spec.sizeXZ);
   const chunkCount = cnx * cny * cnz;
   const triCount = indices.length / 3;
   const triChunk = new Int32Array(triCount);
   const offsets = new Int32Array(chunkCount + 1);
   for (let t = 0; t < triCount; t += 1) {
-    const a = indices[t * 3] * 3;
-    const b = indices[t * 3 + 1] * 3;
-    const c = indices[t * 3 + 2] * 3;
+    const ia = indices[t * 3];
+    const ib = indices[t * 3 + 1];
+    const ic = indices[t * 3 + 2];
+    if (spec.keep && !spec.keep(ia, ib, ic)) {
+      triChunk[t] = -1;
+      continue;
+    }
+    const a = ia * 3;
+    const b = ib * 3;
+    const c = ic * 3;
     const cx = (positions[a] + positions[b] + positions[c]) / 3;
     const cy = (positions[a + 1] + positions[b + 1] + positions[c + 1]) / 3;
     const cz = (positions[a + 2] + positions[b + 2] + positions[c + 2]) / 3;
-    const i = clamp(Math.floor((cx - D.x0) / CHUNK_XZ), 0, cnx - 1);
-    const j = clamp(Math.floor((cy - D.y0) / CHUNK_Y), 0, cny - 1);
-    const k = clamp(Math.floor((cz - D.z0) / CHUNK_XZ), 0, cnz - 1);
+    const i = clamp(Math.floor((cx - box.x0) / spec.sizeXZ), 0, cnx - 1);
+    const j = clamp(Math.floor((cy - box.y0) / spec.sizeY), 0, cny - 1);
+    const k = clamp(Math.floor((cz - box.z0) / spec.sizeXZ), 0, cnz - 1);
     const ch = i + cnx * (j + cny * k);
     triChunk[t] = ch;
     offsets[ch + 1] += 1;
   }
   for (let ch = 0; ch < chunkCount; ch += 1) offsets[ch + 1] += offsets[ch];
   // Counting sort of triangles by chunk.
-  const order = new Int32Array(triCount);
+  const order = new Int32Array(offsets[chunkCount]);
   const cursor = offsets.slice(0, chunkCount);
   for (let t = 0; t < triCount; t += 1) {
     const ch = triChunk[t];
+    if (ch < 0) continue;
     order[cursor[ch]] = t;
     cursor[ch] += 1;
   }
@@ -1281,7 +1544,7 @@ function* chunkSurface(mesh: SurfaceMesh, ao: Float32Array): Generator<void, Ter
     const i = ch % cnx;
     const j = Math.floor(ch / cnx) % cny;
     const k = Math.floor(ch / (cnx * cny));
-    pieces.push({ name: `massif-${i}-${j}-${k}`, geometry, kind: 'massif', triangles: tris });
+    pieces.push({ name: `${spec.prefix}-${i}-${j}-${k}`, geometry, kind: spec.kind, triangles: tris });
     yield;
   }
   return pieces;
@@ -1334,17 +1597,12 @@ function upperBound(arr: readonly number[], v: number): number {
   return lo;
 }
 
-/** How far a point lies inside the massif domain (negative outside). */
-function insideDomain(x: number, z: number): number {
-  return Math.min(x - D.x0, D.x1 - x, z - D.z0, D.z1 - z);
-}
-
-const SKIRT_OVERLAP = 1.6;
+const SKIRT_OVERLAP = 2.4;
 
 function* buildSkirt(cfg: DetailConfig): Generator<void, TerrainPiece, void> {
-  const pad = 12;
-  const xs = axisCoordinates(SKIRT_EXTENT.x0, SKIRT_EXTENT.x1, D.x0 - pad, D.x1 + pad, cfg.skirtNear, cfg.skirtGrowth);
-  const zs = axisCoordinates(SKIRT_EXTENT.z0, SKIRT_EXTENT.z1, D.z0 - pad, D.z1 + pad, cfg.skirtNear, cfg.skirtGrowth);
+  const pad = 14;
+  const xs = axisCoordinates(SKIRT_EXTENT.x0, SKIRT_EXTENT.x1, DO.x0 - pad, DO.x1 + pad, cfg.skirtNear, cfg.skirtGrowth);
+  const zs = axisCoordinates(SKIRT_EXTENT.z0, SKIRT_EXTENT.z1, DO.z0 - pad, DO.z1 + pad, cfg.skirtNear, cfg.skirtGrowth);
   const w = xs.length;
   const hgt = zs.length;
   const vertexCount = w * hgt;
@@ -1355,9 +1613,9 @@ function* buildSkirt(cfg: DetailConfig): Generator<void, TerrainPiece, void> {
       const x = xs[i];
       const z = zs[k];
       let y = skirtHeight(x, z);
-      const inside = insideDomain(x, z);
+      const inside = massifEdge(x, z);
       // Tuck the overlap band just under the massif surface so the seams never show.
-      if (inside > 0) y -= 0.32 * smoothstep(0, 1.2, inside) + Math.max(0, inside - SKIRT_OVERLAP) * 2;
+      if (inside > 0) y -= 0.45 * smoothstep(0, 1.6, inside) + Math.max(0, inside - SKIRT_OVERLAP) * 2;
       const o = i + w * k;
       heights[o] = y;
       positions[o * 3] = x;
@@ -1371,10 +1629,10 @@ function* buildSkirt(cfg: DetailConfig): Generator<void, TerrainPiece, void> {
     for (let i = 0; i < w - 1; i += 1) {
       // Skip cells wholly inside the domain beyond the overlap band.
       if (
-        insideDomain(xs[i], zs[k]) > SKIRT_OVERLAP &&
-        insideDomain(xs[i + 1], zs[k]) > SKIRT_OVERLAP &&
-        insideDomain(xs[i], zs[k + 1]) > SKIRT_OVERLAP &&
-        insideDomain(xs[i + 1], zs[k + 1]) > SKIRT_OVERLAP
+        massifEdge(xs[i], zs[k]) > SKIRT_OVERLAP &&
+        massifEdge(xs[i + 1], zs[k]) > SKIRT_OVERLAP &&
+        massifEdge(xs[i], zs[k + 1]) > SKIRT_OVERLAP &&
+        massifEdge(xs[i + 1], zs[k + 1]) > SKIRT_OVERLAP
       ) {
         continue;
       }
@@ -1427,13 +1685,22 @@ function* buildSkirt(cfg: DetailConfig): Generator<void, TerrainPiece, void> {
 
 export interface MountainBuildStats {
   detail: TerrainDetail;
+  /** Fine climb-detail surface. */
   massifTriangles: number;
+  /** Coarse outer massif surface (after dropping what the fine pass covers). */
+  flankTriangles: number;
   skirtTriangles: number;
   totalTriangles: number;
   pieces: number;
+  /** Vertices snapped onto the exact surface near the route. */
+  projectedVertices: number;
   /** Pure CPU time spent building (excludes idle time between incremental steps). */
   milliseconds: number;
 }
+
+/** Depth of the band (inside the detail domain) where the coarse surface is tucked under the fine one. */
+const TUCK_BAND = 3;
+const TUCK_DEPTH = 0.7;
 
 const now = (): number => (typeof performance !== 'undefined' ? performance.now() : Date.now());
 
@@ -1443,24 +1710,64 @@ function* mountainBuildSteps(
   onStats: (stats: Omit<MountainBuildStats, 'milliseconds'>) => void,
 ): Generator<void, TerrainPiece[], void> {
   const cfg = DETAIL_CONFIG[detail];
-  // Ground cache on the surface-net lattice, padded so the AO field can use it too.
-  const padCells = Math.ceil(10 / cfg.cell);
-  const pad = padCells * cfg.cell;
-  const nx = Math.ceil((D.x1 - D.x0) / cfg.cell) + padCells * 2 + 1;
-  const nz = Math.ceil((D.z1 - D.z0) / cfg.cell) + padCells * 2 + 1;
-  const cache = yield* buildGroundCache(D.x0 - pad, D.z0 - pad, cfg.cell, nx, nz);
-  const surface = yield* polygonise(cache, cfg.cell, cfg.fineNoise);
-  const coarse = yield* buildCoarseField(cache, cfg.aoSpacing);
-  const ao = yield* bakeOcclusion(coarse, surface.positions, surface.normals);
-  const pieces = yield* chunkSurface(surface, ao);
+
+  // ---- Fine pass over the climb.
+  const innerCache = yield* buildCacheForBox(DI, cfg.cell, 2);
+  const innerField: ScalarField = (x, y, z) => composeField(groundTerm(innerCache, x, y, z), x, y, z, cfg.fineNoise);
+  const inner = yield* polygonise(DI, cfg.cell, innerField);
+  const projected = yield* projectNearRoute(inner, innerField, cfg.cell * 0.75);
+  accumulateNormals(inner.positions, inner.indices, inner.normals);
+
+  // ---- Coarse pass over the whole massif, tucked under the fine surface inside the detail domain.
+  const outerCache = yield* buildCacheForBox(DO, cfg.outerCell, 12);
+  const outerField: ScalarField = (x, y, z) => {
+    const f = composeField(groundTerm(outerCache, x, y, z), x, y, z, false);
+    const inside = insideDetail(x, y, z);
+    return inside > 0 ? f + TUCK_DEPTH * smoothstep(0, TUCK_BAND, inside) : f;
+  };
+  const outer = yield* polygonise(DO, cfg.outerCell, outerField);
+  accumulateNormals(outer.positions, outer.indices, outer.normals);
+
+  // ---- Occlusion for both.
+  const coarse = yield* buildCoarseField(outerCache, cfg.aoSpacing);
+  const innerAo = yield* bakeOcclusion(coarse, inner.positions, inner.normals);
+  const outerAo = yield* bakeOcclusion(coarse, outer.positions, outer.normals);
+
+  const pieces = yield* chunkSurface(inner.positions, inner.normals, inner.indices, innerAo, {
+    box: DI,
+    sizeXZ: 16,
+    sizeY: 28,
+    prefix: 'massif',
+    kind: 'massif',
+    keep: null,
+  });
+  const massifTriangles = pieces.reduce((s, p) => s + p.triangles, 0);
+
+  // Drop coarse triangles that lie wholly where the fine surface already covers them.
+  const op = outer.positions;
+  const dropDepth = TUCK_BAND + 2 * cfg.outerCell;
+  const deep = (v: number): boolean => insideDetail(op[v * 3], op[v * 3 + 1], op[v * 3 + 2]) > dropDepth;
+  const flankPieces = yield* chunkSurface(outer.positions, outer.normals, outer.indices, outerAo, {
+    box: DO,
+    sizeXZ: 34,
+    sizeY: 62,
+    prefix: 'flank',
+    kind: 'flank',
+    keep: (a, b, c) => !(deep(a) && deep(b) && deep(c)),
+  });
+  const flankTriangles = flankPieces.reduce((s, p) => s + p.triangles, 0);
+  for (const piece of flankPieces) pieces.push(piece);
+
   const skirt = yield* buildSkirt(cfg);
   pieces.push(skirt);
   onStats({
     detail,
-    massifTriangles: surface.triangleCount,
+    massifTriangles,
+    flankTriangles,
     skirtTriangles: skirt.triangles,
-    totalTriangles: surface.triangleCount + skirt.triangles,
+    totalTriangles: massifTriangles + flankTriangles + skirt.triangles,
     pieces: pieces.length,
+    projectedVertices: projected,
   });
   return pieces;
 }
@@ -1527,10 +1834,10 @@ export function createMountainBuilder(detail: TerrainDetail): MountainBuilder {
 }
 
 /**
- * Builds the whole mountain synchronously for a detail level: chunked massif
- * surface pieces plus the outer skirt. Deterministic; world-space positions;
- * normals and a baked `aOcclusion` attribute (0..1) included. Callers own and
- * must dispose the returned geometries.
+ * Builds the whole mountain synchronously for a detail level: chunked fine
+ * massif pieces, coarse flank pieces and the outer skirt. Deterministic;
+ * world-space positions; normals and a baked `aOcclusion` attribute (0..1)
+ * included. Callers own and must dispose the returned geometries.
  */
 export function buildMountainGeometries(detail: TerrainDetail): TerrainPiece[] {
   const builder = createMountainBuilder(detail);
