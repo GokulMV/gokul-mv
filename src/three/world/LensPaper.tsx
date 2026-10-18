@@ -3,9 +3,10 @@ import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import { clamp01, remap, scrollStore, smootherstep, smoothstep } from '../../store/scrollStore';
 import { usePortfolioStore } from '../../store/portfolioStore';
+import { pageScroll } from '../../store/pageScroll';
 import { sceneFx } from '../fx/sceneFx';
 import { CLOUD_CURTAIN, ENDING, SUN_DIRECTION } from './worldLayout';
-import { buildLensNote, paintLensNote, PAPER_ASPECT, PAPER_UNITS } from './lensPaperNote';
+import { buildLensNote, noteScaleKey, paintLensNote, PAPER_ASPECT, PAPER_UNITS } from './lensPaperNote';
 import {
   createLensHaloMaterial,
   createLensHaloUniforms,
@@ -23,15 +24,26 @@ import {
  *                                          tumbles, flexes, drifts sideways,
  *                                          speeds up and slaps onto the lens
  *  stuck   (paperStick → paperHoldEnd)    pressed on the glass, locked to the
- *                                          camera, corners fluttering; the DOM
+ *                                          camera, corners fluttering; once the
+ *                                          slap has pressed it flat the DOM
  *                                          overlay shows the crisp contact text
- *  peel    (paperHoldEnd → paperPeelEnd)  the top-right corner peels off and
- *                                          the wind carries it out of frame
+ *                                          (corner lifts stay clear of the text,
+ *                                          see CORNER_REACH), and just before
+ *                                          paperHoldEnd hands back to the ink
+ *                                          (a pure function of progress)
+ *  peel    (paperHoldEnd → paperPeelEnd)  ink only: the top-right corner peels
+ *                                          off and the wind carries it out of
+ *                                          frame
  *  gone    (≥ paperPeelEnd)
  *
  * Every pose is a pure function of scrollStore.dampedProgress; flutter, the
- * slap ripple and the text fade are damped, time-based secondary motion.
+ * slap ripple and the text fade-in are damped, time-based secondary motion.
+ * The DOM text is never shown over a moving sheet: outside the flat part of
+ * the stuck phase it is snapped off (the registered ink takes over at once).
  * Scrolling back up re-sticks the sheet and returns it to the pack.
+ *
+ * On short (landscape-phone) viewports the resting sheet takes more of the
+ * height so its ruled lines still hold legible type (lensPaperRestHeightPx).
  *
  * The final pose is composed in onBeforeRender from the camera's final
  * matrix, so the stuck sheet never lags a damped camera move.
@@ -66,6 +78,8 @@ export interface LensPaperState {
   interactive: boolean;
   /** Set by LensPaperOverlay; while true the WebGL ink yields to the DOM text. */
   overlayMounted: boolean;
+  /** noteScaleKey of the layout painted into the ink texture; the overlay must render the same one. */
+  noteKey: number;
   /** Increments every rendered frame. */
   frame: number;
 }
@@ -80,20 +94,25 @@ export const lensPaperState: LensPaperState = {
   textOpacity: 0,
   interactive: false,
   overlayMounted: false,
+  noteKey: 0,
   frame: 0,
 };
 
-const frameListeners = new Set<() => void>();
+/** An array, not a Set: notify() runs every frame and must not allocate (no closure, no iterator). */
+const frameListeners: Array<() => void> = [];
 
 /** Called synchronously after LensPaper updates `lensPaperState` (same frame, no lag). */
 export function subscribeLensPaper(listener: () => void): () => void {
-  frameListeners.add(listener);
+  if (!frameListeners.includes(listener)) frameListeners.push(listener);
   return () => {
-    frameListeners.delete(listener);
+    const i = frameListeners.indexOf(listener);
+    if (i >= 0) frameListeners.splice(i, 1);
   };
 }
 
-const notify = () => frameListeners.forEach((listener) => listener());
+function notify(): void {
+  for (let i = 0; i < frameListeners.length; i += 1) frameListeners[i]();
+}
 
 export function lensPaperPhaseAt(progress: number): LensPaperPhase {
   if (progress < ENDING.paperGustStart) return 'pack';
@@ -106,9 +125,45 @@ export function lensPaperPhaseAt(progress: number): LensPaperPhase {
 /** Distance in front of the near plane where the glass is. */
 const REST_GAP = 0.4;
 const REST_HEIGHT_FRACTION = 0.76;
+/**
+ * Short viewports (landscape phones) give the sheet more of the height: its
+ * ruled lines must still hold legible type. The fraction ramps from
+ * REST_HEIGHT_FRACTION at SHORT_VIEWPORT_PX[1] tall to this at [0] and below.
+ */
+const REST_HEIGHT_FRACTION_SHORT = 0.88;
+const SHORT_VIEWPORT_PX = [460, 720] as const;
 /** Narrow (portrait) screens are width-bound: give the sheet a little more of the width. */
 const REST_WIDTH_FRACTION = 0.86;
-const REST_WIDTH_FRACTION_NARROW = 0.9;
+const REST_WIDTH_FRACTION_NARROW = 0.92;
+
+/**
+ * Height (CSS px) of the sheet resting on the lens in a `width` × `height`
+ * viewport. Independent of the camera's fov: the sheet is sized in screen
+ * fractions. Shared by the WebGL sheet and the DOM overlay's type scale.
+ */
+export function lensPaperRestHeightPx(width: number, height: number): number {
+  const w = Math.max(1, width);
+  const h = Math.max(1, height);
+  const widthFraction = w / h < 0.8 ? REST_WIDTH_FRACTION_NARROW : REST_WIDTH_FRACTION;
+  const short = 1 - smoothstep(SHORT_VIEWPORT_PX[0], SHORT_VIEWPORT_PX[1], h);
+  const heightFraction = REST_HEIGHT_FRACTION + (REST_HEIGHT_FRACTION_SHORT - REST_HEIGHT_FRACTION) * short;
+  return Math.min(heightFraction * h, (widthFraction * w) / PAPER_ASPECT);
+}
+
+/** The layout key (CSS px per paper unit, quantised) for a viewport. */
+export function lensNoteKeyFor(width: number, height: number): number {
+  return noteScaleKey(lensPaperRestHeightPx(width, height) / PAPER_UNITS.height);
+}
+
+/**
+ * The DOM text hands back to the WebGL ink over this progress window just
+ * before paperHoldEnd: it is fully gone before the peel starts to move the
+ * paper (the text is only ever shown while the sheet is stuck).
+ */
+const HANDOFF_START = ENDING.paperHoldEnd - 0.0011;
+const HANDOFF_END = ENDING.paperHoldEnd - 0.0001;
+/** The DOM text only shows this far past paperStick, once the slap has pressed the sheet (nearly) flat. */
+const TEXT_AFTER_STICK = 0.0004;
 const REST_TILT = -0.042;
 const HALO_MARGIN = 0.3;
 const HALO_STRENGTH = 0.45;
@@ -166,10 +221,15 @@ export function LensPaper(): JSX.Element {
   const contact = usePortfolioStore((s) => s.contact);
   const profile = usePortfolioStore((s) => s.profile);
   const gl = useThree((s) => s.gl);
+  const viewport = useThree((s) => s.size);
   const tier = scrollStore.gpuTier;
   const reduced = useReducedMotion();
 
-  const layout = useMemo(() => buildLensNote(contact, profile), [contact, profile]);
+  // The type scale follows the viewport (minimum CSS sizes on phones); the
+  // overlay renders the layout for the key published in lensPaperState.
+  const noteKey = lensNoteKeyFor(viewport.width, viewport.height);
+  const layout = useMemo(() => buildLensNote(contact, profile, noteKey), [contact, profile, noteKey]);
+  const inkKey = useRef(0);
 
   const ink = useMemo(() => {
     const scale = tier >= 2 ? 2 : 1.4;
@@ -227,11 +287,12 @@ export function LensPaper(): JSX.Element {
 
   useLayoutEffect(() => {
     parts.uniforms.tInk.value = ink;
+    inkKey.current = noteKey;
     return () => {
       parts.uniforms.tInk.value = null;
       ink.dispose();
     };
-  }, [ink, parts]);
+  }, [ink, parts, noteKey]);
 
   useLayoutEffect(
     () => () => {
@@ -251,6 +312,7 @@ export function LensPaper(): JSX.Element {
       lensPaperState.interactive = false;
       lensPaperState.stick = 0;
       lensPaperState.frame += 1;
+      pageScroll.paperCover = 0;
       notify();
     },
     [],
@@ -316,8 +378,8 @@ export function LensPaper(): JSX.Element {
     const d = near + REST_GAP;
     const halfH = d * tanHalf;
     const halfW = halfH * aspect;
-    const widthFraction = aspect < 0.8 ? REST_WIDTH_FRACTION_NARROW : REST_WIDTH_FRACTION;
-    const h = Math.min(REST_HEIGHT_FRACTION * 2 * halfH, (widthFraction * 2 * halfW) / PAPER_ASPECT);
+    const restPx = lensPaperRestHeightPx(state.size.width, state.size.height);
+    const h = (restPx / Math.max(1, state.size.height)) * 2 * halfH;
     const w = h * PAPER_ASPECT;
     u.uSize.value.set(w, h);
     w0.rest.set(0, 0.004 * halfH, -d);
@@ -339,6 +401,8 @@ export function LensPaper(): JSX.Element {
     let peelAngle = 0;
     let peelRadius = 0.05 * h;
     let peelFlutter = 0;
+    /** How much of the frame the sheet owns (the HUD chrome steps aside). */
+    let cover = phase === 'pack' ? 0 : 1;
     u.uCornerLift.value.set(0, 0, 0, 0);
     w0.pos.copy(w0.rest);
     w0.euler.set(0, 0, REST_TILT);
@@ -347,6 +411,7 @@ export function LensPaper(): JSX.Element {
 
     if (phase === 'flight') {
       const t = remap(p, E.paperGustStart, E.paperStick);
+      cover = smoothstep(0.5, 0.9, t);
       if (reduce) {
         opacity = smoothstep(0.3, 1, t);
       } else {
@@ -416,13 +481,16 @@ export function LensPaper(): JSX.Element {
         scalePulse = 1 + 0.02 * s.impactAmp * Math.exp(-s.impactAge * 9) * Math.cos(s.impactAge * 22);
         w0.pos.y -= 0.01 * h * s.impactAmp * Math.exp(-s.impactAge * 10) * Math.sin(s.impactAge * 30);
         const lift = 1 - settle;
-        const anticipation = 0.11 * smoothstep(E.paperHoldEnd - 0.009, E.paperHoldEnd, p);
+        // The wind works the top-right corner up before the peel. Like every
+        // corner lift it stays within CORNER_REACH of its corner, clear of the
+        // DOM text, so the crisp text stays registered for the whole hold.
+        const anticipation = 0.1 * smoothstep(E.paperHoldEnd - 0.009, E.paperHoldEnd, p);
         // TL, TR, BR, BL — the bottom-left is dog-eared from the pack.
         u.uCornerLift.value.set(
-          lift * (0.018 + 0.016 * gustAt(s.time, 1.9, 0.3)),
-          lift * (0.03 + 0.026 * gustAt(s.time, 2.3, 1.1)) + anticipation,
-          lift * (0.012 + 0.014 * gustAt(s.time, 1.6, 2.4)),
-          lift * (0.07 + 0.025 * gustAt(s.time, 2.1, 3.3)),
+          lift * (0.02 + 0.018 * gustAt(s.time, 1.9, 0.3)),
+          lift * (0.034 + 0.03 * gustAt(s.time, 2.3, 1.1)) + anticipation,
+          lift * (0.014 + 0.016 * gustAt(s.time, 1.6, 2.4)),
+          lift * (0.075 + 0.028 * gustAt(s.time, 2.1, 3.3)),
         );
         ripple = 0.005 * lift;
       }
@@ -448,7 +516,7 @@ export function LensPaper(): JSX.Element {
         );
         w0.euler.set(0.5 * exit, -1.3 * exit, REST_TILT + 0.9 * exit);
         const fadeCorners = 1 - smoothstep(0, 0.2, t);
-        u.uCornerLift.value.set(0.02 * fadeCorners, 0.11 * fadeCorners, 0.015 * fadeCorners, 0.055 * fadeCorners);
+        u.uCornerLift.value.set(0.02 * fadeCorners, 0.1 * fadeCorners, 0.015 * fadeCorners, 0.075 * fadeCorners);
         ripple = 0.004 * fadeCorners;
         opacity = 1 - smoothstep(0.9, 1, t);
       }
@@ -459,10 +527,18 @@ export function LensPaper(): JSX.Element {
     else if (phase === 'peel') s.stick = Math.min(s.stick, 1 - smoothstep(0, 0.3, remap(p, E.paperHoldEnd, E.paperPeelEnd)));
     else s.stick = 0;
 
-    const wantText = phase === 'stuck' && p >= E.paperStick + 0.0004 && (s.impactAge > 0.12 || s.impactAmp === 0);
+    // The text waits for the slap ring to die down (it moves the paper under the text).
+    const onGlass = phase === 'stuck' && p >= E.paperStick + TEXT_AFTER_STICK;
+    const wantText = onGlass && (s.impactAge > 0.22 || s.impactAmp === 0);
     const target = wantText ? 1 : 0;
     s.textOpacity = damp(s.textOpacity, target, target > s.textOpacity ? 6 : 16, dt);
     if (Math.abs(s.textOpacity - target) < 0.002) s.textOpacity = target;
+    // Flat DOM text never lingers over a sheet that is moving: scrubbing back
+    // into the slap's bow or the flight, or on into the peel, it is gone at once
+    // (the ink, registered under it, takes over in the same frame).
+    if (!onGlass) s.textOpacity = 0;
+    // However fast the scroll, the DOM text is gone before the peel moves the paper under it.
+    const domText = s.textOpacity * (1 - smoothstep(HANDOFF_START, HANDOFF_END, p));
 
     const visible = (phase === 'flight' || phase === 'stuck' || phase === 'peel') && opacity > 0.001 && sceneFx.exposure > 0.003;
     parts.paper.visible = visible;
@@ -480,7 +556,7 @@ export function LensPaper(): JSX.Element {
     u.uContact.value = contact;
     u.uOpacity.value = opacity;
     u.uExposure.value = sceneFx.exposure;
-    u.uInk.value = lensPaperState.overlayMounted ? 1 - s.textOpacity : 1;
+    u.uInk.value = lensPaperState.overlayMounted ? 1 - domText : 1;
     u.uSunView.value.copy(SUN_DIRECTION).transformDirection(camera.matrixWorldInverse);
     u.uSunIntensity.value = lerp(1.45, 0.3, cloudIn);
     u.uAmbient.value = lerp(0.75, 0.62, cloudIn);
@@ -522,9 +598,11 @@ export function LensPaper(): JSX.Element {
     st.phase = phase;
     st.stick = clamp01(s.stick);
     st.visible = visible;
-    st.textOpacity = visible ? s.textOpacity * Math.min(1, sceneFx.exposure * 1.5) : 0;
-    st.interactive = visible && phase === 'stuck' && s.textOpacity > 0.6;
+    st.textOpacity = visible ? domText * Math.min(1, sceneFx.exposure * 1.5) : 0;
+    st.interactive = visible && phase === 'stuck' && domText > 0.6;
+    st.noteKey = inkKey.current;
     st.frame += 1;
+    pageScroll.paperCover = cover;
     notify();
   });
 

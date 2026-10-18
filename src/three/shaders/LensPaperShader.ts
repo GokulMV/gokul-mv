@@ -22,6 +22,12 @@ import { PAPER_CREASES, PAPER_MARGIN_X, PAPER_RULES, PAPER_UNITS } from '../worl
  * `uExposure` (sceneFx.exposure) itself.
  * ========================================================================== */
 
+/**
+ * How far a lifted corner reaches into the sheet, in its [-1,1]² q-space. The
+ * note layout (lensPaperNote) keeps all text outside this radius of the corners.
+ */
+export const LENS_PAPER_CORNER_REACH = 0.34;
+
 /** Draws after the cloud curtain (900). */
 export const LENS_PAPER_RENDER_ORDER = 1000;
 export const LENS_HALO_RENDER_ORDER = 999;
@@ -36,6 +42,11 @@ const GLSL_CONSTANTS = /* glsl */ `
 #define MARGIN_X ${PAPER_MARGIN_X.toFixed(1)}
 #define CREASE_X ${PAPER_CREASES.x.toFixed(1)}
 #define CREASE_Y ${PAPER_CREASES.y.toFixed(1)}
+#define CORNER_REACH ${LENS_PAPER_CORNER_REACH.toFixed(3)}
+// Peel flap integration: FLAP_STEPS segments of FLAP_STEP sheet heights cover
+// the longest flap (the sheet's diagonal × 1.12 ≈ 1.39 h).
+#define FLAP_STEPS 24
+#define FLAP_STEP 0.0625
 `;
 
 export const LENS_PAPER_VERTEX_SHADER = /* glsl */ `
@@ -56,9 +67,19 @@ varying vec2 vUv;
 varying vec3 vNormalV;
 varying float vLift;
 
+// Corner lift reaches only CORNER_REACH (in q, the sheet's [-1,1]² space) from
+// its corner: the DOM contact text is flat, so the paper under it must stay on
+// the glass. The note layout keeps its text out of these regions.
 float cornerWeight(vec2 q, vec2 c) {
-  float w = smoothstep(0.8, 0.0, length(q - c));
+  float w = smoothstep(CORNER_REACH, 0.0, length(q - c));
   return w * w;
+}
+
+// Peel flutter: the tangent angle of the free flap at arc length tau past the
+// cylinder, a wave travelling out from the hinge that grows towards the tip.
+float flapBend(float tau, float h) {
+  float e = 1.0 - exp(-tau / (0.3 * h));
+  return uPeel.w * e * e * sin(uTime * 6.5 - tau * 9.0 / h);
 }
 
 vec3 deform(vec2 uv, out float lift) {
@@ -102,7 +123,10 @@ vec3 deform(vec2 uv, out float lift) {
   pos.z += (wave - sag) * h - lift;
 
   // Peel from the top-right corner: the flap wraps a cylinder of radius
-  // uPeel.z at the peel front and leaves it at angle uPeel.y.
+  // uPeel.z at the peel front and leaves it at angle uPeel.y. Past the
+  // cylinder the flap's profile is integrated along its arc length in fixed
+  // steps, each a unit-length segment turned by the flutter (flapBend): the
+  // flap bends but never stretches, and it cannot fold through itself.
   if (uPeel.y > 0.0) {
     vec2 corner = 0.5 * uSize;
     vec2 dir = normalize(-uSize);
@@ -110,7 +134,7 @@ vec3 deform(vec2 uv, out float lift) {
     float d = uPeel.x - s;
     if (d > 0.0) {
       float R = max(uPeel.z, 1e-4);
-      float ang = uPeel.y + uPeel.w * sin(uTime * 6.5 + s * 9.0 / h) * smoothstep(0.0, 0.35 * h, d);
+      float ang = uPeel.y;
       float arc = R * ang;
       float ds;
       float dz;
@@ -119,8 +143,24 @@ vec3 deform(vec2 uv, out float lift) {
         ds = R * sin(a);
         dz = R * (1.0 - cos(a));
       } else {
-        ds = R * sin(ang) + (d - arc) * cos(ang);
-        dz = R * (1.0 - cos(ang)) + (d - arc) * sin(ang);
+        float sigma = d - arc;
+        ds = R * sin(ang);
+        dz = R * (1.0 - cos(ang));
+        float stepLen = FLAP_STEP * h;
+        float tau = 0.0;
+        float th = ang;
+        for (int i = 0; i < FLAP_STEPS; i++) {
+          float len = min(stepLen, sigma - tau);
+          if (len <= 0.0) break;
+          // One direction per fixed segment: exact arc length, smooth in sigma.
+          th = ang + flapBend(tau + 0.5 * stepLen, h);
+          ds += len * cos(th);
+          dz += len * sin(th);
+          tau += stepLen;
+        }
+        float rest = max(sigma - tau, 0.0);
+        ds += rest * cos(th);
+        dz += rest * sin(th);
       }
       pos.xy += dir * ((uPeel.x - ds) - s);
       pos.z -= dz;

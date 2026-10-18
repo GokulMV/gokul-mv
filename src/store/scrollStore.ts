@@ -41,7 +41,7 @@ export const SCENES: readonly SceneDefinition[] = [
   { index: 5, id: 'extremeLeap', title: 'Extreme Chasm Leap', start: 0.62, end: 0.78 },
   { index: 6, id: 'summit', title: 'The Summit', start: 0.78, end: 0.86 },
   { index: 7, id: 'horizon', title: 'Horizon Reveal', start: 0.86, end: 0.92 },
-  { index: 8, id: 'paperThrow', title: 'Paper Throw & Returning Clouds', start: 0.92, end: 0.98 },
+  { index: 8, id: 'paperThrow', title: 'The Next Mountain & the Note', start: 0.92, end: 0.98 },
   { index: 9, id: 'blownAway', title: 'Blown Away into Nothingness', start: 0.98, end: 1.0 },
 ] as const;
 
@@ -65,8 +65,9 @@ export const GEAR_EQUIP_AT: Readonly<Record<GearId, number>> = {
  * Progress at which each piece of gear detaches and falls away. The backpack
  * is never dropped: it is the one thing carried to the summit, and in the
  * ending the gust blows the contact paper out of it (see ENDING in
- * three/world/worldLayout.ts). The ice axes go before the Chasm 2 leap, so the
- * one-handed cliff catch is pure skill.
+ * three/world/worldLayout.ts). The ice axes stay holstered at the hips through
+ * the Chasm 2 leap, so the 0.68–0.70 one-handed cliff catch is bare-handed; they
+ * fall at 0.72, after the catch, leaving a bare-handed scramble to the summit.
  */
 export const GEAR_DROP_AT: Readonly<Record<GearId, number>> = {
   backpack: Number.POSITIVE_INFINITY,

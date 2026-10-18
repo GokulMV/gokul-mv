@@ -101,3 +101,177 @@ html.lenis body {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* Sound / audit buttons over the scrolling credits (or, focused while tucked, over the sheet). */
+.hud-top-controls {
+  transition:
+    transform 0.32s cubic-bezier(0.2, 0.7, 0.1, 1),
+    opacity 0.24s ease;
+}
+
+.hud-top-controls[data-footer='true'] .hud-btn,
+.hud-top-controls[data-tucked='true']:focus-within .hud-btn {
+  background-color: rgba(4, 5, 8, 0.86);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+}
+
+/* Tucked away (HudControls) while scrolling down through the footer, out of
+   the way of its links, or while the contact sheet on the lens reaches up
+   beside them: slid off the top edge and click-through, but never hidden —
+   they stay in the tab order and the accessibility tree, and keyboard focus
+   slides them straight back in. */
+.hud-top-controls[data-tucked='true'] {
+  transform: translateY(calc(-100% - 1.25rem));
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    transform 0.32s cubic-bezier(0.4, 0, 0.6, 1),
+    opacity 0.24s ease;
+}
+
+.hud-top-controls[data-tucked='true']:focus-within {
+  transform: none;
+  opacity: 1;
+  pointer-events: auto;
+  transition:
+    transform 0.32s cubic-bezier(0.2, 0.7, 0.1, 1),
+    opacity 0.24s ease;
+}
+
+/* ---- Lens paper (the contact sheet stuck to the lens) ----------------------- */
+.lens-paper-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 15;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.lens-paper-sheet {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: calc(740px * var(--u, 0.5));
+  height: calc(1000px * var(--u, 0.5));
+  transform-origin: 0 0;
+  will-change: transform, opacity;
+  /* Written every frame from the WebGL sheet: never interpolated (not even by
+     the reduced-motion rule's 0.01ms transitions, which would trail a frame). */
+  transition-property: none;
+  -webkit-user-select: text;
+  user-select: text;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.lens-paper-sheet ::selection {
+  background: rgba(246, 214, 92, 0.55);
+  color: inherit;
+}
+
+.lens-paper-line {
+  position: absolute;
+  white-space: nowrap;
+  font-kerning: normal;
+  font-variant-ligatures: none;
+  text-shadow: 0 0 0.45px currentColor;
+}
+
+.lens-paper-link {
+  text-decoration-line: underline;
+  text-decoration-thickness: 0.055em;
+  text-underline-offset: 0.17em;
+  text-decoration-color: rgba(27, 49, 112, 0.4);
+  border-radius: 2px;
+  transition: text-decoration-color 0.2s ease, background-color 0.2s ease;
+}
+
+/* Generous touch target without moving the ink. */
+.lens-paper-link::after {
+  content: '';
+  position: absolute;
+  inset: -0.7em -0.35em;
+}
+
+.lens-paper-link:hover {
+  text-decoration-color: currentColor;
+  background-color: rgba(27, 49, 112, 0.06);
+}
+
+.lens-paper-link:focus {
+  outline: none;
+}
+
+.lens-paper-link:focus-visible {
+  outline: 2px dashed rgba(27, 49, 112, 0.8);
+  outline-offset: 5px;
+  background-color: rgba(246, 214, 92, 0.28);
+}
+
+.lens-paper-doodle {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+/* ---- Credits / footer ------------------------------------------------------- */
+/* Focus and in-page jumps never park a footer control under the fixed HUD buttons. */
+#credits a,
+#credits button {
+  scroll-margin-top: 5.5rem;
+  scroll-margin-bottom: 1.5rem;
+}
+
+.credits-reveal {
+  opacity: 0;
+  transform: translateY(18px);
+  transition:
+    opacity 0.9s ease,
+    transform 1.1s cubic-bezier(0.2, 0.7, 0.1, 1);
+  transition-delay: var(--d, 0ms);
+}
+
+.credits-reveal[data-shown='true'] {
+  opacity: 1;
+  transform: none;
+}
+
+.credits-ridge path:not(.credits-trail) {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  transition: stroke-dashoffset 2.6s cubic-bezier(0.45, 0, 0.2, 1) 0.2s;
+}
+
+.credits-ridge[data-shown='true'] path:not(.credits-trail) {
+  stroke-dashoffset: 0;
+}
+
+/* The dotted route to the next summit appears once the ridge is drawn. */
+.credits-ridge .credits-trail {
+  opacity: 0;
+  transition: opacity 1.2s ease 2.4s;
+}
+
+.credits-ridge[data-shown='true'] .credits-trail {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .credits-reveal {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+
+  .credits-ridge path:not(.credits-trail) {
+    stroke-dashoffset: 0;
+    transition: none;
+  }
+
+  .credits-ridge .credits-trail {
+    opacity: 1;
+    transition: none;
+  }
+}

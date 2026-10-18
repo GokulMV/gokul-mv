@@ -58,6 +58,12 @@ the kernel supports IPv6.
   `src/store/scrollStore.ts`. R3F `useFrame` callbacks and DOM `requestAnimationFrame` loops read it directly.
 - **Everything is damped** with `THREE.MathUtils.damp(current, target, lambda, delta)`.
 - **Decluttered HUD.** The previous scene's card fully fades out before the next one fades in.
+- **Track-relative progress.** Progress reaches exactly 1.0 when the 1400vh track ends
+  (`scroll = trackEnd − innerHeight`) and stays 1.0 while the credits / footer (`CreditsFooter`) scroll in
+  after it. `scrollToProgress(p)` always targets the track, so "Back to base camp" works from the footer.
+- **The ending.** `LensPaper` (WebGL) is the sheet the gust tears out of the backpack and slaps onto the lens;
+  `LensPaperOverlay` puts the contact details on it as real, clickable DOM text, aligned every frame
+  through `lensPaperState`. Both share one layout (`lensPaperNote.ts`).
 - **Content** lives in `src/store/portfolioStore.ts`, a Zustand store persisted to `localStorage`. The
   `OFFICIAL_TECH_LOGOS` dictionary holds 55 brand SVG paths and hex colours from Simple Icons (CC0).
   The brand marks are trademarks of their owners.
