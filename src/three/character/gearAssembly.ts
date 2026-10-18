@@ -113,6 +113,9 @@ function restMatrixToRoot(rig: CharacterRigHandle, node: THREE.Object3D, bones: 
 
 const iceAxePivots: readonly THREE.Vector3[] = [iceAxeHolsterPivot(1), iceAxeHolsterPivot(-1)];
 
+/** Per-frame integration budget (ms) for a fall reached before its precompute finished. */
+const FALL_CATCH_UP_MS = 2;
+
 export class GearAssembly {
   readonly world = new THREE.Group();
   private readonly materials: Record<GearId, Partial<Record<GearMaterialKey, GearMaterial>>> = {
@@ -427,12 +430,30 @@ export class GearAssembly {
       return;
     }
     this.setGlint(item.gear, 0);
+    if (!this.fallReady(item.body, t)) {
+      item.root.visible = false;
+      return;
+    }
     this.fallPose(item.body, t, item.home, null, this.v0, this.q0);
     this.setParent(item.root, this.world);
     item.root.position.copy(this.v0);
     item.root.quaternion.copy(this.q0);
     item.root.scale.copy(ONE);
     this.setOpacity(item.gear, gearFallOpacity(t));
+  }
+
+  /**
+   * Whether the item's fall is integrated up to `t` seconds. A fall still being precomputed when progress first
+   * reaches it (a fling past the drop right after load) catches up FALL_CATCH_UP_MS per frame instead of in one
+   * long task; the caller keeps the item hidden until it has. Once precomputed (prepare()), always true.
+   */
+  private fallReady(id: FallBodyId, t: number): boolean {
+    const tr = this.trajectory(id);
+    if (tr.done) return true;
+    const need = Math.min(t, GEAR_FALL.duration) + 2 * GEAR_FALL.dt;
+    if (tr.simulated >= need) return true;
+    tr.step(FALL_CATCH_UP_MS);
+    return tr.done || tr.simulated >= need;
   }
 
   /**
@@ -527,6 +548,10 @@ export class GearAssembly {
         continue;
       }
       if (t >= 0) {
+        if (!this.fallReady(axe.body, t)) {
+          axe.root.visible = false;
+          continue;
+        }
         // Falling from the rack (racked at the drop): live racked pose → trajectory.
         this.rackLocal(axe, this.m1);
         this.fallPose(axe.body, t, axe.pendulum.swing, this.m1, this.v0, this.q0);

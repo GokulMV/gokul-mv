@@ -7,6 +7,7 @@ import * as THREE from 'three';
 import { scrollStore, smoothstep } from '../store/scrollStore';
 import { soundEngine } from '../utils/soundEngine';
 import { CameraRig } from './camera/CameraRig';
+import { Protagonist } from './character/Protagonist';
 import { ExposureFade } from './fx/ExposureFade';
 import { sceneFx } from './fx/sceneFx';
 import { CloudCurtain } from './world/CloudCurtain';
@@ -148,6 +149,9 @@ export function Experience() {
           <SkyDome />
           <WorldLighting />
           <MountainEnvironment />
+          {/* The climber: opaque / alpha-tested meshes drawn with the world, hair's soft pass at renderOrder 1;
+              the cloud curtain (900, depthTest off) and the lens paper (999/1000) composite over it. */}
+          <Protagonist />
           <ProjectBeacons />
           <CloudCurtain />
           <LensPaper />

@@ -2010,6 +2010,8 @@ export function createGearGeometryBuilder(detail: GearDetail): GearGeometryBuild
   const steps: (() => void)[] = [
     () => {
       left = buildIceAxe(detail, 'adze');
+    },
+    () => {
       right = buildIceAxe(detail, 'hammer');
     },
     () => {
@@ -2054,4 +2056,127 @@ export function createGearGeometryBuilder(detail: GearDetail): GearGeometryBuild
 
 export function buildGearGeometry(detail: GearDetail): GearGeometrySet {
   return createGearGeometryBuilder(detail).result();
+}
+
+/* ==========================================================================
+ * Worker transfer: the live app builds the set in gearBuild.worker and
+ * transfers the typed arrays back (zero-copy); the main thread only wraps
+ * them in BufferGeometries.
+ * ========================================================================== */
+
+export interface PackedGearMesh {
+  name: string;
+  material: GearMaterialKey;
+  castShadow: boolean;
+  position: Float32Array;
+  normal: Float32Array;
+  uv: Float32Array;
+  color: Float32Array;
+  index: Uint16Array | Uint32Array;
+  /** Bounding sphere [cx, cy, cz, r] and box [minX, minY, minZ, maxX, maxY, maxZ]. */
+  sphere: [number, number, number, number];
+  box: [number, number, number, number, number, number];
+}
+
+export interface PackedGearSet {
+  detail: GearDetail;
+  backpack: { body: PackedGearMesh[]; lid: PackedGearMesh[]; triangles: number };
+  rope: { meshes: PackedGearMesh[]; centreline: number[]; triangles: number };
+  axes: { left: { meshes: PackedGearMesh[]; triangles: number }; right: { meshes: PackedGearMesh[]; triangles: number } };
+  harness: {
+    belt: PackedGearMesh[];
+    legLoops: Record<'LeftUpLeg' | 'RightUpLeg', PackedGearMesh[]>;
+    rack: { meshes: PackedGearMesh[]; pivot: Vec3Tuple; rest: [number, number, number, number] }[];
+    triangles: number;
+  };
+  triangles: number;
+}
+
+/** Flattens a built set into typed arrays (+ the list of buffers to transfer). */
+export function packGearGeometry(set: GearGeometrySet): { packed: PackedGearSet; transfer: ArrayBuffer[] } {
+  const transfer = new Set<ArrayBuffer>();
+  const array = <T extends Float32Array | Uint16Array | Uint32Array>(a: T): T => {
+    transfer.add(a.buffer as ArrayBuffer);
+    return a;
+  };
+  const mesh = (m: GearMesh): PackedGearMesh => {
+    const g = m.geometry;
+    if (!g.boundingSphere) g.computeBoundingSphere();
+    if (!g.boundingBox) g.computeBoundingBox();
+    const s = g.boundingSphere as THREE.Sphere;
+    const b = g.boundingBox as THREE.Box3;
+    const index = g.getIndex();
+    if (!index) throw new Error(`gear mesh ${g.name} is not indexed`);
+    return {
+      name: g.name,
+      material: m.material,
+      castShadow: m.castShadow,
+      position: array(g.getAttribute('position').array as Float32Array),
+      normal: array(g.getAttribute('normal').array as Float32Array),
+      uv: array(g.getAttribute('uv').array as Float32Array),
+      color: array(g.getAttribute('color').array as Float32Array),
+      index: array(index.array as Uint16Array | Uint32Array),
+      sphere: [s.center.x, s.center.y, s.center.z, s.radius],
+      box: [b.min.x, b.min.y, b.min.z, b.max.x, b.max.y, b.max.z],
+    };
+  };
+  const meshes = (list: readonly GearMesh[]): PackedGearMesh[] => list.map(mesh);
+  const packed: PackedGearSet = {
+    detail: set.detail,
+    backpack: { body: meshes(set.backpack.body), lid: meshes(set.backpack.lid), triangles: set.backpack.triangles },
+    rope: { meshes: meshes(set.rope.meshes), centreline: set.rope.centreline.flatMap((p) => [p.x, p.y, p.z]), triangles: set.rope.triangles },
+    axes: {
+      left: { meshes: meshes(set.axes.left.meshes), triangles: set.axes.left.triangles },
+      right: { meshes: meshes(set.axes.right.meshes), triangles: set.axes.right.triangles },
+    },
+    harness: {
+      belt: meshes(set.harness.belt),
+      legLoops: { LeftUpLeg: meshes(set.harness.legLoops.LeftUpLeg), RightUpLeg: meshes(set.harness.legLoops.RightUpLeg) },
+      rack: set.harness.rack.map((r) => ({ meshes: meshes(r.meshes), pivot: [r.pivot.x, r.pivot.y, r.pivot.z], rest: [r.rest.x, r.rest.y, r.rest.z, r.rest.w] })),
+      triangles: set.harness.triangles,
+    },
+    triangles: set.triangles,
+  };
+  return { packed, transfer: Array.from(transfer) };
+}
+
+/** Rebuilds a set from packGearGeometry's output (wraps the arrays; no copies, no recomputation). */
+export function unpackGearGeometry(packed: PackedGearSet): GearGeometrySet {
+  const mesh = (m: PackedGearMesh): GearMesh => {
+    const g = new THREE.BufferGeometry();
+    g.name = m.name;
+    g.setAttribute('position', new THREE.BufferAttribute(m.position, 3));
+    g.setAttribute('normal', new THREE.BufferAttribute(m.normal, 3));
+    g.setAttribute('uv', new THREE.BufferAttribute(m.uv, 2));
+    g.setAttribute('color', new THREE.BufferAttribute(m.color, 3));
+    g.setIndex(new THREE.BufferAttribute(m.index, 1));
+    g.boundingSphere = new THREE.Sphere(new THREE.Vector3(m.sphere[0], m.sphere[1], m.sphere[2]), m.sphere[3]);
+    g.boundingBox = new THREE.Box3(new THREE.Vector3(m.box[0], m.box[1], m.box[2]), new THREE.Vector3(m.box[3], m.box[4], m.box[5]));
+    return { geometry: g, material: m.material, castShadow: m.castShadow };
+  };
+  const meshes = (list: readonly PackedGearMesh[]): GearMesh[] => list.map(mesh);
+  const centreline: THREE.Vector3[] = [];
+  for (let i = 0; i + 2 < packed.rope.centreline.length; i += 3) {
+    centreline.push(new THREE.Vector3(packed.rope.centreline[i], packed.rope.centreline[i + 1], packed.rope.centreline[i + 2]));
+  }
+  return {
+    detail: packed.detail,
+    backpack: { body: meshes(packed.backpack.body), lid: meshes(packed.backpack.lid), triangles: packed.backpack.triangles },
+    rope: { meshes: meshes(packed.rope.meshes), centreline, triangles: packed.rope.triangles },
+    axes: {
+      left: { meshes: meshes(packed.axes.left.meshes), triangles: packed.axes.left.triangles },
+      right: { meshes: meshes(packed.axes.right.meshes), triangles: packed.axes.right.triangles },
+    },
+    harness: {
+      belt: meshes(packed.harness.belt),
+      legLoops: { LeftUpLeg: meshes(packed.harness.legLoops.LeftUpLeg), RightUpLeg: meshes(packed.harness.legLoops.RightUpLeg) },
+      rack: packed.harness.rack.map((r) => ({
+        meshes: meshes(r.meshes),
+        pivot: new THREE.Vector3(r.pivot[0], r.pivot[1], r.pivot[2]),
+        rest: new THREE.Quaternion(r.rest[0], r.rest[1], r.rest[2], r.rest[3]),
+      })),
+      triangles: packed.harness.triangles,
+    },
+    triangles: packed.triangles,
+  };
 }

@@ -69,8 +69,20 @@ export type SdfFunction = (x: number, y: number, z: number) => number;
 export interface CharacterAnimatorOptions {
   /** Signed distance of the rock (negative inside). Defaults to terrainGeometry's mountainSdf. */
   sdf?: SdfFunction;
-  /** CPU budget per update (ms) for building the contact tables until they are ready. Default 1.5. */
+  /**
+   * CPU budget per update (ms) for building the contact tables until they are ready. Default 1.5. With
+   * blockingPrepare: false, 0 leaves the build to prepareStep() (idle time) unless progress is waiting on it.
+   */
   precomputeBudgetMs?: number;
+  /**
+   * What update() does when progress needs tables that are not built yet (a deep link or a fast fling into a
+   * climb right after load). true (default, tests): build them synchronously (a 0.1–0.3 s main-thread task).
+   * false (the live app): never block — keep the climber hidden, build `urgentBudgetMs` per update (the caller
+   * also pumps prepareStep() in idle time), then snap straight to the pose once ready.
+   */
+  blockingPrepare?: boolean;
+  /** Build budget per update (ms) while hidden waiting for tables (blockingPrepare: false). Default 8. */
+  urgentBudgetMs?: number;
   /** Progress below which the character is hidden (the cloud curtain still covers base camp). Default 0.035. */
   hiddenBefore?: number;
   /** Time-driven secondary motion (breathing, wind flutter, micro head motion). Default true. */
@@ -121,6 +133,8 @@ export interface CharacterAnimator {
   readonly ready: boolean;
   /** Builds the contact tables synchronously (tests, or before a deep link into a climb). */
   prepare(): void;
+  /** Advances the contact-table build by about `budgetMs` (idle-time scheduling). Returns `ready`. */
+  prepareStep(budgetMs: number): boolean;
   /** Makes the next update jump straight to the target pose (no damping). */
   snap(): void;
   /** Precomputed holds of a climb (0 wall 1, 1 wall 2, 2 scramble) for a limb: [x, y, z, nx, ny, nz, kind] per hold. */
@@ -682,6 +696,8 @@ interface LipGrip {
 export function createCharacterAnimator(rig: CharacterRigHandle, options: CharacterAnimatorOptions = {}): CharacterAnimator {
   const sdf: SdfFunction = options.sdf ?? mountainSdf;
   const budgetMs = options.precomputeBudgetMs ?? 1.5;
+  const blockingPrepare = options.blockingPrepare ?? true;
+  const urgentBudgetMs = options.urgentBudgetMs ?? 8;
   const hiddenBefore = options.hiddenBefore ?? 0.035;
   const secondary = options.secondaryMotion ?? true;
   const legIterations = options.detail === 'low' ? 1 : 3;
@@ -917,8 +933,9 @@ export function createCharacterAnimator(rig: CharacterRigHandle, options: Charac
         const x = spot.cx - spot.half + i * spot.step;
         const z = spot.cz - spot.half + k * spot.step;
         spot.heights[i + n * k] = traceDown(x, z, cy + 0.6, cy - 3);
+        // One march per unit: the first SDF queries in a region also fill its lazily built chip cells.
+        yield;
       }
-      yield;
     }
     spot.ready = true;
   }
@@ -995,7 +1012,7 @@ export function createCharacterAnimator(rig: CharacterRigHandle, options: Charac
       rawN[i * 3] = prevN.x;
       rawN[i * 3 + 1] = prevN.y;
       rawN[i * 3 + 2] = prevN.z;
-      if ((i & 3) === 3) yield;
+      yield;
     }
     // Smooth normals along the route (±0.4 m box filter), limit how far they tip upward.
     t.normal = new Float32Array(count * 3);
@@ -1033,6 +1050,7 @@ export function createCharacterAnimator(rig: CharacterRigHandle, options: Charac
     wallBasis(t.topNormal, _scratchU, _scratchL);
     const topSurface = traceDown(a.x - t.topNormal.x * 0.15, a.z - t.topNormal.z * 0.15, a.y + 1.2, a.y - 2.5);
     t.topY = topSurface;
+    yield;
     if (spec.key === 'scramble') {
       // The scramble curves onto the summit from the side: its top-out spots sit toward the approach, where the
       // body still is when the hands reach over (centred on the end they would be a sideways lunge away).
@@ -1046,9 +1064,11 @@ export function createCharacterAnimator(rig: CharacterRigHandle, options: Charac
       // Mantle spots: the hands (fists around the axes on the walls) press on the top just beyond the lip.
       h.copy(a).addScaledVector(t.topNormal, spec.key === 'scramble' ? -0.2 : -0.24).addScaledVector(_scratchL, side * (spec.key === 'scramble' ? 0.2 : 0.24));
       h.y = traceDown(h.x, h.z, a.y + 1.2, a.y - 2.5);
+      yield;
       const edge = t.topEdge[k];
       edge.copy(a).addScaledVector(t.topNormal, -0.05).addScaledVector(_scratchL, side * 0.24);
       edge.y = traceDown(edge.x, edge.z, a.y + 1.2, a.y - 2.5);
+      yield;
     }
     yield;
 
@@ -1067,7 +1087,7 @@ export function createCharacterAnimator(rig: CharacterRigHandle, options: Charac
         d = sdf(a.x - n1.x * dist, a.y, a.z - n1.z * dist);
       }
       rawGap[i] = Math.min(dist, 1.6);
-      if ((i & 15) === 15) yield;
+      if ((i & 1) === 1) yield;
     }
     t.pelvis = new Float32Array(count * 3);
     for (let i = 0; i < count; i += 1) {
@@ -1105,12 +1125,13 @@ export function createCharacterAnimator(rig: CharacterRigHandle, options: Charac
       t.pelvis[i * 3] = a.x;
       t.pelvis[i * 3 + 1] = a.y;
       t.pelvis[i * 3 + 2] = a.z;
-      if ((i & 31) === 31) yield;
+      if ((i & 3) === 3) yield;
     }
     t.pelvisRoom = new Float32Array(count);
     for (let i = 0; i < count; i += 1) {
       const d = Math.min(sdf(t.pelvis[i * 3], t.pelvis[i * 3 + 1], t.pelvis[i * 3 + 2]), sdf(t.pelvis[i * 3], t.pelvis[i * 3 + 1] + 0.45, t.pelvis[i * 3 + 2]));
       t.pelvisRoom[i] = Math.max(0, d - 0.2);
+      if ((i & 7) === 7) yield;
     }
 
     // 3. Holds per limb.
@@ -1201,6 +1222,7 @@ export function createCharacterAnimator(rig: CharacterRigHandle, options: Charac
               ok = project(q, n2) < 0.004;
             }
             if (ok && q.distanceTo(_scratchN) > 1.2) ok = false;
+            yield;
           }
           if (!ok && i > 0) {
             q.set(arr[(i - 1) * HOLD_STRIDE], arr[(i - 1) * HOLD_STRIDE + 1], arr[(i - 1) * HOLD_STRIDE + 2]).addScaledVector(_scratchU, P * 0.5);
@@ -1215,7 +1237,7 @@ export function createCharacterAnimator(rig: CharacterRigHandle, options: Charac
         arr[i * HOLD_STRIDE + 4] = n2.y;
         arr[i * HOLD_STRIDE + 5] = n2.z;
         arr[i * HOLD_STRIDE + 6] = kind;
-        if ((i & 1) === 1) yield;
+        yield;
       }
       t.holds[limb] = arr;
       t.holdCount[limb] = count2;
@@ -1226,10 +1248,11 @@ export function createCharacterAnimator(rig: CharacterRigHandle, options: Charac
   function* buildLip(): Generator<void, void, void> {
     // The lip's nose: the most protruding rock (max z) around the grip height, then projected.
     const g = CATCH_HANG.grip;
-    const findNose = (x: number, out: THREE.Vector3): void => {
+    function* findNose(x: number, out: THREE.Vector3): Generator<void, void, void> {
       let bestZ = -1e9;
       let bestY = g[1];
       for (let y = g[1] - 0.25; y <= g[1] + 0.25; y += 0.025) {
+        yield;
         let z = g[2] + 0.6;
         let d = sdf(x, y, z);
         for (let it = 0; it < 60 && d > 0.002; it += 1) {
@@ -1244,15 +1267,15 @@ export function createCharacterAnimator(rig: CharacterRigHandle, options: Charac
       // Grip on top of the nose: a little above the most protruding point.
       out.set(x, bestY + 0.04, bestZ + 0.02);
       project(out, _scratchN);
-    };
-    findNose(g[0], lip.right);
+    }
+    yield* findNose(g[0], lip.right);
     yield;
     // Character faces −Z at the lip: its left is world −X.
-    findNose(g[0] - 0.36, lip.left);
+    yield* findNose(g[0] - 0.36, lip.left);
     yield;
     gradient(lip.right.x, lip.right.y, lip.right.z, lip.normal);
-    findNose(g[0] - 0.08, lip.footRight);
-    findNose(g[0] - 0.3, lip.footLeft);
+    yield* findNose(g[0] - 0.08, lip.footRight);
+    yield* findNose(g[0] - 0.3, lip.footLeft);
     yield;
     // Pillar takeoff: march from the stand spot along the leap until the ground drops away.
     const spot = spots.pillar;
@@ -1264,6 +1287,7 @@ export function createCharacterAnimator(rig: CharacterRigHandle, options: Charac
       const h = traceDown(STAND_SPOTS.pillar.cx + dirX * s, STAND_SPOTS.pillar.cz + dirZ * s, g0 + 0.6, g0 - 3);
       if (h < g0 - 0.2) break;
       edge = s;
+      yield;
     }
     const s = Math.max(0, edge - 0.08);
     pillarTakeoff.set(STAND_SPOTS.pillar.cx + dirX * s, 0, STAND_SPOTS.pillar.cz + dirZ * s);
@@ -3066,18 +3090,41 @@ export function createCharacterAnimator(rig: CharacterRigHandle, options: Charac
   let stateBlend = 1;
   let visible = true;
 
-  const ensureTablesFor = (p: number): void => {
-    if (ready) return;
-    // Climb / jump / summit states need everything up to their stage: finish synchronously.
-    if (p >= SEG.climb1[0] - 0.004) prepare();
-    else stepBuild(budgetMs);
+  /**
+   * Makes sure the tables progress `p` needs exist. Climb, jump and summit states need everything up to their stage;
+   * base camp only its ground patch (built first). Returns false while they are still being built (non-blocking mode).
+   */
+  const ensureTablesFor = (p: number): boolean => {
+    if (ready) return true;
+    const needsAll = p >= SEG.climb1[0] - 0.004;
+    if (blockingPrepare) {
+      if (needsAll) prepare();
+      else stepBuild(budgetMs);
+      return true;
+    }
+    const usable = !needsAll && spots.base.ready;
+    if (!usable) stepBuild(urgentBudgetMs);
+    else if (budgetMs > 0) stepBuild(budgetMs);
+    return needsAll ? ready : spots.base.ready;
   };
 
   const animator: CharacterAnimator = {
     update(progress: number, delta: number, elapsed: number): void {
       const p = clamp01(Number.isFinite(progress) ? progress : 0);
       const dt = Math.min(Math.max(Number.isFinite(delta) ? delta : 0, 0), 0.1);
-      ensureTablesFor(p);
+      const usable = ensureTablesFor(p);
+      const si = animationStateIndexAt(p);
+      const range = ANIMATION_STATE_RANGES[si];
+      state = range.state;
+      stateBlend = si === 0 ? 1 : smoothstep(range.start, range.start + 0.006, p);
+      if (!usable) {
+        // Still building what this progress needs: stay hidden, then land exactly on the pose once ready.
+        snapNext = true;
+        wind = windTarget(p, elapsed);
+        visible = false;
+        rig.root.visible = false;
+        return;
+      }
       const snapping = snapNext;
       evalTarget(p, elapsed);
       diag.beforeReach.copy(target.pelvisPos);
@@ -3086,10 +3133,6 @@ export function createCharacterAnimator(rig: CharacterRigHandle, options: Charac
       resolveGaze(target);
       dampPose(dt);
       solve(p);
-      const si = animationStateIndexAt(p);
-      const range = ANIMATION_STATE_RANGES[si];
-      state = range.state;
-      stateBlend = si === 0 ? 1 : smoothstep(range.start, range.start + 0.006, p);
       const wt = windTarget(p, elapsed);
       wind = snapping ? wt : THREE.MathUtils.damp(wind, wt, wt > wind ? 7 : 2, dt);
       visible = p >= hiddenBefore;
@@ -3113,6 +3156,10 @@ export function createCharacterAnimator(rig: CharacterRigHandle, options: Charac
       return ready;
     },
     prepare,
+    prepareStep(ms: number): boolean {
+      stepBuild(ms);
+      return ready;
+    },
     debugHolds(index: number, limb: number): Float32Array {
       return climbs[index].holds[limb as LimbIndex];
     },

@@ -189,9 +189,27 @@ export interface FallBodySpec {
   friction: number;
 }
 
+/** Samples of the coil centreline used as the rope's fall proxies (socket frame). */
+export const ROPE_FALL_PROXY_SAMPLES = 10;
+
+let ropeProxyPoints: Vec3Tuple[] | null = null;
+
+/**
+ * Seeds the rope's fall-proxy centreline (ropeCoilCentreline(ROPE_FALL_PROXY_SAMPLES), flattened x, y, z), e.g.
+ * computed by the gear build worker, so the main thread skips the coil wrap (it marches the torso field).
+ */
+export function primeRopeFallProxies(flat: ArrayLike<number>): void {
+  const points: Vec3Tuple[] = [];
+  for (let i = 0; i + 2 < flat.length; i += 3) points.push([flat[i], flat[i + 1], flat[i + 2]]);
+  ropeProxyPoints = points;
+}
+
 function ropeProxies(): FallProxy[] {
-  const { points } = ropeCoilCentreline(10);
-  return points.map((p) => ({ p: [p.x, p.y, p.z] as Vec3Tuple, r: 0.032 }));
+  if (!ropeProxyPoints) {
+    const { points } = ropeCoilCentreline(ROPE_FALL_PROXY_SAMPLES);
+    ropeProxyPoints = points.map((p) => [p.x, p.y, p.z] as Vec3Tuple);
+  }
+  return ropeProxyPoints.map((p) => ({ p, r: 0.032 }));
 }
 
 export function fallBodySpecs(): FallBodySpec[] {

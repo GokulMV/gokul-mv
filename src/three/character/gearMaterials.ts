@@ -43,12 +43,16 @@ function dataTexture(data: Uint8Array, w: number, h: number, srgb: boolean): THR
   return t;
 }
 
-/** Normal map (tangent space, +Z up) from a tiling height function sampled on a w × h grid. */
-function normalFromHeight(w: number, h: number, height: (x: number, y: number) => number, strength: number): THREE.DataTexture {
+/** Normal map (tangent space, +Z up) from a tiling height function sampled on a w × h grid; yields every 8 rows. */
+function* normalFromHeight(w: number, h: number, height: (x: number, y: number) => number, strength: number): Generator<void, THREE.DataTexture, void> {
   const hf = new Float32Array(w * h);
-  for (let y = 0; y < h; y += 1) for (let x = 0; x < w; x += 1) hf[y * w + x] = height(x, y);
+  for (let y = 0; y < h; y += 1) {
+    if ((y & 7) === 7) yield;
+    for (let x = 0; x < w; x += 1) hf[y * w + x] = height(x, y);
+  }
   const data = new Uint8Array(w * h * 4);
   for (let y = 0; y < h; y += 1) {
+    if ((y & 7) === 7) yield;
     for (let x = 0; x < w; x += 1) {
       const l = hf[y * w + ((x - 1 + w) % w)];
       const r = hf[y * w + ((x + 1) % w)];
@@ -77,9 +81,18 @@ function hash2(x: number, y: number): number {
   return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
 }
 
+/** Builds the gear textures (synchronously). */
 export function createGearTextures(): GearTextures {
+  const steps = gearTextureSteps();
+  let r = steps.next();
+  while (!r.done) r = steps.next();
+  return r.value;
+}
+
+/** The gear textures as a time-sliceable generator (a few milliseconds per step). */
+export function* gearTextureSteps(): Generator<void, GearTextures, void> {
   // Ripstop: plain weave (4 px threads) with a raised grid every 32 px.
-  const ripstop = normalFromHeight(
+  const ripstop = yield* normalFromHeight(
     128,
     128,
     (x, y) => {
@@ -91,9 +104,10 @@ export function createGearTextures(): GearTextures {
     },
     1.3,
   );
+  yield;
 
   // Webbing: fine ribs across the strap (v) with a slight twill along it (u).
-  const webbing = normalFromHeight(
+  const webbing = yield* normalFromHeight(
     64,
     64,
     (x, y) => {
@@ -103,6 +117,7 @@ export function createGearTextures(): GearTextures {
     },
     1.4,
   );
+  yield;
 
   // Rope sheath: 2-over-2 braid of two helical carrier families (tile: 256 along the rope × 64 around).
   const RW = 256;
@@ -114,7 +129,9 @@ export function createGearTextures(): GearTextures {
   const navy = new THREE.Color('#1d2c4d');
   const fleck = new THREE.Color('#efe6cf');
   const c = new THREE.Color();
+  const srgb = new THREE.Color();
   for (let y = 0; y < RH; y += 1) {
+    if ((y & 7) === 7) yield;
     for (let x = 0; x < RW; x += 1) {
       const s = x / RW;
       const t = y / RH;
@@ -134,21 +151,24 @@ export function createGearTextures(): GearTextures {
       c.multiplyScalar(0.72 + 0.28 * bump);
       const i = (y * RW + x) * 4;
       // Store sRGB bytes (the texture is flagged SRGBColorSpace).
-      const sr = c.clone().convertLinearToSRGB();
-      ropeData[i] = Math.round(THREE.MathUtils.clamp(sr.r, 0, 1) * 255);
-      ropeData[i + 1] = Math.round(THREE.MathUtils.clamp(sr.g, 0, 1) * 255);
-      ropeData[i + 2] = Math.round(THREE.MathUtils.clamp(sr.b, 0, 1) * 255);
+      srgb.copy(c).convertLinearToSRGB();
+      ropeData[i] = Math.round(THREE.MathUtils.clamp(srgb.r, 0, 1) * 255);
+      ropeData[i + 1] = Math.round(THREE.MathUtils.clamp(srgb.g, 0, 1) * 255);
+      ropeData[i + 2] = Math.round(THREE.MathUtils.clamp(srgb.b, 0, 1) * 255);
       ropeData[i + 3] = 255;
     }
   }
   const ropeColor = dataTexture(ropeData, RW, RH, true);
-  const ropeNormal = normalFromHeight(RW, RH, (x, y) => ropeHeight[y * RW + x], 2.2);
+  yield;
+  const ropeNormal = yield* normalFromHeight(RW, RH, (x, y) => ropeHeight[y * RW + x], 2.2);
+  yield;
 
   // Carbon 2/2 twill: 8 tows per 64 px tile.
   const CW = 64;
   const carbonHeight = new Float32Array(CW * CW);
   const carbonData = new Uint8Array(CW * CW * 4);
   for (let y = 0; y < CW; y += 1) {
+    if ((y & 15) === 15) yield;
     for (let x = 0; x < CW; x += 1) {
       const i0 = Math.floor(x / 8);
       const j0 = Math.floor(y / 8);
@@ -167,7 +187,7 @@ export function createGearTextures(): GearTextures {
     }
   }
   const carbonColor = dataTexture(carbonData, CW, CW, true);
-  const carbonNormal = normalFromHeight(CW, CW, (x, y) => carbonHeight[y * CW + x], 0.9);
+  const carbonNormal = yield* normalFromHeight(CW, CW, (x, y) => carbonHeight[y * CW + x], 0.9);
 
   const all = [ripstop, webbing, ropeColor, ropeNormal, carbonColor, carbonNormal];
   return {
