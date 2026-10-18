@@ -1,32 +1,36 @@
 import * as THREE from 'three';
-import { PALETTE, SUN_DIRECTION } from '../world/worldLayout';
+import { keyLight } from '../world/keyLight';
+import { ROCK_NOISE_GLSL, getRockNoiseTexture } from './rockNoise';
 
 /* ==========================================================================
  * Alpine rock material — a MeshStandardMaterial extended via onBeforeCompile.
  *
- * Everything is procedural and world-space (no textures, no UVs, no
- * triplanar seams):
- *   - fracture blocks: a 3D cellular joint field (cells taller than wide, like
- *     vertically jointed granite) cuts the rock into blocks. Every block is a
- *     facet with its own slight tilt; open joints are thin dark cracks whose
- *     edges are bevelled (the normal leans into the crack, so one lip catches
- *     the sun and the other falls into shade); closed joints are just a crease.
- *     A second, smaller set of chips adds fracture detail close to the camera;
- *   - sheeting joints: intermittent, gently dipping horizontal cracks;
- *   - weathered relief: ridged and fine gradient noise;
- *   - albedo: PALETTE.granite / graniteDark lifted toward a pale feldspar grey,
- *     per-block tone, warm iron staining, dark water streaks on steep faces,
- *     mineral grain up close, darker cracks and crevices;
- *   - snow on up-facing ledges (after the facet tilt), increasing with altitude,
- *     wind-scoured by noise; PALETTE.snow in the sun, PALETTE.snowShadow (blue)
- *     away from it; sparse ice glints;
+ * Everything is procedural and world-space (no UVs, no triplanar seams); one
+ * shared 3D noise texture (rockNoise.ts) serves the layered noises, three
+ * fetches per fragment, each filtered and mip-mapped:
+ *   - fracture blocks: joint sets cut the rock into blocks; open joints are
+ *     thin dark cracks with bevelled, occluded lips; the terrain's own planar
+ *     facets (`aFacet`, one id per geometric facet) each get their own value,
+ *     roughness and a few a faint warm cast (without `aFacet` a shader
+ *     cellular facet id stands in);
+ *   - weathered relief (ridged and fine gradient noise), chips up close;
+ *   - albedo: cool-neutral granite, per-facet tone, iron staining, mottling,
+ *     dark fall-line varnish and meltwater streaks on steep faces, cracks;
+ *   - mid-field (20-150 m): snow gathers in gullies and on benches and sheds
+ *     off the steep pyramid flanks, convex ribs stay bare and darker,
+ *     horizontal bands break the faces, lit snow carries the alpenglow;
+ *   - snow on up-facing ledges with a crisp, lobed, wind-scoured edge
+ *     (anti-aliased to ~1.5 px), a rounded 5 cm lip that catches the light and
+ *     a dark wet rim on the rock just outside it; wind ripples (sastrugi) and
+ *     pixel-sized ice sparkle that only the sun's own highlight can flash;
  *   - baked per-vertex ambient occlusion (`aOcclusion`) and curvature
- *     (`aCurvature`): worn pale edges, grime and occlusion in the creases,
- *     snow scoured off convex edges and packed into hollows.
+ *     (`aCurvature`): worn edges, grime in creases, snow scoured off convex
+ *     edges and packed into hollows.
  * Every layer fades out with the world size of a pixel before it could alias.
- * It stays a standard PBR material: shadows, fog, tone mapping and environment
- * lighting keep working. The program cache key is stable per
- * (quality, AO, curvature, all-snow) combination.
+ * It stays a standard PBR material: shadows, fog, tone mapping (and so
+ * sceneFx.exposure) and environment lighting keep working. The sun direction
+ * is the key light (keyLight.ts), shared by reference. The program cache key
+ * is stable per (quality, AO, curvature, facet, sun-visibility, all-snow).
  * ========================================================================== */
 
 export type RockShaderQuality = 0 | 1 | 2;
@@ -37,8 +41,8 @@ export interface AlpineRockMaterialOptions {
   /** Read the per-vertex `aCurvature` attribute baked by terrainGeometry (edge wear, cavity grime, wind-scoured snow). */
   vertexCurvature?: boolean;
   /**
-   * Shader detail: 0 = low (one steep joint set, sheeting joints, facets), 1 = medium (+ second joint set and
-   * weathered relief), 2 = high (27-cell facets, chips, fine relief, mineral grain, ice glints).
+   * Shader detail: 0 = low (one steep joint set, sheeting joints, snow edge, lip and rim), 1 = medium (+ second
+   * joint set, weathered relief, sastrugi, sparkle), 2 = high (+ 27-cell facets, chips, fine relief).
    */
   quality?: RockShaderQuality;
   /** Global snow coverage 0..1. */
@@ -49,10 +53,17 @@ export interface AlpineRockMaterialOptions {
   bumpStrength?: number;
   /** World-space scale multiplier of the rock pattern (1 = authored scale). */
   patternScale?: number;
-  /** Direction towards the sun (world space). */
+  /**
+   * Direction towards the sun (world space), copied. Default: the shared key-light vector
+   * (`keyLight.direction`, by reference, so the material follows WorldLighting's key light).
+   */
   sunDirection?: THREE.Vector3;
   /** Render every fragment as snow (used by createSnowMaterial). */
   allSnow?: boolean;
+  /** Read the per-vertex `aFacet` id baked by terrainGeometry (one value per geometric facet). */
+  vertexFacet?: boolean;
+  /** Read the per-vertex `aSunVis` key-light visibility baked by terrainGeometry (quality 0 only). */
+  vertexSunVis?: boolean;
 }
 
 export interface AlpineRockUniforms {
@@ -69,6 +80,10 @@ export interface AlpineRockUniforms {
   uGraniteWarm: { value: THREE.Color };
   uSnowColor: { value: THREE.Color };
   uSnowShadow: { value: THREE.Color };
+  /** Shared rock noise (rockNoise.ts). */
+  uRockNoise: { value: THREE.Data3DTexture };
+  /** Weight of the baked key-light visibility (keyLight.bakeWeight, shared by reference). */
+  uKeyBakeWeight: { value: number };
 }
 
 export type AlpineRockMaterial = THREE.MeshStandardMaterial & {
@@ -120,6 +135,14 @@ varying float vRockAO;
 attribute float aCurvature;
 varying float vRockCurv;
 #endif
+#ifdef ROCK_VERTEX_FACET
+attribute float aFacet;
+varying vec3 vRockFacet;
+#endif
+#if defined( ROCK_VERTEX_SUNVIS ) && ROCK_QUALITY == 0
+attribute float aSunVis;
+varying float vRockSunVis;
+#endif
 `;
 
 const VERTEX_MAIN = /* glsl */ `
@@ -141,6 +164,13 @@ vRockAO = aOcclusion;
 #ifdef ROCK_VERTEX_CURVATURE
 vRockCurv = aCurvature;
 #endif
+#ifdef ROCK_VERTEX_FACET
+// Facet id plus two per-facet hashes, derived per vertex so they interpolate across facet seams without banding.
+vRockFacet = vec3( aFacet, fract( aFacet * 7.3 ), smoothstep( 0.83, 0.87, fract( aFacet * 13.1 ) ) );
+#endif
+#if defined( ROCK_VERTEX_SUNVIS ) && ROCK_QUALITY == 0
+vRockSunVis = aSunVis;
+#endif
 `;
 
 const FRAGMENT_PARS = /* glsl */ `
@@ -156,6 +186,7 @@ uniform vec3 uGraniteLight;
 uniform vec3 uGraniteWarm;
 uniform vec3 uSnowColor;
 uniform vec3 uSnowShadow;
+uniform float uKeyBakeWeight;
 varying vec3 vRockPos;
 varying vec3 vRockNormal;
 varying vec4 vRockLow;
@@ -166,13 +197,22 @@ varying float vRockAO;
 #ifdef ROCK_VERTEX_CURVATURE
 varying float vRockCurv;
 #endif
+#ifdef ROCK_VERTEX_FACET
+varying vec3 vRockFacet;
+#endif
+#if defined( ROCK_VERTEX_SUNVIS ) && ROCK_QUALITY == 0
+varying float vRockSunVis;
+#endif
 ${NOISE_COMMON}
+${ROCK_NOISE_GLSL}
 
+#if ROCK_QUALITY > 1 || ! defined( ROCK_VERTEX_FACET )
 vec3 rockHash33( vec3 p3 ) {
 	p3 = fract( p3 * vec3( 0.1031, 0.1030, 0.0973 ) );
 	p3 += dot( p3, p3.yxz + 33.33 );
 	return fract( ( p3.xxy + p3.yxx ) * p3.zyx );
 }
+#endif
 
 /* 3D value noise with analytic derivatives: ( value in [0, 1], d/dx, d/dy, d/dz ). */
 vec4 rockNoised3( vec3 x ) {
@@ -241,12 +281,13 @@ float rockPlanes( vec3 p, vec3 pn, float sp, float warp, float seed, vec3 n, out
 /*
  * Adds one joint family to the relief: the crack line and its bevelled lips
  * (the surface rolls into an open joint, so one lip catches the light and the
- * other falls into shade). Joints open in segments along their plane (segFreq
- * sets the segment scale) and the crack tapers to nothing at each end; planes
- * that slice the surface at a grazing angle are faded out (they would smear
- * into bands). Closed joints leave no trace.
+ * other falls into shade; the lips are also occluded, accumulated in bevel).
+ * Joints open in segments along their plane (segFreq sets the segment scale)
+ * and the crack tapers to nothing at each end; planes that slice the surface
+ * at a grazing angle are faded out (they would smear into bands). Closed
+ * joints leave no trace.
  */
-void rockJointSet( vec3 p, vec3 pn, float sp, float warp, float openAt, float segFreq, float seed, vec3 n, float px, float lineFade, float blockFade, inout vec3 off, inout float crack ) {
+void rockJointSet( vec3 p, vec3 pn, float sp, float warp, float openAt, float segFreq, float seed, vec3 n, float px, float lineFade, float blockFade, inout vec3 off, inout float crack, inout float bevel ) {
 	float jdx;
 	vec3 toEdge;
 	float obliq;
@@ -255,11 +296,14 @@ void rockJointSet( vec3 p, vec3 pn, float sp, float warp, float openAt, float se
 	o *= step( 0.3, rockHash13( vec3( jdx, seed, 1.7 ) ) ) * smoothstep( 0.3, 0.6, obliq );
 	float bw = 0.12 + 0.12 * o;
 	float t = clamp( e / bw, 0.0, 1.0 );
-	off += toEdge * ( 1.0 - t ) * ( 1.0 - t ) * 0.6 * o * blockFade;
+	float lip = ( 1.0 - t ) * ( 1.0 - t ) * o * blockFade;
+	off += toEdge * lip * 0.6;
+	bevel = max( bevel, lip );
 	float cw = 0.006 + 0.022 * o + 0.3 * px;
 	crack = max( crack, ( 1.0 - smoothstep( cw * 0.45, cw, e ) ) * smoothstep( 0.04, 0.35, o ) * lineFade );
 }
 
+#if ROCK_QUALITY > 1 || ! defined( ROCK_VERTEX_FACET )
 /*
  * Fracture facets: jittered 3D cells. Returns the distance along the surface
  * to the nearest cell boundary; id1 / id2 are the two nearest cells and toEdge
@@ -312,6 +356,7 @@ float rockFacets( vec3 p, vec3 invScale, vec3 n, bool wide, out vec3 id1, out ve
 	toEdge = gt / tl;
 	return e / tl;
 }
+#endif
 `;
 
 /* Computes rock / snow albedo, relief normal and roughness (world space). */
@@ -326,7 +371,6 @@ const FRAGMENT_SURFACE = /* glsl */ `
 	#endif
 	float rockConvex = smoothstep( 0.05, 0.6, rockCurv );
 	float rockCavity = smoothstep( 0.05, 0.6, - rockCurv );
-	float rockDist = length( cameraPosition - vRockPos );
 	// World size of one pixel (outside any branch: derivatives need uniform control flow).
 	float rockPx = length( fwidth( vRockPos ) ) * uPatternScale;
 
@@ -334,12 +378,22 @@ const FRAGMENT_SURFACE = /* glsl */ `
 	float rockBlockFade = 1.0 - smoothstep( 0.09, 0.32, rockPx );
 	float rockLineFade = 1.0 - smoothstep( 0.02, 0.07, rockPx );
 	float rockChipFade = 1.0 - smoothstep( 0.012, 0.045, rockPx );
-	float rockFineFade = 1.0 - smoothstep( 0.008, 0.03, rockPx );
+	// Mid-field (about 20-150 m): gully / bench snow, bare ribs, bands.
+	float rockMid = smoothstep( 0.03, 0.06, rockPx ) * ( 1.0 - smoothstep( 0.9, 1.3, rockPx ) );
 
-	// Normal offset (world space, projected onto the surface at the end) and crack / tone accumulators.
+	// Shared noise, one filtered fetch per scale (implicit LOD: keep these in uniform control flow).
+	// F1 (2.5 m): x joint warp, y mottling, z wind scour, w snow noise.
+	vec4 rockF1 = rockTex( rockP * 0.4 + vec3( 9.0, 2.0, -4.0 ) );
+	// F2 (fall-line stretched, 0.45 m x 6 m): x varnish, y varnish break, z meltwater streak, w snow runnels.
+	vec4 rockF2 = rockTex( vec3( ( rockP.x + rockP.z ) * 2.2, rockP.y * 0.16, ( rockP.x - rockP.z ) * 2.2 ) + 17.0 );
+	// F3 (0.45 m): x snow-edge break-up, y sastrugi strength.
+	vec4 rockF3 = rockTex( rockP * 2.2 + 5.0 );
+
+	// Normal offset (world space, projected onto the surface at the end) and crack / tone / bevel accumulators.
 	vec3 rockOff = vec3( 0.0 );
 	float rockCrack = 0.0;
 	float rockTone = 0.0;
+	float rockBevel = 0.0;
 
 	// Joints, facets and relief fade out with distance: far rock (flanks, skirt) skips them entirely.
 	if ( rockBlockFade > 0.0 ) {
@@ -347,24 +401,27 @@ const FRAGMENT_SURFACE = /* glsl */ `
 		float rockFracZone = smoothstep( 0.3, 0.7, vRockLow.y );
 		float rockOpenAt = mix( 0.64, 0.4, rockFracZone );
 		// Low-frequency warp that bends the joint planes and varies their spacing.
-		float rockWarp = vRockLow.z - 0.5 + ( rockValue3( rockP * 0.4 + 9.0 ) - 0.5 ) * 0.05;
+		float rockWarp = vRockLow.z - 0.5 + ( rockF1.x - 0.5 ) * 0.05;
 
 		// ---- Joints: two steep sets (vertical jointing) and gently dipping sheeting joints.
-		rockJointSet( rockP, vec3( 0.86, 0.0, 0.51 ), 3.1, rockWarp * 1.6, rockOpenAt, 0.14, 1.0, rockN, rockPx, rockLineFade, rockBlockFade, rockOff, rockCrack );
+		rockJointSet( rockP, vec3( 0.86, 0.0, 0.51 ), 3.1, rockWarp * 1.6, rockOpenAt, 0.14, 1.0, rockN, rockPx, rockLineFade, rockBlockFade, rockOff, rockCrack, rockBevel );
 		#if ROCK_QUALITY > 0
-			rockJointSet( rockP, normalize( vec3( -0.47, 0.12, 0.87 ) ), 4.3, rockWarp * 1.3 + 0.37, rockOpenAt + 0.06, 0.14, 2.0, rockN, rockPx, rockLineFade, rockBlockFade, rockOff, rockCrack );
+			rockJointSet( rockP, normalize( vec3( -0.47, 0.12, 0.87 ) ), 4.3, rockWarp * 1.3 + 0.37, rockOpenAt + 0.06, 0.14, 2.0, rockN, rockPx, rockLineFade, rockBlockFade, rockOff, rockCrack, rockBevel );
 		#endif
 		{
 			// Sheeting joints only show on steep faces (on ledges they would run parallel to the surface).
 			float sheet = smoothstep( 0.86, 0.55, abs( rockN.y ) );
 			float c = 0.0;
+			float bv = 0.0;
 			vec3 o = vec3( 0.0 );
-			rockJointSet( rockP, normalize( vec3( 0.1, 0.99, -0.07 ) ), 2.3, rockWarp * 2.2, rockOpenAt + 0.26, 0.3, 3.0, rockN, rockPx, rockLineFade, rockBlockFade, o, c );
+			rockJointSet( rockP, normalize( vec3( 0.1, 0.99, -0.07 ) ), 2.3, rockWarp * 2.2, rockOpenAt + 0.26, 0.3, 3.0, rockN, rockPx, rockLineFade, rockBlockFade, o, c, bv );
 			rockOff += o * sheet;
 			rockCrack = max( rockCrack, c * sheet * 0.85 );
+			rockBevel = max( rockBevel, bv * sheet );
 		}
+		#ifndef ROCK_VERTEX_FACET
 		{
-			// Facets: irregular planar faces a few metres across, each with its own slight tilt and tone.
+			// No geometric facet ids: cellular facets a few metres across, each with its own tilt and value.
 			vec3 fId1;
 			vec3 fId2;
 			vec3 fTo;
@@ -379,8 +436,9 @@ const FRAGMENT_SURFACE = /* glsl */ `
 			// A crisp crease between facets.
 			float t = clamp( fe / 0.16, 0.0, 1.0 );
 			rockOff += fTo * ( 1.0 - t ) * ( 1.0 - t ) * 0.06 * rockBlockFade;
-			rockTone += ( rockHash13( fId1 + 3.1 ) - 0.5 ) * 0.2 * rockBlockFade;
+			rockTone += ( rockHash13( fId1 + 3.1 ) - 0.5 ) * 0.36 * rockBlockFade;
 		}
+		#endif
 
 		#if ROCK_QUALITY > 0
 			// ---- Weathered relief: ridged creases (vertical ribs) and a softer undulation.
@@ -395,6 +453,10 @@ const FRAGMENT_SURFACE = /* glsl */ `
 			}
 		#endif
 	}
+	#ifdef ROCK_VERTEX_FACET
+		// Geometric facets (terrainGeometry): every planar face has its own value at any distance.
+		rockTone += ( vRockFacet.x - 0.5 ) * 0.22;
+	#endif
 
 	#if ROCK_QUALITY > 1
 		// ---- Chips: small fracture facets close to the camera (rarely an open hairline).
@@ -414,6 +476,7 @@ const FRAGMENT_SURFACE = /* glsl */ `
 		}
 		// ---- Fine grain relief.
 		{
+			float rockFineFade = 1.0 - smoothstep( 0.008, 0.03, rockPx );
 			vec4 nf = rockNoised3( rockP * 4.3 + vec3( 1.3, -2.1, 0.7 ) );
 			rockOff -= nf.yzw * 4.3 * 0.02 * rockFineFade;
 		}
@@ -423,46 +486,73 @@ const FRAGMENT_SURFACE = /* glsl */ `
 	vec3 rockOffT = rockOff - dot( rockOff, rockN ) * rockN;
 	vec3 rockBumped = normalize( rockN + uBumpStrength * rockOffT );
 
-	// ---- Albedo.
-	float rockMacro = vRockLow.x;
-	vec3 rockAlbedo = mix( uGraniteDark, uGranite, smoothstep( 0.2, 0.55, rockMacro ) );
-	rockAlbedo = mix( rockAlbedo, uGraniteLight, smoothstep( 0.45, 0.8, rockMacro ) * 0.85 );
-	rockAlbedo *= 1.0 + rockTone;
-	float rockIron = smoothstep( 0.6, 0.85, vRockLow.w );
-	rockAlbedo = mix( rockAlbedo, uGraniteWarm, rockIron * 0.5 );
-	// Weathering mottling at a few metres.
-	rockAlbedo *= 0.86 + 0.24 * rockValue3( rockP * 0.45 + 2.0 );
-	#if ROCK_QUALITY > 1
-		// Mineral grain up close: pale feldspar and dark biotite flecks (low contrast).
-		float rockGrainFade = 1.0 - smoothstep( 0.005, 0.016, rockPx );
-		if ( rockGrainFade > 0.0 ) {
-			float rockGrainA = rockValue3( rockP * 21.0 );
-			float rockGrainB = rockValue3( rockP * 37.0 + 5.0 );
-			rockAlbedo = mix( rockAlbedo, uGraniteLight * 1.1, smoothstep( 0.68, 0.86, rockGrainA ) * 0.2 * rockGrainFade );
-			rockAlbedo *= 1.0 - smoothstep( 0.72, 0.9, rockGrainB ) * 0.22 * rockGrainFade;
-		}
-	#endif
-	// Dark water streaks running down steep faces, strongest under ledges.
+	// ---- Albedo: cool-neutral granite.
 	float rockSteep = 1.0 - abs( rockN.y );
-	float rockStreak = rockValue3( vec3( ( rockP.x + rockP.z ) * 0.55, rockP.y * 0.03, ( rockP.x - rockP.z ) * 0.55 ) );
-	rockAlbedo *= 1.0 - 0.3 * smoothstep( 0.58, 0.85, rockStreak ) * smoothstep( 0.45, 0.85, rockSteep );
-	// Worn, paler convex edges; grime and lichen in the creases.
+	float rockMacro = vRockLow.x;
+	// Broad tone stays calm (it read as blotches up close): darker and paler zones only in the tails.
+	vec3 rockAlbedo = mix( uGranite, uGraniteDark, ( 1.0 - smoothstep( 0.22, 0.48, rockMacro ) ) * 0.6 );
+	rockAlbedo = mix( rockAlbedo, uGraniteLight, smoothstep( 0.55, 0.85, rockMacro ) * 0.5 );
+	// The upper mountain's rock is darker (wet, varnished), so its snow reads.
+	rockAlbedo *= ( 1.0 + rockTone ) * ( 1.0 - 0.65 * smoothstep( 12.0, 48.0, vRockPos.y ) );
+	rockAlbedo = mix( rockAlbedo, uGraniteWarm, smoothstep( 0.6, 0.85, vRockLow.w ) * 0.3 );
+	#ifdef ROCK_VERTEX_FACET
+		// A few facets are freshly broken / oxidised: a faint warm cast.
+		rockAlbedo *= mix( vec3( 1.0 ), vec3( 1.03, 1.0, 0.97 ), vRockFacet.z );
+	#endif
+	// Weathering mottling at a few metres.
+	rockAlbedo *= 0.9 + 0.18 * rockF1.y;
+	// Varnish and meltwater streaks: narrow dark runs down the fall line on steep faces, broken along their length.
+	float rockVarnish = max(
+		smoothstep( 0.62, 0.8, rockF2.x ) * smoothstep( 0.35, 0.65, rockF2.y ),
+		smoothstep( 0.66, 0.86, rockF2.z ) * 0.7
+	) * smoothstep( 0.3, 0.8, rockSteep );
+	rockAlbedo *= 1.0 - 0.38 * rockVarnish;
+	// Worn, paler convex edges; grime in the creases.
 	rockAlbedo *= ( 1.0 + 0.3 * rockConvex ) * ( 1.0 - 0.2 * rockCavity );
+	// Mid-field: bare steep convex ribs are darker; horizontal bands break the faces.
+	float rockRib = rockMid * smoothstep( 0.15, 0.5, rockCurv ) * smoothstep( 0.35, 0.6, rockSteep );
+	float rockBandY = vRockPos.y + ( vRockLow.z - 0.5 ) * 9.0 + ( rockF1.x - 0.5 ) * 2.0;
+	float rockBandI = floor( rockBandY * ( 1.0 / 11.0 ) );
+	float rockBandF = fract( rockBandY * ( 1.0 / 11.0 ) ) * 11.0;
+	float rockBandW = mix( 1.2, 3.0, rockHash13( vec3( rockBandI, 4.0, 1.0 ) ) );
+	float rockBand = ( 1.0 - smoothstep( rockBandW - 0.4, rockBandW + 0.4, rockBandF ) ) * smoothstep( 0.0, 0.4, rockBandF );
+	rockBand *= rockMid * smoothstep( 0.38, 0.62, rockF1.z + ( rockMacro - 0.5 ) * 0.4 );
+	rockAlbedo *= ( 1.0 - 0.15 * rockRib ) * ( 1.0 - 0.18 * rockBand );
 	// Cracks: dark, not black.
 	rockAlbedo *= 1.0 - 0.55 * rockCrack;
 
-	// ---- Snow: up-facing (after the facet tilt), more with altitude, broken up by noise.
-	float rockSnowNoise = vRockSnowLow * 0.62 + rockValue3( rockP * 0.74 - 9.0 ) * 0.38;
+	// ---- Snow: up-facing (after the facet tilt), more with altitude, wind-scoured.
+	float rockSnowNoise = vRockSnowLow * 0.62 + rockF1.w * 0.38;
 	float rockAlt = smoothstep( uSnowLine - 70.0, uSnowLine + 8.0, vRockPos.y );
 	float rockUp = mix( rockN.y, rockBumped.y, 0.4 );
 	float rockSnowEdge = mix( 0.84, 0.6, rockAlt * uSnowAmount ) + ( rockSnowNoise - 0.5 ) * 0.3 - 0.12 * rockCavity + 0.16 * rockConvex;
+	// Upper mountain (and the mid-field): snow gathers in gullies and on benches; steep flanks shed it.
+	float rockHigh = smoothstep( 0.4, 0.6, rockAlt );
+	rockSnowEdge += rockHigh * ( 0.08 * ( 1.0 - rockCavity ) * ( 1.0 - smoothstep( 0.65, 0.75, rockN.y ) ) - 0.12 * smoothstep( 0.6, 1.0, rockAlt ) ) - max( rockMid, rockHigh ) * 0.18 * rockCavity;
 	// Edges soften with distance: far slopes read as a gentle gradient of cover, not a high-contrast camouflage.
 	float rockSnowSoft = clamp( rockPx * 0.8, 0.0, 0.3 );
-	float rockSnow = smoothstep( rockSnowEdge, rockSnowEdge + 0.06 + rockSnowSoft, rockUp );
-	// Coverage decides where snow lies, never how opaque it is: wind-scoured
-	// bare patches, more of them lower down and with less snow overall.
-	float rockScour = rockValue3( rockP * 0.33 + vec3( -6.0, 2.0, 4.0 ) ) * 0.7 + rockSnowNoise * 0.3;
-	rockSnow *= smoothstep( -rockSnowSoft, 0.05 + rockSnowSoft, rockScour - ( 1.0 - uSnowAmount ) * 0.9 - ( 1.0 - rockAlt ) * 0.38 + 0.1 );
+	float rockScour = rockF1.z * 0.7 + rockSnowNoise * 0.3;
+	// Wind-scoured, lobed edge (0.15-0.5 m lobes) anti-aliased to ~1.5 px: two edge-relative fields.
+	float rockBreak = 0.16 * ( rockF3.x - 0.5 );
+	float rockSnowF1 = rockUp - rockSnowEdge - 0.03 + rockBreak;
+	// High on the mountain snow also clings to steep faces in fall-line runnels (never on convex ribs).
+	float rockRunnel = smoothstep( 0.45, 0.65, rockF2.w ) * smoothstep( 0.7, 1.0, rockAlt ) * smoothstep( 0.3, 0.5, rockSteep ) * ( 1.0 - rockConvex );
+	rockSnowF1 += 0.45 * rockRunnel;
+	float rockSnowF2 = rockScour - ( 1.0 - uSnowAmount ) * 0.9 - ( 1.0 - rockAlt ) * 0.38 + 0.12 + rockBreak + 0.3 * rockRunnel;
+	float rockSnowW1 = max( 0.7 * fwidth( rockSnowF1 ), 0.2 * rockSnowSoft );
+	float rockSnowW2 = max( 0.7 * fwidth( rockSnowF2 ), 0.2 * rockSnowSoft );
+	float rockSnow = smoothstep( - rockSnowW1, rockSnowW1, rockSnowF1 ) * smoothstep( - rockSnowW2, rockSnowW2, rockSnowF2 );
+	// Thickness: a rounded 5 cm lip (height in metres; field units per metre from the derivatives), close up only.
+	float rockPxS = max( rockPx, 1e-4 );
+	float rockLip1 = max( 0.08 * fwidth( rockSnowF1 ) / rockPxS, 2.0 * rockSnowW1 );
+	float rockLip2 = max( 0.08 * fwidth( rockSnowF2 ) / rockPxS, 2.0 * rockSnowW2 );
+	float rockNear = 1.0 - smoothstep( 0.02, 0.05, rockPx );
+	float rockSnowH = 0.05 * smoothstep( 0.0, rockLip1, rockSnowF1 ) * smoothstep( 0.0, rockLip2, rockSnowF2 ) * rockNear;
+	// The rock right outside the edge is wet and shaded by the lip.
+	float rockSnowRim = ( 1.0 - rockSnow ) * smoothstep( - 3.0 * rockLip1, 0.0, rockSnowF1 ) * smoothstep( - rockLip2, 0.0, rockSnowF2 ) * ( 1.0 - smoothstep( 0.05, 0.12, rockPx ) );
+	rockAlbedo *= 1.0 - 0.3 * rockSnowRim;
+	// Bare ribs and steep bands shed snow.
+	rockSnow *= ( 1.0 - rockRib ) * ( 1.0 - rockBand * smoothstep( 0.3, 0.6, rockSteep ) );
 	// Wind-packed snow lingers in the joints of gentle slabs.
 	rockSnow = max( rockSnow, rockCrack * smoothstep( 0.55, 0.85, rockN.y ) * 0.85 * uSnowAmount );
 	#ifdef ROCK_ALL_SNOW
@@ -473,49 +563,81 @@ const FRAGMENT_SURFACE = /* glsl */ `
 		vec4 rockDrift = rockNoised3( rockP * 0.8 + 7.0 );
 		vec3 rockDriftN = normalize( rockN - ( rockDrift.yzw - dot( rockDrift.yzw, rockN ) * rockN ) * 0.8 * 0.22 );
 		rockBumped = normalize( mix( rockBumped, rockDriftN, rockSnow ) );
+		#if ROCK_QUALITY > 0
+			// Wind ripples (sastrugi): ridges elongated across the wind (~ +z), 0.25-0.6 m apart.
+			vec4 rockRip = rockNoised3( rockP * vec3( 0.7, 1.2, 3.4 ) + 3.0 );
+			vec3 rockRipG = rockRip.yzw * vec3( 0.7, 1.2, 3.4 );
+			rockBumped = normalize( rockBumped - ( rockRipG - dot( rockRipG, rockBumped ) * rockBumped ) * 0.05 * ( 0.5 + rockF3.y ) * rockSnow * rockChipFade );
+		#endif
+	}
+	{
+		// Lip bump from the snow-height field (world metres), in three's perturbNormalArb form.
+		vec3 sX = dFdx( vRockPos );
+		vec3 sY = dFdy( vRockPos );
+		float hX = dFdx( rockSnowH );
+		float hY = dFdy( rockSnowH );
+		vec3 r1 = cross( sY, rockBumped );
+		vec3 r2 = cross( rockBumped, sX );
+		float det = dot( sX, r1 );
+		vec3 g = sign( det ) * ( hX * r1 + hY * r2 );
+		rockBumped = normalize( abs( det ) * rockBumped - g );
 	}
 
 	float rockSunFacing = dot( rockBumped, uRockSun );
-	vec3 rockSnowCol = mix( uSnowColor, uSnowShadow, 0.55 * ( 1.0 - smoothstep( -0.1, 0.35, rockSunFacing ) ) );
+	// Snow stays bright in shade: the sky light makes it blue, not the albedo.
+	vec3 rockSnowCol = mix( uSnowColor, uSnowShadow, 0.18 * ( 1.0 - smoothstep( -0.1, 0.35, rockSunFacing ) ) );
 	rockSnowCol *= 0.95 + 0.05 * rockSnowNoise;
+	// Alpenglow: lit snow high on the mountain takes the warm last light.
+	rockSnowCol *= mix( vec3( 1.0 ), vec3( 1.0, 0.86, 0.72 ), 0.35 * smoothstep( 20.0, 56.0, vRockPos.y ) * smoothstep( 0.0, 0.3, rockSunFacing ) );
 	diffuseColor.rgb = mix( rockAlbedo, rockSnowCol, rockSnow );
-	float rockRoughness = mix( 0.82 - 0.2 * rockTone + 0.1 * rockCrack, 0.5, rockSnow );
+	float rockRoughness = 0.82 - 0.2 * rockTone + 0.1 * rockCrack + 0.06 * rockVarnish;
+	#ifdef ROCK_VERTEX_FACET
+		rockRoughness += ( vRockFacet.y - 0.5 ) * 0.12;
+	#endif
+	rockRoughness = mix( rockRoughness, 0.68, rockSnow );
+	float rockSparkle = 0.0;
+	#if ROCK_QUALITY > 0
+	{
+		// Sparkle: pixel-sized ice facets (power-of-two cells so they do not swim) that are glassy and lean toward
+		// the sun's half vector, so only the sun's own GGX lobe flashes them: shadowed snow never sparkles.
+		float gs = exp2( ceil( log2( max( rockPx * 2.0, 0.004 ) ) ) );
+		float gh = rockHash13( floor( vRockPos / gs ) * 1.31 + 0.7 );
+		rockSparkle = step( 0.982, gh ) * smoothstep( 0.5, 0.9, rockSnow ) * ( 1.0 - smoothstep( 0.02, 0.06, rockPx ) );
+		vec3 gH = normalize( uRockSun + normalize( cameraPosition - vRockPos ) );
+		rockBumped = normalize( mix( rockBumped, gH, rockSparkle * ( 0.55 + 0.45 * fract( gh * 53.0 ) ) ) );
+		rockRoughness = mix( rockRoughness, 0.07, rockSparkle );
+	}
+	#endif
 `;
 
 const FRAGMENT_ROUGHNESS = /* glsl */ `
-	roughnessFactor = clamp( rockRoughness, 0.3, 1.0 );
+	roughnessFactor = clamp( rockRoughness, mix( 0.3, 0.05, rockSparkle ), 1.0 );
 `;
 
 const FRAGMENT_NORMAL = /* glsl */ `
 	normal = normalize( ( viewMatrix * vec4( rockBumped * faceDirection, 0.0 ) ).xyz );
 `;
 
-const FRAGMENT_EMISSIVE = /* glsl */ `
-	#if ROCK_QUALITY > 1
-		{
-			// Sparse ice-crystal glints in sunlit snow, only close to the camera.
-			vec3 rockV = normalize( cameraPosition - vRockPos );
-			float rockGlint = step( 0.994, rockHash13( floor( vRockPos * 28.0 ) ) );
-			rockGlint *= pow( max( dot( reflect( -uRockSun, rockBumped ), rockV ), 0.0 ), 40.0 );
-			rockGlint *= smoothstep( 0.0, 0.25, rockSunFacing ) * rockSnow * ( 1.0 - smoothstep( 4.0, 22.0, rockDist ) );
-			totalEmissiveRadiance += rockGlint * vec3( 1.6, 1.5, 1.35 );
-		}
-	#endif
-`;
-
 const FRAGMENT_OCCLUSION = /* glsl */ `
 	{
 		#ifdef ROCK_VERTEX_AO
-			float rockOcc = vRockAO;
+			// The ~2 m baked field stays broad occlusion; crack and bevel AO carry the detail.
+			float rockOcc = 0.4 + 0.6 * vRockAO;
 		#else
 			float rockOcc = 1.0;
 		#endif
 		rockOcc *= 1.0 - rockCrack * 0.6 * ( 1.0 - rockSnow );
 		rockOcc *= 1.0 - 0.28 * rockCavity;
+		rockOcc *= 1.0 - 0.45 * rockBevel * ( 1.0 - rockSnow );
+		rockOcc *= 1.0 - 0.4 * rockSnowRim;
 		reflectedLight.indirectDiffuse *= rockOcc;
 		reflectedLight.indirectSpecular *= rockOcc;
 		reflectedLight.directDiffuse *= mix( 1.0, rockOcc, 0.35 );
 		reflectedLight.directSpecular *= mix( 1.0, rockOcc, 0.5 );
+		#if defined( ROCK_VERTEX_SUNVIS ) && ROCK_QUALITY == 0
+			// No shadow map on this tier: the baked visibility toward the climb's key light stands in.
+			reflectedLight.directDiffuse *= mix( 1.0, vRockSunVis, uKeyBakeWeight );
+		#endif
 	}
 `;
 
@@ -535,30 +657,34 @@ function inject(source: string, anchor: string, addition: string, before = false
 /**
  * Creates the procedural granite / snow material. Uniforms live on
  * `material.userData.rockUniforms` and can be changed at any time.
- * The caller owns the material and must `dispose()` it.
+ * The caller owns the material and must `dispose()` it (the shared noise
+ * texture is never disposed with it).
  */
 export function createAlpineRockMaterial(options: AlpineRockMaterialOptions = {}): AlpineRockMaterial {
   const quality: RockShaderQuality = options.quality ?? 2;
   const vertexOcclusion = options.vertexOcclusion ?? false;
   const vertexCurvature = options.vertexCurvature ?? false;
   const allSnow = options.allSnow ?? false;
+  const vertexFacet = options.vertexFacet ?? false;
+  const vertexSunVis = options.vertexSunVis ?? false;
 
   const uniforms: AlpineRockUniforms = {
-    uRockSun: { value: (options.sunDirection ?? SUN_DIRECTION).clone().normalize() },
+    uRockSun: { value: options.sunDirection ? options.sunDirection.clone().normalize() : keyLight.direction },
     uSnowAmount: { value: options.snowAmount ?? 0.85 },
     uSnowLine: { value: options.snowLine ?? 46 },
     uBumpStrength: { value: options.bumpStrength ?? 1.0 },
     uPatternScale: { value: options.patternScale ?? 1 },
     uReveal: { value: 1 },
-    // The palette swatches are display colours for a shaded face; as albedo
-    // they are lifted so granite reads as the pale, crisp rock it is under a
-    // low sun, with a light feldspar grey for the bright zones.
-    uGranite: { value: new THREE.Color(PALETTE.granite).multiplyScalar(2.7) },
-    uGraniteDark: { value: new THREE.Color(PALETTE.graniteDark).multiplyScalar(2.6) },
-    uGraniteLight: { value: new THREE.Color('#ABA79F') },
-    uGraniteWarm: { value: new THREE.Color('#8C6A50') },
-    uSnowColor: { value: new THREE.Color(PALETTE.snow) },
-    uSnowShadow: { value: new THREE.Color(PALETTE.snowShadow) },
+    // Cool-neutral alpine granite (the sky light adds the blue, the key light the warmth); these are albedos,
+    // not the PALETTE display swatches the horizon range and sky use.
+    uGranite: { value: new THREE.Color('#8A8C8E') },
+    uGraniteDark: { value: new THREE.Color('#56585B') },
+    uGraniteLight: { value: new THREE.Color('#B1B0AC') },
+    uGraniteWarm: { value: new THREE.Color('#7A6352') },
+    uSnowColor: { value: new THREE.Color('#F0F3F7') },
+    uSnowShadow: { value: new THREE.Color('#A9BAD2') },
+    uRockNoise: { value: getRockNoiseTexture() },
+    uKeyBakeWeight: keyLight.bakeWeight,
   };
 
   const material = new THREE.MeshStandardMaterial({
@@ -574,6 +700,8 @@ export function createAlpineRockMaterial(options: AlpineRockMaterialOptions = {}
     ...(vertexOcclusion ? { ROCK_VERTEX_AO: '' } : {}),
     ...(vertexCurvature ? { ROCK_VERTEX_CURVATURE: '' } : {}),
     ...(allSnow ? { ROCK_ALL_SNOW: '' } : {}),
+    ...(vertexFacet ? { ROCK_VERTEX_FACET: '' } : {}),
+    ...(vertexSunVis ? { ROCK_VERTEX_SUNVIS: '' } : {}),
   };
 
   material.onBeforeCompile = (shader) => {
@@ -588,13 +716,12 @@ export function createAlpineRockMaterial(options: AlpineRockMaterialOptions = {}
     fs = inject(fs, '#include <color_fragment>', FRAGMENT_SURFACE);
     fs = inject(fs, '#include <roughnessmap_fragment>', FRAGMENT_ROUGHNESS);
     fs = inject(fs, '#include <normal_fragment_maps>', FRAGMENT_NORMAL);
-    fs = inject(fs, '#include <emissivemap_fragment>', FRAGMENT_EMISSIVE);
     fs = inject(fs, '#include <aomap_fragment>', FRAGMENT_OCCLUSION);
     fs = inject(fs, '#include <fog_fragment>', FRAGMENT_REVEAL);
     shader.fragmentShader = fs;
   };
 
-  const cacheKey = `alpine-rock-v3|q${quality}|ao${vertexOcclusion ? 1 : 0}|cv${vertexCurvature ? 1 : 0}|snow${allSnow ? 1 : 0}`;
+  const cacheKey = `alpine-rock-v4|q${quality}|ao${vertexOcclusion ? 1 : 0}|cv${vertexCurvature ? 1 : 0}|fa${vertexFacet ? 1 : 0}|sv${vertexSunVis ? 1 : 0}|snow${allSnow ? 1 : 0}`;
   material.customProgramCacheKey = () => cacheKey;
   return material;
 }

@@ -3,11 +3,17 @@ import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import { scrollStore, smoothstep } from '../../store/scrollStore';
 import { protagonistPositionAt } from '../protagonistPath';
+import { keyBakeWeightAt, keyDirectionAt, keyLight } from './keyLight';
 import { PALETTE, SUN_DIRECTION } from './worldLayout';
 
 /* ==========================================================================
  * World lighting — golden-hour sun, sky/ground hemisphere, a cool low fill
  * and a procedural (PMREM) sky environment for PBR reflections.
+ *
+ * The sun light is the key light (keyLight.ts): SUN_DIRECTION swung toward
+ * the south during the climb so the faces the camera sees are raked by it;
+ * keyLight.direction is written here every frame and shared by the rock
+ * material. The sky, horizon, clouds and chasm effects keep SUN_DIRECTION.
  *
  * The sun's shadow camera follows the region the camera is looking at: every
  * frame the light and its target are re-centred on a focus point ahead of the
@@ -18,33 +24,35 @@ import { PALETTE, SUN_DIRECTION } from './worldLayout';
 
 const { damp } = THREE.MathUtils;
 
-/** Distance from the focus point back to the sun light (along SUN_DIRECTION). */
+/** Distance from the focus point back to the sun light (along the key direction). */
 const SUN_DISTANCE = 150;
-const SUN_INTENSITY = 4.6;
-const HEMI_INTENSITY = 4.4;
-const FILL_INTENSITY = 2.1;
-const ENV_INTENSITY = 0.7;
+const SUN_INTENSITY = 5.0;
+const HEMI_INTENSITY = 3.2;
+const FILL_INTENSITY = 1.1;
+const ENV_INTENSITY = 1.0;
+/** Key-light colour: a warm golden-hour white (PALETTE.sun stays the sky's sun disc). */
+const SUN_COLOR = '#FFE0BE';
 
-/** Cool fill from the side opposite the sun, low over the horizon (sky bounce: blue, but not navy). */
-const FILL_COLOR = '#8EA2C6';
-/** Sky half of the hemisphere light: the palette sky blue, less saturated so shaded granite stays grey. */
-const HEMI_SKY = new THREE.Color(PALETTE.hemisphereSky).lerp(new THREE.Color('#C4C8CF'), 0.45);
-/** Ground half: the palette's dark valley tone lifted by warm bounce off sunlit snow and rock. */
-const HEMI_GROUND = new THREE.Color(PALETTE.hemisphereGround).lerp(new THREE.Color('#6E625A'), 0.45);
-const FILL_DIRECTION = new THREE.Vector3(-SUN_DIRECTION.x, 0.32, -SUN_DIRECTION.z + 0.2).normalize();
-
-const SUN_START = SUN_DIRECTION.clone().multiplyScalar(SUN_DISTANCE);
-const FILL_START = FILL_DIRECTION.clone().multiplyScalar(SUN_DISTANCE);
+/** Cool fill: sky bounce from high on the side opposite the key (reveals form instead of flattening it). */
+const FILL_COLOR = '#9FB2D0';
+/** Sky half of the hemisphere light: a soft sky blue, so shade is cool but granite stays grey. */
+const HEMI_SKY = new THREE.Color('#B4C0D2');
+/** Ground half: warm bounce off sunlit rock and snow. */
+const HEMI_GROUND = new THREE.Color('#5E5148');
+const KEY_START = keyDirectionAt(0, new THREE.Vector3());
+/** Fill: a high sky bounce from the side opposite the key (written into `out`, no allocation). */
+function fillDirectionFor(key: THREE.Vector3, out: THREE.Vector3): THREE.Vector3 {
+  return out.set(-key.x, 0.75, -key.z).normalize();
+}
+const SUN_START = KEY_START.clone().multiplyScalar(SUN_DISTANCE);
+const FILL_START = fillDirectionFor(KEY_START, new THREE.Vector3()).multiplyScalar(SUN_DISTANCE);
 
 /** Route samples used to judge how far the camera is from the action. */
 const ROUTE_SAMPLES: readonly THREE.Vector3[] = Array.from({ length: 64 }, (_, i) =>
   protagonistPositionAt(0.26 + (0.54 * i) / 63, new THREE.Vector3()),
 );
 
-/* Light-space basis matching three's DirectionalLightShadow lookAt (up = +Y). */
-const LIGHT_Z = SUN_DIRECTION.clone().normalize();
-const LIGHT_X = new THREE.Vector3(0, 1, 0).cross(LIGHT_Z).normalize();
-const LIGHT_Y = LIGHT_Z.clone().cross(LIGHT_X).normalize();
+const UP = new THREE.Vector3(0, 1, 0);
 
 const ENV_VERTEX = /* glsl */ `
 varying vec3 vDir;
@@ -127,7 +135,11 @@ export function WorldLighting(): JSX.Element {
       desired: new THREE.Vector3(),
       focus: new THREE.Vector3(),
       snapped: new THREE.Vector3(),
-      sunColor: new THREE.Color(PALETTE.sun),
+      /* Light-space basis matching three's DirectionalLightShadow lookAt (up = +Y), rebuilt from the key each frame. */
+      lightX: new THREE.Vector3(),
+      lightY: new THREE.Vector3(),
+      fillDir: new THREE.Vector3(),
+      sunColor: new THREE.Color(SUN_COLOR),
       warm: new THREE.Color('#FFC890'),
       tmpColor: new THREE.Color(),
     }),
@@ -175,7 +187,13 @@ export function WorldLighting(): JSX.Element {
     const light = sun.current;
     if (!light) return;
     const s = state.current;
-    const { forward, desired, focus, snapped } = scratch;
+    const { forward, desired, focus, snapped, lightX, lightY } = scratch;
+    const p = scrollStore.dampedProgress;
+    const key = keyLight.direction;
+    keyDirectionAt(p, key);
+    keyLight.bakeWeight.value = keyBakeWeightAt(p);
+    lightX.crossVectors(UP, key).normalize();
+    lightY.crossVectors(key, lightX);
 
     // How far the camera is from the climb decides focus distance and box size.
     let nearest = Infinity;
@@ -185,7 +203,9 @@ export function WorldLighting(): JSX.Element {
     }
     nearest = Math.sqrt(nearest);
     const focusDistance = THREE.MathUtils.clamp(nearest * 0.85, 7, 60);
-    const sizeTarget = THREE.MathUtils.clamp(16 + nearest * 0.6, 24, 64);
+    // Close to the route (base camp: cameras 9-14 out) the box may shrink to 16 for finer shadow texels.
+    const sizeFloor = 16 + 8 * smoothstep(8, 12, nearest);
+    const sizeTarget = THREE.MathUtils.clamp(16 + nearest * 0.6, sizeFloor, 64);
 
     camera.getWorldDirection(forward);
     desired.copy(camera.position).addScaledVector(forward, focusDistance);
@@ -215,17 +235,16 @@ export function WorldLighting(): JSX.Element {
 
     // Snap the centre to whole shadow texels in light space.
     const texel = (applied * 2) / light.shadow.mapSize.x;
-    const u = Math.round(focus.dot(LIGHT_X) / texel) * texel;
-    const v = Math.round(focus.dot(LIGHT_Y) / texel) * texel;
-    const w = Math.round(focus.dot(LIGHT_Z) / texel) * texel;
-    snapped.set(0, 0, 0).addScaledVector(LIGHT_X, u).addScaledVector(LIGHT_Y, v).addScaledVector(LIGHT_Z, w);
+    const u = Math.round(focus.dot(lightX) / texel) * texel;
+    const v = Math.round(focus.dot(lightY) / texel) * texel;
+    const w = Math.round(focus.dot(key) / texel) * texel;
+    snapped.set(0, 0, 0).addScaledVector(lightX, u).addScaledVector(lightY, v).addScaledVector(key, w);
 
     sunTarget.position.copy(snapped);
     sunTarget.updateMatrixWorld();
-    light.position.copy(snapped).addScaledVector(LIGHT_Z, SUN_DISTANCE);
+    light.position.copy(snapped).addScaledVector(key, SUN_DISTANCE);
 
     // Golden hour deepens slightly as the climb nears the summit.
-    const p = scrollStore.dampedProgress;
     const summitGlow = smoothstep(0.62, 0.86, p);
     s.intensity = damp(s.intensity, SUN_INTENSITY * (1 + 0.12 * summitGlow), 2, delta);
     light.intensity = s.intensity;
@@ -238,7 +257,7 @@ export function WorldLighting(): JSX.Element {
     if (fillLight) {
       fillTarget.position.copy(snapped);
       fillTarget.updateMatrixWorld();
-      fillLight.position.copy(snapped).addScaledVector(FILL_DIRECTION, SUN_DISTANCE);
+      fillLight.position.copy(snapped).addScaledVector(fillDirectionFor(key, scratch.fillDir), SUN_DISTANCE);
     }
   });
 
@@ -248,7 +267,7 @@ export function WorldLighting(): JSX.Element {
       <primitive object={fillTarget} />
       <directionalLight
         ref={sun}
-        color={PALETTE.sun}
+        color={SUN_COLOR}
         intensity={SUN_INTENSITY}
         position={SUN_START}
         castShadow={shadows}

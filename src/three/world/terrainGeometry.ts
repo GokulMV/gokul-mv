@@ -32,8 +32,12 @@ import { PATH_PHASES, WAYPOINTS, protagonistPositionAt } from '../protagonistPat
  * one where they overlap. Beyond the massif the ground heightfield continues as
  * a graded-resolution skirt mesh. Vertices close to the route are projected
  * onto the exact iso-surface. Ambient occlusion and curvature (cavity) are
- * baked per vertex. Deterministic (fixed seeds); built once per detail level,
- * optionally time-sliced.
+ * baked per vertex; then each fine vertex takes the exact normal and the id of
+ * the fracture plane that shapes it, so the facets shade flat with straight
+ * creases at the mesh's resolution (in the climb corridor, where the rock must
+ * stay where the animator plants hands and feet, the facets of the shared
+ * corridor chip lattice shade the uncut rock). Deterministic (fixed seeds);
+ * built once per detail level, optionally time-sliced.
  * ========================================================================== */
 
 export type TerrainDetail = 'high' | 'medium' | 'low';
@@ -42,9 +46,16 @@ export interface TerrainPiece {
   /** Stable name, e.g. `massif-1-0-2`, `flank-0-1-1` or `skirt`. */
   name: string;
   /**
-   * World-space, indexed geometry with `position`, `normal`, `aOcclusion`
-   * (0..1, baked ambient occlusion) and `aCurvature` (-1..1: negative in
-   * creases and hollows, positive on convex edges).
+   * World-space, indexed geometry with `position`, `normal` (unit length; on
+   * the massif pieces the exact gradient of the fracture plane that shapes the
+   * vertex where one does and it lies within 45° of the area-weighted normal —
+   * in the climb corridor, where the rock is kept uncut for the animator's
+   * holds, the plane a corridor chip would cut there, within 30° — else the
+   * area-weighted normal), `aOcclusion` (0.2..1, baked ambient occlusion),
+   * `aCurvature` (-1..1: negative in creases and hollows, positive on convex
+   * edges; both baked with the area-weighted normals) and `aFacet` ([0, 1): one
+   * hashed id per facet — the shading plane's cell, or a 2.5-unit lattice cell
+   * where no plane shapes the rock).
    */
   geometry: THREE.BufferGeometry;
   /** massif = fine climb detail, flank = coarse outer massif, skirt = far heightfield. */
@@ -585,7 +596,9 @@ function baseCampTopY(x: number, z: number): number {
   const ez = (z - CAMP_CZ) / CAMP_AZ;
   const el = Math.sqrt(ex * ex + ez * ez);
   const rim = smoothstep(0.72, 0.97, el) * (0.12 + 0.34 * (0.5 + 0.5 * noise2(x * 0.6 + 3.3, z * 0.6 - 1.1)));
-  return SY.baseCamp + flat * (0.1 * noise2(x * 0.38 + 4, z * 0.38) + rim);
+  // A little relief outside the 1.6 disc kept flat for the feet and the gear-up (the chips facet it).
+  const relief = 0.06 * noise2(x * 1.3 + 7, z * 1.3 - 2) * smoothstep(1.6, 3.0, dStand);
+  return SY.baseCamp + flat * (0.1 * noise2(x * 0.38 + 4, z * 0.38) + rim) + relief;
 }
 
 function baseCampSdf(x: number, y: number, z: number): number {
@@ -822,8 +835,27 @@ const STAND_SPOTS: readonly StandSpot[] = [
   { x: WAYPOINTS.summit[0], y: SY.summit, z: WAYPOINTS.summit[2] },
 ];
 
-/** 0 → no displacement (standing spots), ~0.2 along climbing lines, 1 → full detail. */
-function detailMask(x: number, y: number, z: number): number {
+/**
+ * Horizontal distances of the last point passed to routeStandDistances: to the
+ * climb route (at the point's height) and to the nearest standing spot (within
+ * its height band). Module scratch, so asking costs no allocation.
+ */
+const DIST = { route: 1e9, stand: 1e9 };
+let distX = Number.NaN;
+let distY = Number.NaN;
+let distZ = Number.NaN;
+
+/**
+ * Fills DIST for (x, y, z). Memoised on the last point (exact equality): one
+ * field evaluation asks for the same point several times (the displacement
+ * mask and every chip grid), and nested evaluations elsewhere only cost a
+ * recomputation.
+ */
+function routeStandDistances(x: number, y: number, z: number): void {
+  if (x === distX && y === distY && z === distZ) return;
+  distX = x;
+  distY = y;
+  distZ = z;
   let dRoute = 1e9;
   if (y > -1.5 && y < 19.5) {
     const dx = x - routeX(ROUTE_ASCENT, y);
@@ -851,8 +883,15 @@ function detailMask(x: number, y: number, z: number): number {
       if (d < dStand) dStand = d;
     }
   }
-  const routeAmp = 0.14 + 0.86 * smoothstep(0.9, 3.0, dRoute);
-  const standAmp = smoothstep(0.9, 2.6, dStand);
+  DIST.route = dRoute;
+  DIST.stand = dStand;
+}
+
+/** 0 → no displacement (standing spots), ~0.2 along climbing lines, 1 → full detail. */
+function detailMask(x: number, y: number, z: number): number {
+  routeStandDistances(x, y, z);
+  const routeAmp = 0.14 + 0.86 * smoothstep(0.9, 3.0, DIST.route);
+  const standAmp = smoothstep(0.9, 2.6, DIST.stand);
   return Math.min(routeAmp, standAmp);
 }
 
@@ -1039,11 +1078,13 @@ function composeField(g: number, x: number, y: number, z: number, fine: boolean)
  * piecewise planar: flat facets, sharp convex edges and steep little steps
  * where a deeper facet meets a shallower one, never deeper than the spec's
  * `cut`. Two octaves: slabs (~4.5 units) and chips (~2 units) cut into the
- * slabs. Chips only ever remove rock; they are suppressed along the route and
- * at the standing spots (detailMask) and faded out by a region function — the
- * fine pass fades them out toward the edge of the detail domain, the coarse
- * pass only carries slabs well outside it, so the two surfaces always meet
- * uncut at the seam.
+ * slabs. Chips only ever remove rock. Slabs are suppressed along the route and
+ * at the standing spots (detailMask); the small chips reach to within 1.25 of
+ * the route and 0.9 of a standing spot, and within 2.4 of the route they come
+ * from one corridor grid shared by every detail level. All are faded out by a
+ * region function — the fine pass fades them out toward the edge of the detail
+ * domain, the coarse pass only carries slabs well outside it, so the two
+ * surfaces always meet uncut at the seam.
  * ========================================================================== */
 
 interface ChipSpec {
@@ -1072,6 +1113,32 @@ const SLAB_CHIPS = { cut: 1.1, tilt: 0.34, fallLine: 0.7, depth0: 0.24, depth1: 
 const SMALL_CHIPS = { cut: 0.5, tilt: 0.36, fallLine: 0.45, depth0: 0.09, depth1: 0.12 } as const;
 /** Slab cells are this many times the size of the small chips. */
 const SLAB_SCALE = 2.6;
+/**
+ * Cell size of the chips in the route corridor, the same for every detail
+ * level: the animator places hands and feet on mountainSdf (the high field),
+ * so the rock under them is cut from one lattice on every tier.
+ */
+const CORRIDOR_CHIP_SIZE = 1.7;
+/** The corridor chips hand over to the detail level's own chips between these distances from the route. */
+const CORRIDOR_IN = 1.8;
+const CORRIDOR_OUT = 2.4;
+/**
+ * Small chips fade in between these distances from the route. The animator plants hands and feet on the
+ * rock 0.15-1.45 from the route (median 0.7), so the rock there stays where it holds them.
+ */
+const CHIP_ROUTE_IN = 1.25;
+const CHIP_ROUTE_FULL = 1.8;
+
+/**
+ * How a grid's cut fades near the climb. Slabs follow the displacement mask
+ * (a slab could push the wall past the climbable 1.6); small chips only remove
+ * rock and come within 1.25 of the route and 0.9 of a standing spot, split
+ * between the detail level's grid (outside the corridor) and the shared
+ * corridor grid (inside it).
+ */
+const CHIP_MODE_SLAB = 0;
+const CHIP_MODE_TIER = 1;
+const CHIP_MODE_CORRIDOR = 2;
 
 /** Steepness of a plane's fall-off past its cell's bisector (per cell size). */
 const CHIP_PENALTY = 1.1;
@@ -1097,6 +1164,8 @@ interface ChipGrid {
   /** Half-width of the band around the surface in which the cut is evaluated. */
   band: number;
   salt: number;
+  /** CHIP_MODE_*: how the cut fades near the route and the standing spots. */
+  mode: number;
   /**
    * Scratch for chipField, per grid: fitting a plane lazily evaluates the base
    * field, which may run another grid's chipField in the middle of this one.
@@ -1114,7 +1183,7 @@ function hash3i(i: number, j: number, k: number, salt: number): number {
   return (h >>> 0) / 4294967296;
 }
 
-function createChipGrid(box: Box, spec: ChipSpec, base: ScalarField, region: ScalarField, band: number, salt: number): ChipGrid {
+function createChipGrid(box: Box, spec: ChipSpec, base: ScalarField, region: ScalarField, band: number, salt: number, mode: number): ChipGrid {
   const size = spec.size;
   const pad = 2;
   const x0 = box.x0 - pad * size;
@@ -1125,7 +1194,7 @@ function createChipGrid(box: Box, spec: ChipSpec, base: ScalarField, region: Sca
   const nz = Math.ceil((box.z1 - box.z0) / size) + 2 * pad;
   // Cells are filled lazily (a NaN centre = not yet jittered), so creating a grid costs one allocation.
   const data = new Float32Array(nx * ny * nz * CHIP_STRIDE).fill(Number.NaN);
-  return { spec, x0, y0, z0, nx, ny, nz, data, base, region, band, salt, r2: new Float64Array(27), ids: new Int32Array(27) };
+  return { spec, x0, y0, z0, nx, ny, nz, data, base, region, band, salt, mode, r2: new Float64Array(27), ids: new Int32Array(27) };
 }
 
 /** Fits (once) the cutting plane of a cell; false when the cell carries no chip. */
@@ -1218,21 +1287,32 @@ function chipPlane(g: ChipGrid, cell: number): boolean {
   return true;
 }
 
-/** The field `f` (uncut, at x, y, z) with the grid's facets cut into it. */
-function chipField(g: ChipGrid, x: number, y: number, z: number, f: number): number {
-  // Far from the surface the cut cannot change the sign of the field at any
-  // grid point next to a crossing, so only a band around the surface is cut.
-  if (f > g.band || f < -(g.spec.cut + g.band)) return f;
+/**
+ * The fracture plane that produced the last value of a chipped field: `plane`
+ * is 1 when a facet plane is the surface there (0 when the uncut or capped
+ * surface is), with the plane's exact unit gradient and its facet id in
+ * [0, 1). Module scratch, valid right after an evaluation of a field built by
+ * fineChippedField / coarseChippedField; the outermost winning grid (a chip
+ * over a slab) sets it.
+ */
+const CHIP_WIN = { plane: 0, nx: 0, ny: 0, nz: 0, id: 0 };
+
+/** Grid cells of the winning plane and of the nearest centre at the last chipEnvelope call (read right after it). */
+const ENV = { best: -1, near: -1 };
+
+/**
+ * Upper envelope of the grid's facet planes at a point: the max over the 27
+ * nearby cells of each cell's plane minus its bisector penalty, fitting planes
+ * lazily (which evaluates the base field). -Infinity when no nearby cell
+ * carries a plane or the point lies outside the grid. Fills ENV.
+ */
+function chipEnvelope(g: ChipGrid, x: number, y: number, z: number): number {
   const s = g.spec.size;
-  const region = g.region(x, y, z);
-  if (region <= 0) return f;
-  const amount = smoothstep(0.25, 0.65, detailMask(x, y, z)) * region;
-  if (amount <= 0) return f;
   const ci = Math.floor((x - g.x0) / s);
   const cj = Math.floor((y - g.y0) / s);
   const ck = Math.floor((z - g.z0) / s);
   // The grid is padded by two cells around its box, and every region lies inside the box.
-  if (ci < 1 || cj < 1 || ck < 1 || ci > g.nx - 2 || cj > g.ny - 2 || ck > g.nz - 2) return f;
+  if (ci < 1 || cj < 1 || ck < 1 || ci > g.nx - 2 || cj > g.ny - 2 || ck > g.nz - 2) return -Infinity;
   const d = g.data;
   // Squared distances to the 27 candidate centres; the nearest defines the bisector penalties.
   const r2 = g.r2;
@@ -1241,6 +1321,7 @@ function chipField(g: ChipGrid, x: number, y: number, z: number, f: number): num
   const sz = g.nx * g.ny;
   let n = 0;
   let near2 = Infinity;
+  let nearIdx = 0;
   for (let k = ck - 1; k <= ck + 1; k += 1) {
     for (let j = cj - 1; j <= cj + 1; j += 1) {
       const row = sy * j + sz * k;
@@ -1259,14 +1340,18 @@ function chipField(g: ChipGrid, x: number, y: number, z: number, f: number): num
         const dd = dx * dx + dy * dy + dz * dz;
         ids[n] = cell;
         r2[n] = dd;
+        if (dd < near2) {
+          near2 = dd;
+          nearIdx = n;
+        }
         n += 1;
-        if (dd < near2) near2 = dd;
       }
     }
   }
   const slope = CHIP_PENALTY / s;
   const reach = 2.5 + g.spec.cut;
   let cut = -Infinity;
+  let bestIdx = -1;
   for (let m = 0; m < 27; m += 1) {
     const penalty = slope * (r2[m] - near2);
     // Planes penalised this much sit far below the nearest facet wherever the cut can reach;
@@ -1277,10 +1362,74 @@ function chipField(g: ChipGrid, x: number, y: number, z: number, f: number): num
     const state = d[o + 7];
     if (state === 1 || (state !== 2 && !chipPlane(g, cell))) continue;
     const plane = d[o + 3] * x + d[o + 4] * y + d[o + 5] * z + d[o + 6] - penalty;
-    if (plane > cut) cut = plane;
+    if (plane > cut) {
+      cut = plane;
+      bestIdx = m;
+    }
   }
+  ENV.best = bestIdx >= 0 ? ids[bestIdx] : -1;
+  ENV.near = ids[nearIdx];
+  return cut;
+}
+
+/**
+ * Sets CHIP_WIN to the envelope plane of cell `best` (nearest centre `near`):
+ * plane = m·p + d - slope (|p - c_best|² - |p - c_near|²), whose exact gradient
+ * is m - 2 slope (c_near - c_best).
+ */
+function setChipWin(g: ChipGrid, best: number, near: number): void {
+  const d = g.data;
+  const ob = best * CHIP_STRIDE;
+  const on = near * CHIP_STRIDE;
+  const k = (2 * CHIP_PENALTY) / g.spec.size;
+  const gx = d[ob + 3] - k * (d[on] - d[ob]);
+  const gy = d[ob + 4] - k * (d[on + 1] - d[ob + 1]);
+  const gz = d[ob + 5] - k * (d[on + 2] - d[ob + 2]);
+  const gl = Math.sqrt(gx * gx + gy * gy + gz * gz) || 1;
+  CHIP_WIN.plane = 1;
+  CHIP_WIN.nx = gx / gl;
+  CHIP_WIN.ny = gy / gl;
+  CHIP_WIN.nz = gz / gl;
+  CHIP_WIN.id = hash3i(best, 0, 0, g.salt + 31);
+}
+
+/** The field `f` (uncut, at x, y, z) with the grid's facets cut into it. */
+function chipField(g: ChipGrid, x: number, y: number, z: number, f: number): number {
+  // Far from the surface the cut cannot change the sign of the field at any
+  // grid point next to a crossing, so only a band around the surface is cut.
+  if (f > g.band || f < -(g.spec.cut + g.band)) return f;
+  const region = g.region(x, y, z);
+  if (region <= 0) return f;
+  let amount: number;
+  if (g.mode === CHIP_MODE_SLAB) {
+    amount = smoothstep(0.25, 0.65, detailMask(x, y, z)) * region;
+  } else {
+    routeStandDistances(x, y, z);
+    const split = smoothstep(CORRIDOR_IN, CORRIDOR_OUT, DIST.route);
+    amount = Math.min(smoothstep(CHIP_ROUTE_IN, CHIP_ROUTE_FULL, DIST.route), smoothstep(0.9, 1.8, DIST.stand)) * region * (g.mode === CHIP_MODE_TIER ? split : 1 - split);
+  }
+  if (amount <= 0) return f;
+  // Fitting planes evaluates the base field (which may set CHIP_WIN): keep the entry state (the
+  // winner of the grids already applied to `f`) to restore when this grid's plane does not win.
+  const winPlane = CHIP_WIN.plane;
+  const winX = CHIP_WIN.nx;
+  const winY = CHIP_WIN.ny;
+  const winZ = CHIP_WIN.nz;
+  const winId = CHIP_WIN.id;
+  const cut = chipEnvelope(g, x, y, z);
+  const cap = f + g.spec.cut * amount;
+  if (cut > f && cut <= cap) {
+    // The plane is the surface.
+    setChipWin(g, ENV.best, ENV.near);
+    return cut;
+  }
+  CHIP_WIN.plane = winPlane;
+  CHIP_WIN.nx = winX;
+  CHIP_WIN.ny = winY;
+  CHIP_WIN.nz = winZ;
+  CHIP_WIN.id = winId;
   if (cut === -Infinity) return f;
-  return Math.max(f, Math.min(cut, f + g.spec.cut * amount));
+  return Math.max(f, Math.min(cut, cap));
 }
 
 /** Fine-pass chip region: full inside the detail domain, fading out over its last few units. */
@@ -1297,19 +1446,50 @@ function chipBand(cell: number): number {
   return Math.max(1, LIPSCHITZ * cell);
 }
 
+/** A fine-pass field that can also tell the facet its corridor chips would cut where the climb keeps the rock uncut. */
+type FineField = ScalarField & {
+  /**
+   * Where the small chips are held back for the climb (hands and feet rest on the rock within ~1.5 of
+   * the route; the standing spots), sets CHIP_WIN to the facet a full corridor chip would cut at
+   * (x, y, z), whose field value is `f`, and returns true; false elsewhere or where no chip would cut.
+   * Shading only: the rock itself stays where the animator holds it.
+   */
+  corridorFacet: (x: number, y: number, z: number, f: number) => boolean;
+};
+
 /** The fine field `uncut` with slabs and chips (cell size `chip`) cut into it, exact for `cell`-sized surface nets. */
-function fineChippedField(uncut: ScalarField, chip: number, cell: number): ScalarField {
+function fineChippedField(uncut: ScalarField, chip: number, cell: number): FineField {
   const band = chipBand(cell);
-  const slabs = createChipGrid(DI, { size: chip * SLAB_SCALE, ...SLAB_CHIPS }, uncut, fineChipRegion, band + SMALL_CHIPS.cut, 100);
-  const slabbed: ScalarField = (x, y, z) => chipField(slabs, x, y, z, uncut(x, y, z));
-  const chips = createChipGrid(DI, { size: chip, ...SMALL_CHIPS }, slabbed, fineChipRegion, band, 200);
-  return (x, y, z) => chipField(chips, x, y, z, slabbed(x, y, z));
+  const slabs = createChipGrid(DI, { size: chip * SLAB_SCALE, ...SLAB_CHIPS }, uncut, fineChipRegion, band + SMALL_CHIPS.cut, 100, CHIP_MODE_SLAB);
+  const slabbed: ScalarField = (x, y, z) => {
+    const u = uncut(x, y, z);
+    CHIP_WIN.plane = 0;
+    return chipField(slabs, x, y, z, u);
+  };
+  // The tier's chips and the shared corridor chips have complementary amounts, so together they
+  // never cut deeper than one small chip (the slab band above allows for one).
+  const chips = createChipGrid(DI, { size: chip, ...SMALL_CHIPS }, slabbed, fineChipRegion, band, 200, CHIP_MODE_TIER);
+  const corridor = createChipGrid(DI, { size: CORRIDOR_CHIP_SIZE, ...SMALL_CHIPS }, uncut, fineChipRegion, band, 200, CHIP_MODE_CORRIDOR);
+  const field: ScalarField = (x, y, z) => chipField(corridor, x, y, z, chipField(chips, x, y, z, slabbed(x, y, z)));
+  const corridorFacet = (x: number, y: number, z: number, f: number): boolean => {
+    routeStandDistances(x, y, z);
+    if ((DIST.route >= CHIP_ROUTE_FULL && DIST.stand >= 1.8) || fineChipRegion(x, y, z) <= 0) return false;
+    const cut = chipEnvelope(corridor, x, y, z);
+    if (!(cut > f && cut <= f + SMALL_CHIPS.cut)) return false;
+    setChipWin(corridor, ENV.best, ENV.near);
+    return true;
+  };
+  return Object.assign(field, { corridorFacet });
 }
 
 /** The coarse field `uncut` with slabs (cell size `chip` × SLAB_SCALE) cut into it outside the detail domain. */
 function coarseChippedField(uncut: ScalarField, chip: number, cell: number): ScalarField {
-  const slabs = createChipGrid(DO, { size: chip * SLAB_SCALE, ...SLAB_CHIPS }, uncut, coarseChipRegion, chipBand(cell), 300);
-  return (x, y, z) => chipField(slabs, x, y, z, uncut(x, y, z));
+  const slabs = createChipGrid(DO, { size: chip * SLAB_SCALE, ...SLAB_CHIPS }, uncut, coarseChipRegion, chipBand(cell), 300, CHIP_MODE_SLAB);
+  return (x, y, z) => {
+    const u = uncut(x, y, z);
+    CHIP_WIN.plane = 0;
+    return chipField(slabs, x, y, z, u);
+  };
 }
 
 let sdfField: ScalarField | null = null;
@@ -1805,6 +1985,78 @@ function* accumulateNormals(positions: Float32Array, indices: Uint32Array, norma
 }
 
 /* ==========================================================================
+ * Facet ids and facet-plane normals
+ * ========================================================================== */
+
+/** Size of the lattice whose cells give the facet id where no fracture plane shapes the rock. */
+const FACET_LATTICE = 2.5;
+
+function latticeFacet(x: number, y: number, z: number): number {
+  return hash3i(Math.floor(x / FACET_LATTICE), Math.floor(y / FACET_LATTICE), Math.floor(z / FACET_LATTICE), 977);
+}
+
+/** Lattice facet ids for every vertex (surfaces the fracture planes never shape: flanks, skirt). */
+function* latticeFacets(positions: Float32Array): Generator<void, Float32Array, void> {
+  const count = positions.length / 3;
+  const out = new Float32Array(count);
+  for (let v = 0; v < count; v += 1) {
+    out[v] = latticeFacet(positions[v * 3], positions[v * 3 + 1], positions[v * 3 + 2]);
+    if ((v & 16383) === 16383) yield;
+  }
+  return out;
+}
+
+/** Plane normals further than this (cosine) from the area-weighted normal are not used (crease vertices). */
+const FACET_NORMAL_MIN_COS = 0.7071;
+/** The same for the shading-only corridor facets (no geometric crease backs them up). */
+const CORRIDOR_FACET_MIN_COS = 0.866;
+
+/**
+ * Facet-plane vertex normals and facet ids for a fine surface: the field is
+ * evaluated once at each (final) vertex position; where a fracture plane is
+ * the surface there, its exact gradient replaces the area-weighted normal
+ * (unless they disagree by more than 45°, as at the vertices on a sharp
+ * crease) and its cell gives the facet id. Where the climb keeps the rock
+ * uncut, the facet a corridor chip would cut there shades it instead (within
+ * 30°). Elsewhere the area-weighted normal stays and the id comes from a
+ * lattice cell. `mesh.normals` must hold the area-weighted normals; they are
+ * overwritten. Returns the number of planar normals written.
+ */
+function* facetNormals(mesh: SurfaceMesh, field: FineField, facetOut: Float32Array): Generator<void, number, void> {
+  const p = mesh.positions;
+  const n = mesh.normals;
+  let planar = 0;
+  for (let v = 0; v < mesh.vertexCount; v += 1) {
+    if ((v & 4095) === 4095 || buildWork.count > WORK_QUANTUM) {
+      buildWork.count = 0;
+      yield;
+    }
+    const x = p[v * 3];
+    const y = p[v * 3 + 1];
+    const z = p[v * 3 + 2];
+    buildWork.count += 3;
+    const f = field(x, y, z);
+    let minCos = FACET_NORMAL_MIN_COS;
+    if (CHIP_WIN.plane === 0) {
+      if (!field.corridorFacet(x, y, z, f)) {
+        facetOut[v] = latticeFacet(x, y, z);
+        continue;
+      }
+      minCos = CORRIDOR_FACET_MIN_COS;
+    }
+    facetOut[v] = CHIP_WIN.id;
+    const o = v * 3;
+    if (CHIP_WIN.nx * n[o] + CHIP_WIN.ny * n[o + 1] + CHIP_WIN.nz * n[o + 2] >= minCos) {
+      n[o] = CHIP_WIN.nx;
+      n[o + 1] = CHIP_WIN.ny;
+      n[o + 2] = CHIP_WIN.nz;
+      planar += 1;
+    }
+  }
+  return planar;
+}
+
+/* ==========================================================================
  * Baked ambient occlusion from a coarse copy of the field.
  * ========================================================================== */
 
@@ -1997,6 +2249,7 @@ function* chunkSurface(
   indices: Uint32Array,
   ao: Float32Array,
   curvature: Float32Array,
+  facet: Float32Array,
   spec: ChunkSpec,
 ): Generator<void, TerrainPiece[], void> {
   const { box } = spec;
@@ -2073,6 +2326,7 @@ function* chunkSurface(
     const nor = new Float32Array(vc * 3);
     const occ = new Float32Array(vc);
     const crv = new Float32Array(vc);
+    const fac = new Float32Array(vc);
     for (let l = 0; l < vc; l += 1) {
       const g = used[l];
       pos[l * 3] = positions[g * 3];
@@ -2083,6 +2337,7 @@ function* chunkSurface(
       nor[l * 3 + 2] = normals[g * 3 + 2];
       occ[l] = ao[g];
       crv[l] = curvature[g];
+      fac[l] = facet[g];
       remap[g] = -1;
     }
     const geometry = new THREE.BufferGeometry();
@@ -2090,6 +2345,7 @@ function* chunkSurface(
     geometry.setAttribute('normal', new THREE.BufferAttribute(nor, 3));
     geometry.setAttribute('aOcclusion', new THREE.BufferAttribute(occ, 1));
     geometry.setAttribute('aCurvature', new THREE.BufferAttribute(crv, 1));
+    geometry.setAttribute('aFacet', new THREE.BufferAttribute(fac, 1));
     geometry.setIndex(new THREE.BufferAttribute(local, 1));
     geometry.computeBoundingBox();
     geometry.computeBoundingSphere();
@@ -2228,6 +2484,7 @@ function* buildSkirt(cfg: DetailConfig): Generator<void, TerrainPiece, void> {
   geometry.setAttribute('aOcclusion', new THREE.BufferAttribute(ao, 1));
   // The skirt is far away and smooth: no cavity detail.
   geometry.setAttribute('aCurvature', new THREE.BufferAttribute(new Float32Array(vertexCount), 1));
+  geometry.setAttribute('aFacet', new THREE.BufferAttribute(yield* latticeFacets(positions), 1));
   geometry.setIndex(new THREE.BufferAttribute(indices, 1));
   geometry.computeBoundingBox();
   geometry.computeBoundingSphere();
@@ -2296,7 +2553,13 @@ function* mountainBuildSteps(
   const innerCurv = yield* bakeCurvature(inner.positions, inner.normals, inner.indices, cfg.cell);
   const outerCurv = yield* bakeCurvature(outer.positions, outer.normals, outer.indices, cfg.outerCell);
 
-  const pieces = yield* chunkSurface(inner.positions, inner.normals, inner.indices, innerAo, innerCurv, {
+  // ---- Facets: the fine surface shades with its fracture planes (after the bakes, which keep the
+  // area-weighted normals); the flanks only carry lattice facet ids.
+  const innerFacet = new Float32Array(inner.vertexCount);
+  yield* facetNormals(inner, innerField, innerFacet);
+  const outerFacet = yield* latticeFacets(outer.positions);
+
+  const pieces = yield* chunkSurface(inner.positions, inner.normals, inner.indices, innerAo, innerCurv, innerFacet, {
     box: DI,
     sizeXZ: 16,
     sizeY: 28,
@@ -2310,7 +2573,7 @@ function* mountainBuildSteps(
   const op = outer.positions;
   const dropDepth = TUCK_BAND + 2 * cfg.outerCell;
   const deep = (v: number): boolean => insideDetail(op[v * 3], op[v * 3 + 1], op[v * 3 + 2]) > dropDepth;
-  const flankPieces = yield* chunkSurface(outer.positions, outer.normals, outer.indices, outerAo, outerCurv, {
+  const flankPieces = yield* chunkSurface(outer.positions, outer.normals, outer.indices, outerAo, outerCurv, outerFacet, {
     box: DO,
     sizeXZ: 34,
     sizeY: 62,
@@ -2400,9 +2663,9 @@ export function createMountainBuilder(detail: TerrainDetail): MountainBuilder {
 /**
  * Builds the whole mountain synchronously for a detail level: chunked fine
  * massif pieces, coarse flank pieces and the outer skirt. Deterministic;
- * world-space positions; normals and baked `aOcclusion` (0..1) and
- * `aCurvature` (-1..1) attributes included. Callers own and must dispose the
- * returned geometries.
+ * world-space positions; normals, baked `aOcclusion` (0.2..1), `aCurvature`
+ * (-1..1) and the `aFacet` id ([0, 1)) included (see TerrainPiece). Callers
+ * own and must dispose the returned geometries.
  */
 export function buildMountainGeometries(detail: TerrainDetail): TerrainPiece[] {
   const builder = createMountainBuilder(detail);
