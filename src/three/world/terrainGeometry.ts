@@ -930,7 +930,7 @@ function* buildGroundCache(x0: number, z0: number, h: number, nx: number, nz: nu
   const height = new Float32Array((nx + 1) * (nz + 1));
   for (let k = 0; k <= nz; k += 1) {
     for (let i = 0; i <= nx; i += 1) height[i + (nx + 1) * k] = skirtHeight(x0 + i * h, z0 + k * h);
-    if ((k & 7) === 7) yield;
+    if ((k & 3) === 3) yield;
   }
   const slope = new Float32Array((nx + 1) * (nz + 1));
   for (let k = 0; k <= nz; k += 1) {
@@ -943,6 +943,7 @@ function* buildGroundCache(x0: number, z0: number, h: number, nx: number, nz: nu
       const gz = (height[i + (nx + 1) * k1] - height[i + (nx + 1) * k0]) / ((k1 - k0) * h);
       slope[i + (nx + 1) * k] = 1 / Math.sqrt(1 + gx * gx + gz * gz);
     }
+    if ((k & 31) === 31) yield;
   }
   return { x0, z0, h, nx, nz, height, slope };
 }
@@ -1074,7 +1075,10 @@ const SLAB_SCALE = 2.6;
 
 /** Steepness of a plane's fall-off past its cell's bisector (per cell size). */
 const CHIP_PENALTY = 1.1;
-/** Per cell: jittered centre (3), plane normal (3), plane offset, state (0 unknown, 1 no chip, 2 chip). */
+/**
+ * Per cell: jittered centre (3; NaN until first used), plane normal (3), plane
+ * offset, state (NaN or 0 unknown, 1 no chip, 2 chip).
+ */
 const CHIP_STRIDE = 8;
 
 interface ChipGrid {
@@ -1119,17 +1123,8 @@ function createChipGrid(box: Box, spec: ChipSpec, base: ScalarField, region: Sca
   const nx = Math.ceil((box.x1 - box.x0) / size) + 2 * pad;
   const ny = Math.ceil((box.y1 - box.y0) / size) + 2 * pad;
   const nz = Math.ceil((box.z1 - box.z0) / size) + 2 * pad;
-  const data = new Float32Array(nx * ny * nz * CHIP_STRIDE);
-  for (let k = 0; k < nz; k += 1) {
-    for (let j = 0; j < ny; j += 1) {
-      for (let i = 0; i < nx; i += 1) {
-        const o = (i + nx * (j + ny * k)) * CHIP_STRIDE;
-        data[o] = x0 + (i + 0.1 + 0.8 * hash3i(i, j, k, salt + 1)) * size;
-        data[o + 1] = y0 + (j + 0.1 + 0.8 * hash3i(i, j, k, salt + 2)) * size;
-        data[o + 2] = z0 + (k + 0.1 + 0.8 * hash3i(i, j, k, salt + 3)) * size;
-      }
-    }
-  }
+  // Cells are filled lazily (a NaN centre = not yet jittered), so creating a grid costs one allocation.
+  const data = new Float32Array(nx * ny * nz * CHIP_STRIDE).fill(Number.NaN);
   return { spec, x0, y0, z0, nx, ny, nz, data, base, region, band, salt, r2: new Float64Array(27), ids: new Int32Array(27) };
 }
 
@@ -1138,10 +1133,11 @@ function chipPlane(g: ChipGrid, cell: number): boolean {
   const d = g.data;
   const o = cell * CHIP_STRIDE;
   const state = d[o + 7];
-  if (state !== 0) return state === 2;
+  if (state === 1 || state === 2) return state === 2;
   const cx = d[o];
   const cy = d[o + 1];
   const cz = d[o + 2];
+  buildWork.count += 15;
   const f = g.base(cx, cy, cz);
   if (Math.abs(f) > 0.8 * g.spec.size) {
     d[o + 7] = 1;
@@ -1251,6 +1247,12 @@ function chipField(g: ChipGrid, x: number, y: number, z: number, f: number): num
       for (let i = ci - 1; i <= ci + 1; i += 1) {
         const cell = i + row;
         const o = cell * CHIP_STRIDE;
+        if (d[o] !== d[o]) {
+          d[o] = g.x0 + (i + 0.1 + 0.8 * hash3i(i, j, k, g.salt + 1)) * s;
+          d[o + 1] = g.y0 + (j + 0.1 + 0.8 * hash3i(i, j, k, g.salt + 2)) * s;
+          d[o + 2] = g.z0 + (k + 0.1 + 0.8 * hash3i(i, j, k, g.salt + 3)) * s;
+          d[o + 7] = 0;
+        }
         const dx = x - d[o];
         const dy = y - d[o + 1];
         const dz = z - d[o + 2];
@@ -1273,7 +1275,7 @@ function chipField(g: ChipGrid, x: number, y: number, z: number, f: number): num
     const cell = ids[m];
     const o = cell * CHIP_STRIDE;
     const state = d[o + 7];
-    if (state === 1 || (state === 0 && !chipPlane(g, cell))) continue;
+    if (state === 1 || (state !== 2 && !chipPlane(g, cell))) continue;
     const plane = d[o + 3] * x + d[o + 4] * y + d[o + 5] * z + d[o + 6] - penalty;
     if (plane > cut) cut = plane;
   }
@@ -1349,6 +1351,21 @@ const BRICK = 8;
 const BRICK_CELLS = BRICK * BRICK * BRICK;
 /** Conservative Lipschitz bound of the field, used for the seeding march. */
 const LIPSCHITZ = 2.4;
+/**
+ * Field evaluations between two yields of the time-sliced build (~1–2 ms on
+ * a mid-range CPU). Loops without field evaluations yield every LOOP_QUANTUM
+ * iterations.
+ */
+const WORK_QUANTUM = 500;
+const LOOP_QUANTUM = 16384;
+
+/**
+ * Field evaluations done since the build last yielded, including the nested
+ * ones hidden inside a single evaluation (fitting a facet plane evaluates the
+ * field underneath it ~14 times). Generators that evaluate the field yield
+ * once it passes WORK_QUANTUM and reset it.
+ */
+const buildWork = { count: 0 };
 
 type ScalarField = (x: number, y: number, z: number) => number;
 
@@ -1454,6 +1471,7 @@ function* polygonise(box: Box, cell: number, field: ScalarField): Generator<void
     const vals = brickValues[s];
     let v = vals[local];
     if (v !== v) {
+      buildWork.count += 1;
       v = field(x0 + i * cell, y0 + j * cell, z0 + k * cell);
       // Never exactly zero: keeps the sign test unambiguous.
       if (v === 0) v = 1e-6;
@@ -1477,10 +1495,16 @@ function* polygonise(box: Box, cell: number, field: ScalarField): Generator<void
       let y = box.y1;
       let prevY = y;
       let f = field(x, y, z);
+      buildWork.count += 1;
       while (f > 0 && y > box.y0) {
         prevY = y;
         y -= Math.max(cell, (f / LIPSCHITZ) * 0.9);
         f = field(x, Math.max(box.y0, y), z);
+        buildWork.count += 1;
+        if (buildWork.count > WORK_QUANTUM) {
+          buildWork.count = 0;
+          yield;
+        }
       }
       if (f > 0) continue;
       // Exact crossing on the grid column between prevY and y.
@@ -1491,8 +1515,11 @@ function* polygonise(box: Box, cell: number, field: ScalarField): Generator<void
       for (let dk = -1; dk <= 0; dk += 1) {
         for (let di = -1; di <= 0; di += 1) pushCell(i + di, j, k + dk);
       }
+      if (buildWork.count > WORK_QUANTUM) {
+        buildWork.count = 0;
+        yield;
+      }
     }
-    yield;
   }
 
   // ---- Trace the connected surface.
@@ -1503,7 +1530,10 @@ function* polygonise(box: Box, cell: number, field: ScalarField): Generator<void
   let traced = 0;
   while (head < queue.length) {
     traced += 1;
-    if ((traced & 1023) === 0) yield;
+    if (buildWork.count > WORK_QUANTUM || (traced & 16383) === 0) {
+      buildWork.count = 0;
+      yield;
+    }
     const ci = queue.data[head];
     const cj = queue.data[head + 1];
     const ck = queue.data[head + 2];
@@ -1608,7 +1638,10 @@ function* polygonise(box: Box, cell: number, field: ScalarField): Generator<void
 
   const sc = surfaceCells.data;
   for (let n = 0; n < surfaceCells.length; n += 3) {
-    if (n % 24576 === 0) yield;
+    if (n % 24576 === 0 || buildWork.count > WORK_QUANTUM) {
+      buildWork.count = 0;
+      yield;
+    }
     const ci = sc[n];
     const cj = sc[n + 1];
     const ck = sc[n + 2];
@@ -1641,11 +1674,15 @@ function* projectNearRoute(mesh: SurfaceMesh, field: ScalarField, maxStep: numbe
   const e = 0.03;
   let moved = 0;
   for (let v = 0; v < mesh.vertexCount; v += 1) {
-    if ((v & 4095) === 4095) yield;
+    if ((v & 4095) === 4095 || buildWork.count > WORK_QUANTUM) {
+      buildWork.count = 0;
+      yield;
+    }
     let x = p[v * 3];
     let y = p[v * 3 + 1];
     let z = p[v * 3 + 2];
     if (detailMask(x, y, z) >= 0.999) continue;
+    buildWork.count += 14;
     for (let it = 0; it < 2; it += 1) {
       const f = field(x, y, z);
       const gx = (field(x + e, y, z) - field(x - e, y, z)) / (2 * e);
@@ -1693,7 +1730,7 @@ function* removeFloatingComponents(mesh: SurfaceMesh, box: Box, cell: number): G
     const c = find(idx[t + 2]);
     if (b !== a) parent[b] = a;
     if (c !== a && c !== b) parent[c] = a;
-    if ((t & 65535) === 0) yield;
+    if (t % (LOOP_QUANTUM * 3) === 0) yield;
   }
   const size = new Int32Array(n);
   const touches = new Uint8Array(n);
@@ -1708,6 +1745,7 @@ function* removeFloatingComponents(mesh: SurfaceMesh, box: Box, cell: number): G
     const z = p[v * 3 + 2];
     if (x < box.x0 + m || x > box.x1 - m || y < box.y0 + m || y > box.y1 - m || z < box.z0 + m || z > box.z1 - m) touches[r] = 1;
     if (largest < 0 || size[r] > size[largest]) largest = r;
+    if (v % LOOP_QUANTUM === LOOP_QUANTUM - 1) yield;
   }
   yield;
   let removed = 0;
@@ -1722,6 +1760,7 @@ function* removeFloatingComponents(mesh: SurfaceMesh, box: Box, cell: number): G
     idx[w + 1] = idx[t + 1];
     idx[w + 2] = idx[t + 2];
     w += 3;
+    if (t % (LOOP_QUANTUM * 3) === 0) yield;
   }
   if (removed > 0) {
     mesh.indices = idx.slice(0, w);
@@ -1730,7 +1769,7 @@ function* removeFloatingComponents(mesh: SurfaceMesh, box: Box, cell: number): G
   return removed;
 }
 
-function accumulateNormals(positions: Float32Array, indices: Uint32Array, normals: Float32Array): void {
+function* accumulateNormals(positions: Float32Array, indices: Uint32Array, normals: Float32Array): Generator<void, void, void> {
   normals.fill(0);
   for (let t = 0; t < indices.length; t += 3) {
     const a = indices[t] * 3;
@@ -1754,7 +1793,9 @@ function accumulateNormals(positions: Float32Array, indices: Uint32Array, normal
     normals[c] += nx;
     normals[c + 1] += ny;
     normals[c + 2] += nz;
+    if (t % (LOOP_QUANTUM * 3) === 0) yield;
   }
+  yield;
   for (let i = 0; i < normals.length; i += 3) {
     const l = Math.sqrt(normals[i] * normals[i] + normals[i + 1] * normals[i + 1] + normals[i + 2] * normals[i + 2]) || 1;
     normals[i] /= l;
@@ -1797,8 +1838,12 @@ function* buildCoarseField(cache: GroundCache, spacing: number): Generator<void,
         data[o] = composeField(groundTerm(cache, x, y, z), x, y, z, false);
         o += 1;
       }
+      buildWork.count += nx + 1;
+      if (buildWork.count > WORK_QUANTUM) {
+        buildWork.count = 0;
+        yield;
+      }
     }
-    yield;
   }
   return { x0, y0, z0, h: spacing, nx, ny, nz, data };
 }
@@ -1893,7 +1938,7 @@ function* bakeCurvature(positions: Float32Array, normals: Float32Array, indices:
     addEdge(b, c);
     addEdge(c, a);
     addEdge(c, b);
-    if ((t & 131071) === 0) yield;
+    if (t % (LOOP_QUANTUM * 3) === 0) yield;
   }
   let curv = new Float32Array(count);
   const gain = 1 / (0.22 * cell);
@@ -1905,6 +1950,7 @@ function* bakeCurvature(positions: Float32Array, normals: Float32Array, indices:
     const lz = sum[v * 3 + 2] / w - positions[v * 3 + 2];
     // Neighbours below the tangent plane (Laplacian against the normal) = convex.
     curv[v] = -(lx * normals[v * 3] + ly * normals[v * 3 + 1] + lz * normals[v * 3 + 2]) * gain;
+    if (v % (LOOP_QUANTUM * 4) === 0) yield;
   }
   yield;
   for (let pass = 0; pass < 2; pass += 1) {
@@ -1921,6 +1967,7 @@ function* bakeCurvature(positions: Float32Array, normals: Float32Array, indices:
       accW[a] += 3;
       accW[b] += 3;
       accW[c] += 3;
+      if (t % (LOOP_QUANTUM * 3) === 0) yield;
     }
     for (let v = 0; v < count; v += 1) curv[v] = accW[v] > 0 ? acc[v] / accW[v] : 0;
     curv = curv.slice();
@@ -1980,6 +2027,7 @@ function* chunkSurface(
     const ch = i + cnx * (j + cny * k);
     triChunk[t] = ch;
     offsets[ch + 1] += 1;
+    if (t % LOOP_QUANTUM === 0) yield;
   }
   for (let ch = 0; ch < chunkCount; ch += 1) offsets[ch + 1] += offsets[ch];
   // Counting sort of triangles by chunk.
@@ -1990,6 +2038,7 @@ function* chunkSurface(
     if (ch < 0) continue;
     order[cursor[ch]] = t;
     cursor[ch] += 1;
+    if (t % (LOOP_QUANTUM * 4) === 0) yield;
   }
   yield;
 
@@ -2005,6 +2054,7 @@ function* chunkSurface(
     let vc = 0;
     let w = 0;
     for (let n = begin; n < end; n += 1) {
+      if ((n - begin) % LOOP_QUANTUM === LOOP_QUANTUM - 1) yield;
       const t = order[n];
       for (let e = 0; e < 3; e += 1) {
         const g = indices[t * 3 + e];
@@ -2124,7 +2174,7 @@ function* buildSkirt(cfg: DetailConfig): Generator<void, TerrainPiece, void> {
       positions[o * 3 + 1] = y;
       positions[o * 3 + 2] = z;
     }
-    if (k % 24 === 23) yield;
+    if ((k & 3) === 3) yield;
   }
   const tri: number[] = [];
   for (let k = 0; k < hgt - 1; k += 1) {
@@ -2145,10 +2195,11 @@ function* buildSkirt(cfg: DetailConfig): Generator<void, TerrainPiece, void> {
       // Counter-clockwise when seen from above (+y normal).
       tri.push(a, c, b, b, c, d);
     }
+    if ((k & 15) === 15) yield;
   }
   const indices = new Uint32Array(tri);
   const normals = new Float32Array(vertexCount * 3);
-  accumulateNormals(positions, indices, normals);
+  yield* accumulateNormals(positions, indices, normals);
 
   // Cheap valley occlusion: compare with the surrounding mean height (looked up on the grid itself).
   const lookup = (x: number, z: number): number => {
@@ -2168,7 +2219,7 @@ function* buildSkirt(cfg: DetailConfig): Generator<void, TerrainPiece, void> {
     const r = 9;
     const mean = (lookup(x + r, z) + lookup(x - r, z) + lookup(x, z + r) + lookup(x, z - r)) * 0.25;
     ao[o] = clamp(1 - Math.max(0, mean - heights[o]) * 0.045 - 0.12 * smoothstep(-40, -110, heights[o]), 0.3, 1);
-    if ((o & 8191) === 8191) yield;
+    if ((o & 4095) === 4095) yield;
   }
 
   const geometry = new THREE.BufferGeometry();
@@ -2224,7 +2275,7 @@ function* mountainBuildSteps(
   const inner = yield* polygonise(DI, cfg.cell, innerField);
   const debris = yield* removeFloatingComponents(inner, DI, cfg.cell);
   const projected = yield* projectNearRoute(inner, innerField, cfg.cell * 0.75);
-  accumulateNormals(inner.positions, inner.indices, inner.normals);
+  yield* accumulateNormals(inner.positions, inner.indices, inner.normals);
 
   // ---- Coarse pass over the whole massif, tucked under the fine surface inside the detail domain.
   const outerCache = yield* buildCacheForBox(DO, cfg.outerCell, 12);
@@ -2236,7 +2287,7 @@ function* mountainBuildSteps(
   };
   const outer = yield* polygonise(DO, cfg.outerCell, outerField);
   const outerDebris = yield* removeFloatingComponents(outer, DO, cfg.outerCell);
-  accumulateNormals(outer.positions, outer.indices, outer.normals);
+  yield* accumulateNormals(outer.positions, outer.indices, outer.normals);
 
   // ---- Occlusion for both.
   const coarse = yield* buildCoarseField(outerCache, cfg.aoSpacing);
