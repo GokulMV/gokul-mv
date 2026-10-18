@@ -14,7 +14,7 @@ import {
   createValleyMistMaterial,
   maxMistLayersForTier,
   MIST_HEIGHT_ENCODING,
-  VALLEY_MIST_FIELD,
+  MIST_HEIGHT_RECT,
 } from '../shaders/ValleyMistShader';
 import { skirtHeight } from './terrainGeometry';
 import { NEXT_MOUNTAIN, SUN_DIRECTION, ZONES } from './worldLayout';
@@ -235,6 +235,77 @@ const HERO_RIDGES: readonly RidgeDef[] = [
   // East-face rib off the east ridge.
   { points: [[44, 92, -244], [57, 72, -229], [70, 48, -215], [84, 17, -202], [99, -30, -188]], cross: 2.1, flatten: 380 },
 ];
+
+/** Major couloirs carved into the hero's faces (snow-filled lines down from the summit area). */
+interface CouloirDef {
+  /** Centre line [x, unused, z]; the carve depth tapers in at the top and out at the bottom. */
+  points: readonly P3[];
+  halfWidth: number;
+  depth: number;
+}
+
+const HERO_COULOIRS: readonly CouloirDef[] = [
+  // Central couloir between the journey ridge and the front-left rib.
+  { points: [[0, 0, -227], [2, 0, -213], [5, 0, -200], [11, 0, -189], [19, 0, -179]], halfWidth: 5.5, depth: 6 },
+  // Left couloir between the front-left rib and the south-west buttress.
+  { points: [[-25, 0, -237], [-31, 0, -222], [-37, 0, -208], [-45, 0, -195], [-53, 0, -185]], halfWidth: 6, depth: 5.5 },
+  // East-face couloir between the journey ridge and the east-face rib.
+  { points: [[27, 0, -236], [35, 0, -222], [43, 0, -208], [53, 0, -196], [63, 0, -186]], halfWidth: 6, depth: 5 },
+];
+
+interface CouloirRuntime {
+  xs: Float64Array;
+  zs: Float64Array;
+  /** Cumulative length at each point (for the taper). */
+  ls: Float64Array;
+  total: number;
+  halfWidth: number;
+  depth: number;
+}
+
+const COULOIRS: readonly CouloirRuntime[] = HERO_COULOIRS.map((c) => {
+  const n = c.points.length;
+  const xs = new Float64Array(n);
+  const zs = new Float64Array(n);
+  const ls = new Float64Array(n);
+  for (let i = 0; i < n; i += 1) {
+    xs[i] = c.points[i][0];
+    zs[i] = c.points[i][2];
+    if (i > 0) ls[i] = ls[i - 1] + Math.sqrt((xs[i] - xs[i - 1]) ** 2 + (zs[i] - zs[i - 1]) ** 2);
+  }
+  return { xs, zs, ls, total: ls[n - 1], halfWidth: c.halfWidth, depth: c.depth };
+});
+
+function couloirCarve(x: number, z: number): number {
+  let carve = 0;
+  for (let c = 0; c < COULOIRS.length; c += 1) {
+    const g = COULOIRS[c];
+    let bestD = 1e9;
+    let bestL = 0;
+    for (let i = 0; i < g.xs.length - 1; i += 1) {
+      const ax = g.xs[i];
+      const az = g.zs[i];
+      const abx = g.xs[i + 1] - ax;
+      const abz = g.zs[i + 1] - az;
+      let t = ((x - ax) * abx + (z - az) * abz) / (abx * abx + abz * abz);
+      t = t < 0 ? 0 : t > 1 ? 1 : t;
+      const dx = x - (ax + abx * t);
+      const dz = z - (az + abz * t);
+      const d = dx * dx + dz * dz;
+      if (d < bestD) {
+        bestD = d;
+        bestL = g.ls[i] + (g.ls[i + 1] - g.ls[i]) * t;
+      }
+    }
+    const d = Math.sqrt(bestD) / g.halfWidth;
+    if (d >= 2.5) continue;
+    const along = bestL / g.total;
+    const taper = smoothstep(0, 0.15, along) * (1 - smoothstep(0.75, 1, along));
+    const c2 = g.depth * taper * Math.exp(-d * d * 1.6);
+    if (c2 > carve) carve = c2;
+  }
+  return carve;
+}
 
 interface FlankSpec {
   x: number;
@@ -463,6 +534,8 @@ export function horizonBaseHeight(x: number, z: number): number {
     h = smax(h, fh, 11);
   }
 
+  h -= couloirCarve(x, z);
+
   const floor = floorAt(x, z);
   h = smax(h, floor, 14);
   return floor + (h - floor) * edgeMask(x, z);
@@ -521,9 +594,9 @@ function shelfAt(x: number, z: number, h: number): void {
     const surface = s.y0 - s.tilt * along;
     const above = surface - h;
     if (above <= 0) continue;
-    const b = above * (1 - smoothstep(3.5, 6, above)) * m;
+    const b = above * (1 - smoothstep(2.2, 4, above)) * m;
     if (b > bulge) bulge = b;
-    const gm = m * smoothstep(0.2, 1.5, above) * (1 - smoothstep(5, 7.5, above));
+    const gm = m * smoothstep(0.1, 1.2, above) * (1 - smoothstep(4.5, 7, above));
     if (gm > mask) mask = gm;
   }
   shelfScratch.bulge = bulge;
@@ -565,7 +638,8 @@ function detailHeight(
     smoothstep(0.2, 0.95, slope) *
     smoothstep(-58, -30, base) *
     summitDetailMask(x, z) *
-    (1 - 0.8 * crest);
+    (1 - 0.94 * crest) *
+    (0.55 + 0.75 * smoothstep(-0.35, 0.45, noise2(x * 0.019 + 11.3, z * 0.019 - 4.1)));
   if (amp0 < 1e-3) return 0;
   let h = 0;
   let ax = gx;
@@ -715,7 +789,7 @@ const AO_RADII = [5, 16, 42] as const;
 const MIST_MAP_W = 512;
 const MIST_MAP_H = 128;
 /** Horizontal reach (world units) of the mist's soft contact with steep faces. */
-const MIST_DILATE = 9;
+const MIST_DILATE = 6;
 
 /** Working state of one build. Per-row work lives in plain functions (fully optimisable, no boxing). */
 interface BuildGrid {
@@ -782,11 +856,11 @@ function detailRow(g: BuildGrid, k: number, octaves: number): void {
     const convexX = sx > 0 ? (b - (base[k * nx + ia] + base[k * nx + ib]) * 0.5) / sx : 0;
     const convexZ = sz > 0 ? (b - (base[ka * nx + i] + base[kb * nx + i]) * 0.5) / sz : 0;
     const convex = Math.max(convexX, convexZ, (convexX + convexZ) * 0.75);
-    const crest = smoothstep(0.25, 1.1, convex);
+    const crest = smoothstep(0.18, 0.9, convex);
     shelfAt(x, z, b);
     const glacier = shelfScratch.mask;
     const d = detailHeight(x, z, gx, gz, b, crest, octaves);
-    g.height[idx] = b + d * (1 - 0.6 * glacier) + shelfScratch.bulge;
+    g.height[idx] = b + d * (1 - 0.35 * glacier) + shelfScratch.bulge;
     g.glacier[idx] = glacier;
   }
 }
@@ -918,7 +992,7 @@ function indexRow(g: BuildGrid, k: number, indices: Uint32Array, offset: number,
 }
 
 function mistRawRow(g: BuildGrid, j: number, raw: Float32Array): void {
-  const F = VALLEY_MIST_FIELD;
+  const F = MIST_HEIGHT_RECT;
   const z = F.z0 + ((j + 0.5) / MIST_MAP_H) * (F.z1 - F.z0);
   for (let i = 0; i < MIST_MAP_W; i += 1) {
     const x = F.x0 + ((i + 0.5) / MIST_MAP_W) * (F.x1 - F.x0);
@@ -1025,7 +1099,7 @@ function* buildHorizon(detail: HorizonDetail): Generator<void, HorizonBuildResul
   // 6. Terrain height maps for the valley mist (range + skirt): G = raw ground
   //    height (pooling), R = ground dilated by MIST_DILATE world units, so a
   //    sheet fades out near steep faces too (a cheap horizontal distance field).
-  const F = VALLEY_MIST_FIELD;
+  const F = MIST_HEIGHT_RECT;
   const W = F.x1 - F.x0;
   const D = F.z1 - F.z0;
   const raw = new Float32Array(MIST_MAP_W * MIST_MAP_H);
@@ -1241,18 +1315,17 @@ export function HorizonRange(): JSX.Element {
     const time = scrollStore.elapsed;
     pu.uReveal.value = s.reveal;
     pu.uAlpenglow.value = s.alpenglow;
-    pu.uTime.value = time;
 
     // Mist layers follow the adaptive particle density (last layer cross-fades).
     const target = ready ? adaptiveQuality.countFor(maxLayers, Math.min(2, maxLayers)) : 0;
     s.mistCount = damp(s.mistCount, target, 2.5, delta);
     if (Math.abs(s.mistCount - target) < 1e-3) s.mistCount = target;
-    const drawn = Math.min(maxLayers, Math.ceil(s.mistCount - 0.002));
-    resources.mistGeometry.instanceCount = Math.max(0, drawn);
+    // All banks stay in the draw (blend order far → near); banks ranked beyond
+    // the damped count collapse in the vertex shader at zero fill cost.
     mu.uCount.value = s.mistCount;
     mu.uOpacity.value = s.reveal;
     mu.uTime.value = time;
-    mistMesh.visible = s.reveal > 0.01 && drawn > 0;
+    mistMesh.visible = s.reveal > 0.01 && s.mistCount > 0.002;
 
     // Scene 10 void: nothing left to draw.
     g.visible = sceneFx.exposure > 0.002;

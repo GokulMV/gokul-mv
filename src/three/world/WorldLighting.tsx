@@ -20,10 +20,10 @@ const { damp } = THREE.MathUtils;
 
 /** Distance from the focus point back to the sun light (along SUN_DIRECTION). */
 const SUN_DISTANCE = 150;
-const SUN_INTENSITY = 3.1;
-const HEMI_INTENSITY = 0.55;
-const FILL_INTENSITY = 0.42;
-const ENV_INTENSITY = 0.45;
+const SUN_INTENSITY = 4.6;
+const HEMI_INTENSITY = 2.9;
+const FILL_INTENSITY = 1.45;
+const ENV_INTENSITY = 1.0;
 
 /** Cool fill from the side opposite the sun, low over the horizon. */
 const FILL_DIRECTION = new THREE.Vector3(-SUN_DIRECTION.x, 0.32, -SUN_DIRECTION.z + 0.2).normalize();

@@ -54,13 +54,16 @@ export function SkyDome(): JSX.Element {
 
   const state = useRef({ initialised: false });
 
-  useFrame(({ camera }, delta) => {
+  useFrame(({ camera, scene }, delta) => {
     const m = mesh.current;
     if (!m) return;
+    // Re-centred on the camera; the renderer's matrix update picks this up before drawing.
     m.position.copy(camera.position);
-    m.updateMatrixWorld();
 
     const u = resources.material.uniforms;
+    // Below the horizon the dome meets fully fogged terrain: follow the scene fog colour.
+    const fog = scene.fog;
+    if (fog instanceof THREE.Fog || fog instanceof THREE.FogExp2) u.uFog.value.copy(fog.color);
     const p = scrollStore.dampedProgress;
     const s = state.current;
     if (!s.initialised) {
@@ -83,7 +86,6 @@ export function SkyDome(): JSX.Element {
       material={resources.material}
       renderOrder={-1}
       frustumCulled={false}
-      matrixAutoUpdate={false}
     />
   );
 }

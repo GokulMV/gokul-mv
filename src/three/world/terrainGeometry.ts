@@ -47,11 +47,11 @@ export interface TerrainPiece {
 
 /** World-space Y of the rock surface directly under each standing waypoint. */
 export const STANDING_SURFACE_Y = {
-  baseCamp: 0,
-  firstLedge: 17.97,
-  chasmOneLanding: 21.97,
-  chasmOneTop: 31.97,
-  summit: 54.97,
+  baseCamp: -0.03,
+  firstLedge: 17.95,
+  chasmOneLanding: 21.94,
+  chasmOneTop: 31.95,
+  summit: 54.92,
 } as const;
 
 /** Top of the one-handed catch lip on the summit pyramid (Scene 6). */
@@ -484,7 +484,9 @@ export function skirtHeight(x: number, z: number): number {
   const dz = z + 40;
   const zs = dz > 0 ? dz * 1.3 : dz;
   const r = Math.sqrt(x * x + zs * zs);
-  let h = 44 - 1.18 * r + 0.0026 * r * r;
+  // Concave profile that flattens out (never rises again) far from the mountain.
+  const rc = Math.min(r, 210);
+  let h = 44 - 1.18 * r + 0.0026 * rc * rc + 0.55 * Math.max(0, r - 210);
 
   for (let i = 0; i < RIDGES.length; i += 1) {
     h = smax(h, ridgeHeight(RIDGES[i], x, z), 6);
@@ -496,6 +498,11 @@ export function skirtHeight(x: number, z: number): number {
   const mid = noise2(x * 0.071 + 3.1, z * 0.071 - 7.7);
   const fine = noise2(x * 0.19 - 1.7, z * 0.19 + 4.4);
   h += (0.3 + 0.7 * core) * (big * 15 + mid * 3) + fine * (0.6 + 0.4 * core);
+
+  // The stepped front face is carved from 3D blocks: keep the heightfield well
+  // under it so it never bulges through the climb.
+  const corridor = smoothstep(17, 9, Math.abs(x - 2)) * smoothstep(-30, -20, z) * smoothstep(5, -1, z);
+  if (corridor > 0) h -= 14 * corridor;
 
   // Valley floors far below, softly levelled.
   return smax(h, VALLEY_FLOOR + noise2(x * 0.012, z * 0.012) * 6, 14);
@@ -509,12 +516,50 @@ export function skirtHeight(x: number, z: number): number {
 
 const SY = STANDING_SURFACE_Y;
 
-/** Front-edge positions just in front of each standing waypoint (the lips). */
-const LEDGE_ONE_LIP_Z = WAYPOINTS.firstLedge[2] + 0.05;
-const PILLAR_LIP_Z = WAYPOINTS.chasmOneTop[2] + 0.05;
-const SUMMIT_LIP_Z = WAYPOINTS.summit[2] + 0.05;
 /** Face behind the catch point (the climber hangs 0.62 in front of it). */
 const CATCH_LIP_Z = WAYPOINTS.chasmTwoCatch[2] - 0.62;
+
+/**
+ * A top-out lip. The climb arrives at each standing waypoint almost
+ * vertically, so the face hugs the route (clearance easing from `cBase` to a
+ * few centimetres) up to `r` below the top, then stands `e` in front of the
+ * feet; the edge is rounded with radius `r`. The route clears the rounded edge
+ * while the feet still stand on rock.
+ */
+interface LipSpec {
+  table: RouteTable;
+  top: number;
+  zStand: number;
+  /** How far the top edge stands in front of the feet. */
+  e: number;
+  /** Edge rounding radius. */
+  r: number;
+  /** Height over which the face converges onto the route below the rounding. */
+  w: number;
+  cBase: number;
+  cTop: number;
+  /** Lowest height the route table is followed to (below it the face is vertical). */
+  yMin: number;
+}
+
+function makeLip(table: RouteTable, top: number, zStand: number, e: number, r: number, w: number, cBase: number, yMin: number): LipSpec {
+  const yr = top - r;
+  return { table, top, zStand, e, r, w, cBase, cTop: routeZ(table, yr) - (zStand + e), yMin };
+}
+
+function lipFaceZ(l: LipSpec, y: number): number {
+  const yr = l.top - l.r;
+  if (y >= yr) return l.zStand + l.e;
+  const c = l.cBase + (l.cTop - l.cBase) * smoothstep(yr - l.w, yr, y);
+  return routeZ(l.table, Math.max(y, l.yMin)) - c;
+}
+
+/* Lip parameters found by a numeric search that keeps every route sample clear
+ * of the rock (>= 0.04 in the last unit of the top-out, >= 0.25 below) while
+ * putting rock as flat and as close as possible under the feet. */
+const LEDGE_ONE_LIP = makeLip(ROUTE_ASCENT, STANDING_SURFACE_Y.firstLedge, WAYPOINTS.firstLedge[2], 0.06, 0.35, 0.5, 0.75, -1e9);
+const PILLAR_LIP = makeLip(ROUTE_PILLAR, STANDING_SURFACE_Y.chasmOneTop, WAYPOINTS.chasmOneTop[2], 0.06, 0.5, 0.5, 0.55, ROUTE_PILLAR.y0);
+const SUMMIT_LIP = makeLip(ROUTE_SCRAMBLE, STANDING_SURFACE_Y.summit, WAYPOINTS.summit[2], 0.13, 0.35, 0.5, 0.62, CATCH_LIP_Y);
 
 /* ---- Base-camp shoulder ------------------------------------------------- */
 
@@ -530,7 +575,7 @@ function baseCampTopY(x: number, z: number): number {
   const ez = (z - CAMP_CZ) / CAMP_AZ;
   const el = Math.sqrt(ex * ex + ez * ez);
   const rim = smoothstep(0.72, 0.97, el) * (0.12 + 0.34 * (0.5 + 0.5 * noise2(x * 0.6 + 3.3, z * 0.6 - 1.1)));
-  return flat * (0.1 * noise2(x * 0.38 + 4, z * 0.38) + rim);
+  return SY.baseCamp + flat * (0.1 * noise2(x * 0.38 + 4, z * 0.38) + rim);
 }
 
 function baseCampSdf(x: number, y: number, z: number): number {
@@ -545,10 +590,7 @@ function baseCampSdf(x: number, y: number, z: number): number {
 /* ---- Company-1 cliff (lower face) with the ledge-1 terrace -------------- */
 
 function cliffOneFaceZ(x: number, y: number): number {
-  const yc = Math.min(y, SY.firstLedge);
-  let z = routeZ(ROUTE_ASCENT, yc) - 0.75;
-  // Converges onto a crisp lip just in front of the standing point.
-  z += (LEDGE_ONE_LIP_Z - z) * smoothstep(15.0, 17.3, y);
+  let z = lipFaceZ(LEDGE_ONE_LIP, y);
   // Plan shape: turns to face south-east toward the cleft, steps forward on the west.
   if (x > 1.2) {
     const e = x - 1.2;
@@ -564,7 +606,7 @@ function cliffOneTopY(x: number): number {
 
 function cliffOneSdf(x: number, y: number, z: number, n1: number): number {
   const top = cliffOneTopY(x);
-  let d = roundMax((z - cliffOneFaceZ(x, y)) * 0.92, y - top, 0.26);
+  let d = roundMax((z - cliffOneFaceZ(x, y)) * 0.92, y - top, LEDGE_ONE_LIP.r);
   d = Math.max(d, n1 - 1.5, -(x + 19) - 0.3 * Math.max(0, top - y));
   return d;
 }
@@ -608,9 +650,7 @@ function shelfSdf(x: number, y: number, z: number, n1: number): number {
 /* ---- Mid-face pillar (Company 2) --------------------------------------- */
 
 function pillarFaceZ(x: number, y: number): number {
-  const yc = clamp(y, ROUTE_PILLAR.y0, SY.chasmOneTop);
-  let z = routeZ(ROUTE_PILLAR, yc) - 0.55;
-  z += (PILLAR_LIP_Z - z) * smoothstep(29.6, 31.4, y);
+  let z = lipFaceZ(PILLAR_LIP, y);
   if (x > 5.6) z -= 0.24 * (x - 5.6);
   if (x < 4.3) z -= 0.3 * (4.3 - x);
   return z;
@@ -624,7 +664,7 @@ function pillarTopY(x: number, z: number): number {
 
 function pillarSdf(x: number, y: number, z: number, n1: number): number {
   const top = pillarTopY(x, z);
-  let d = roundMax((z - pillarFaceZ(x, y)) * 0.95, y - top, 0.26);
+  let d = roundMax((z - pillarFaceZ(x, y)) * 0.95, y - top, PILLAR_LIP.r);
   d = Math.max(d, -1.5 - n1, x - 20 - 0.35 * Math.max(0, top - y), -(z + 36));
   return d;
 }
@@ -701,12 +741,12 @@ interface PyramidPlane {
 /** Facets: outward horizontal direction, slope angle (deg), offset at the platform height. */
 const PYRAMID: readonly PyramidPlane[] = (
   [
-    [1.0, -0.06, 62, 0.9],
-    [0.4, -0.92, 64, 0.9],
-    [-0.4, -0.92, 64, 0.9],
-    [-1.0, -0.06, 61, 0.9],
-    [0.74, 0.67, 52, 1.7],
-    [-0.74, 0.67, 54, 1.7],
+    [1.0, -0.06, 63, 0.55],
+    [0.4, -0.92, 65, 0.6],
+    [-0.4, -0.92, 65, 0.6],
+    [-1.0, -0.06, 62, 0.55],
+    [0.74, 0.67, 52, 1.15],
+    [-0.74, 0.67, 54, 1.15],
   ] as const
 ).map(([hx, hz, deg, r0]) => {
   const l = Math.hypot(hx, hz);
@@ -725,10 +765,8 @@ function summitFaceZ(x: number, y: number): number {
   let z: number;
   let xr: number;
   if (y >= CATCH_LIP_Y) {
-    const yc = Math.min(y, SY.summit);
-    xr = routeX(ROUTE_SCRAMBLE, yc);
-    z = routeZ(ROUTE_SCRAMBLE, yc) - 0.62;
-    z += (SUMMIT_LIP_Z - z) * smoothstep(53.2, 54.6, y);
+    xr = routeX(ROUTE_SCRAMBLE, Math.min(y, SY.summit));
+    z = lipFaceZ(SUMMIT_LIP, y);
   } else {
     xr = WAYPOINTS.chasmTwoCatch[0];
     // Small undercut below the lip, then a sheer wall that flares toward its foot.
@@ -752,7 +790,7 @@ function pyramidFlanks(x: number, y: number, z: number): number {
 }
 
 function summitSdf(x: number, y: number, z: number): number {
-  return Math.max(pyramidFlanks(x, y, z), roundMax((z - summitFaceZ(x, y)) * 0.86, y - SY.summit, 0.25));
+  return Math.max(pyramidFlanks(x, y, z), roundMax((z - summitFaceZ(x, y)) * 0.86, y - SY.summit, SUMMIT_LIP.r));
 }
 
 /* ==========================================================================
@@ -796,39 +834,54 @@ function detailMask(x: number, y: number, z: number): number {
   for (let i = 0; i < STAND_SPOTS.length; i += 1) {
     const s = STAND_SPOTS[i];
     const dy = y - s.y;
-    if (dy > -2.6 && dy < 3) {
+    if (dy > -1.6 && dy < 3) {
       const ddx = x - s.x;
       const ddz = z - s.z;
       const d = Math.sqrt(ddx * ddx + ddz * ddz);
       if (d < dStand) dStand = d;
     }
   }
-  const routeAmp = 0.2 + 0.8 * smoothstep(1.0, 3.6, dRoute);
-  const standAmp = smoothstep(1.4, 3.8, dStand);
+  const routeAmp = 0.14 + 0.86 * smoothstep(1.0, 3.8, dRoute);
+  const standAmp = smoothstep(1.2, 3.2, dStand);
   return Math.min(routeAmp, standAmp);
 }
 
 /** Upper bound of |displacement| (used to skip the noise far from any rock). */
-const MAX_DISPLACEMENT = 2.7;
+const MAX_DISPLACEMENT = 3.3;
 
 function displacement(x: number, y: number, z: number, fine: boolean): number {
+  // Low-frequency warp shared by the joint sets so they never line up perfectly.
+  const warp = noise3(x * 0.031 + 1.7, y * 0.027, z * 0.031 - 3.1);
   // Buttress-scale undulation.
   const n1 = noise3(x * 0.07, y * 0.07, z * 0.07) + 0.5 * noise3(x * 0.16 + 5.2, y * 0.16, z * 0.16 - 1.3);
+  // Couloirs and spurs: sharp vertical creases where a stretched noise crosses zero.
+  const cr = noise3(x * 0.075 - 4.4, y * 0.022 + warp * 0.6, z * 0.075 + 8.1);
+  const crease = 1 - Math.abs(cr);
   // Vertical jointing: ribs and gullies.
-  const rr = noise3(x * 0.33 + 11.3, y * 0.06, z * 0.33 - 4.2);
+  const rr = noise3(x * 0.3 + 11.3, y * 0.055, z * 0.3 - 4.2);
   const joint = 1 - Math.abs(rr);
-  // Stepped strata: a quick inward step (a ledge that holds snow) then a slow outward lean.
-  const u = y * 0.55 + n1 * 0.8;
+  // Sheeting joints: tilted, irregularly spaced steps (a quick inward step that
+  // holds snow, then a slow outward lean), only in some zones and not on the summit block.
+  const u = y * 0.33 + x * 0.09 - z * 0.05 + warp * 2.8 + n1 * 0.5;
   const f = u - Math.floor(u);
-  const saw = f < 0.22 ? f / 0.22 : (1 - f) / 0.78;
-  const strataAmp = 0.42 * smoothstep(-0.3, 0.4, noise3(x * 0.045 + 3, y * 0.03, z * 0.045));
-  // Vertical block jointing along a rotated horizontal axis (granite sheeting).
-  const v = (x * 0.8 + z * 0.6) * 0.42 + n1 * 0.7;
+  const saw = f < 0.16 ? f / 0.16 : (1 - f) / 0.84;
+  // Step height varies from step to step (hashed per band), so the ledges never look stacked.
+  const band = Math.floor(u);
+  const bandAmp = 0.35 + 0.65 * (((band * 0.618034) % 1) + 1) % 1;
+  const strataZone = smoothstep(0.05, 0.6, noise3(x * 0.04 + 3, y * 0.045, z * 0.04));
+  const strataAmp = 0.46 * strataZone * bandAmp * (1 - 0.85 * smoothstep(40, 47, y));
+  // Vertical block jointing along a rotated horizontal axis.
+  const v = (x * 0.8 + z * 0.6) * 0.3 + warp * 1.7;
   const g = v - Math.floor(v);
-  const blocks = g < 0.18 ? g / 0.18 : (1 - g) / 0.82;
-  const blockAmp = 0.3 * smoothstep(-0.2, 0.5, noise3(x * 0.05 - 7, y * 0.05, z * 0.05 + 2));
-  let d = 1.05 * n1 + 0.7 * (joint * joint - 0.45) + strataAmp * (saw - 0.5) * 2 + blockAmp * (blocks - 0.5) * 2;
-  if (fine) d += 0.16 * noise3(x * 0.9 - 2.1, y * 0.9, z * 0.9 + 7.7);
+  const blocks = g < 0.14 ? g / 0.14 : (1 - g) / 0.86;
+  const blockAmp = 0.34 * smoothstep(-0.1, 0.5, noise3(x * 0.05 - 7, y * 0.04, z * 0.05 + 2));
+  let d =
+    1.0 * n1 +
+    0.9 * (crease * crease * crease - 0.42) +
+    0.55 * (joint * joint - 0.45) +
+    strataAmp * (saw - 0.5) * 2 +
+    blockAmp * (blocks - 0.5) * 2;
+  if (fine) d += 0.15 * noise3(x * 0.9 - 2.1, y * 0.9, z * 0.9 + 7.7);
   return d;
 }
 
@@ -937,17 +990,22 @@ const EDGE_FADE = 8;
 function composeField(g: number, x: number, y: number, z: number, fine: boolean): number {
   const edge = massifEdge(x, z);
   if (edge <= 0) return g;
-  let f = smin(g, frontComplex(x, y, z), 1.6);
+  const front = frontComplex(x, y, z);
+  let f = smin(g, front, 1.0);
   if (x > -14 && x < 26 && z > -24 && z < 12 && y < 46) f = smax(f, -cleftCarve(x, y, z), 0.35);
   if (x > -14 && x < 20 && z > -40 && z < -6 && y < 46) f = smax(f, -gorgeCarve(x, y, z), 0.5);
-  f = smin(f, summitSdf(x, y, z), 1.0);
+  const summit = summitSdf(x, y, z);
+  f = smin(f, summit, 1.0);
   let fade = 1;
   if (edge < EDGE_FADE) {
     fade = smoothstep(1, EDGE_FADE, edge);
     f = g + (f - g) * fade;
   }
   if (f < MAX_DISPLACEMENT + 1.2 && f > -(MAX_DISPLACEMENT + 1.2)) {
-    const mask = detailMask(x, y, z) * fade;
+    // Full relief on the carved rock; gentler where the ground heightfield is the surface
+    // (it carries its own erosion detail, and strong 3D noise would float flakes off it).
+    const groundShare = smoothstep(-0.6, 1.2, Math.min(front, summit) - g);
+    const mask = detailMask(x, y, z) * fade * (1 - 0.65 * groundShare);
     if (mask > 0) f += displacement(x, y, z, fine) * mask;
   }
   return f;
@@ -1296,6 +1354,68 @@ function* projectNearRoute(mesh: SurfaceMesh, field: ScalarField, maxStep: numbe
     moved += 1;
   }
   return moved;
+}
+
+/**
+ * Removes connected components that neither reach the domain boundary nor are
+ * the largest one: loose debris the noise can pinch off. Returns the count.
+ */
+function* removeFloatingComponents(mesh: SurfaceMesh, box: Box, cell: number): Generator<void, number, void> {
+  const n = mesh.vertexCount;
+  const parent = new Int32Array(n);
+  for (let i = 0; i < n; i += 1) parent[i] = i;
+  const find = (a: number): number => {
+    let r = a;
+    while (parent[r] !== r) r = parent[r];
+    while (parent[a] !== r) {
+      const next = parent[a];
+      parent[a] = r;
+      a = next;
+    }
+    return r;
+  };
+  const idx = mesh.indices;
+  for (let t = 0; t < idx.length; t += 3) {
+    const a = find(idx[t]);
+    const b = find(idx[t + 1]);
+    const c = find(idx[t + 2]);
+    if (b !== a) parent[b] = a;
+    if (c !== a && c !== b) parent[c] = a;
+    if ((t & 65535) === 0) yield;
+  }
+  const size = new Int32Array(n);
+  const touches = new Uint8Array(n);
+  const p = mesh.positions;
+  const m = cell * 1.5;
+  let largest = -1;
+  for (let v = 0; v < n; v += 1) {
+    const r = find(v);
+    size[r] += 1;
+    const x = p[v * 3];
+    const y = p[v * 3 + 1];
+    const z = p[v * 3 + 2];
+    if (x < box.x0 + m || x > box.x1 - m || y < box.y0 + m || y > box.y1 - m || z < box.z0 + m || z > box.z1 - m) touches[r] = 1;
+    if (largest < 0 || size[r] > size[largest]) largest = r;
+  }
+  yield;
+  let removed = 0;
+  let w = 0;
+  for (let t = 0; t < idx.length; t += 3) {
+    const r = find(idx[t]);
+    if (r !== largest && touches[r] === 0) {
+      removed += 1;
+      continue;
+    }
+    idx[w] = idx[t];
+    idx[w + 1] = idx[t + 1];
+    idx[w + 2] = idx[t + 2];
+    w += 3;
+  }
+  if (removed > 0) {
+    mesh.indices = idx.slice(0, w);
+    mesh.triangleCount = w / 3;
+  }
+  return removed;
 }
 
 function accumulateNormals(positions: Float32Array, indices: Uint32Array, normals: Float32Array): void {
@@ -1694,6 +1814,8 @@ export interface MountainBuildStats {
   pieces: number;
   /** Vertices snapped onto the exact surface near the route. */
   projectedVertices: number;
+  /** Triangles of loose noise debris removed from the surface. */
+  debrisTriangles: number;
   /** Pure CPU time spent building (excludes idle time between incremental steps). */
   milliseconds: number;
 }
@@ -1715,6 +1837,7 @@ function* mountainBuildSteps(
   const innerCache = yield* buildCacheForBox(DI, cfg.cell, 2);
   const innerField: ScalarField = (x, y, z) => composeField(groundTerm(innerCache, x, y, z), x, y, z, cfg.fineNoise);
   const inner = yield* polygonise(DI, cfg.cell, innerField);
+  const debris = yield* removeFloatingComponents(inner, DI, cfg.cell);
   const projected = yield* projectNearRoute(inner, innerField, cfg.cell * 0.75);
   accumulateNormals(inner.positions, inner.indices, inner.normals);
 
@@ -1726,6 +1849,7 @@ function* mountainBuildSteps(
     return inside > 0 ? f + TUCK_DEPTH * smoothstep(0, TUCK_BAND, inside) : f;
   };
   const outer = yield* polygonise(DO, cfg.outerCell, outerField);
+  const outerDebris = yield* removeFloatingComponents(outer, DO, cfg.outerCell);
   accumulateNormals(outer.positions, outer.indices, outer.normals);
 
   // ---- Occlusion for both.
@@ -1768,6 +1892,7 @@ function* mountainBuildSteps(
     totalTriangles: massifTriangles + flankTriangles + skirt.triangles,
     pieces: pieces.length,
     projectedVertices: projected,
+    debrisTriangles: debris + outerDebris,
   });
   return pieces;
 }
