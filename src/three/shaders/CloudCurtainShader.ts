@@ -90,10 +90,10 @@ void main() {
   // Depth fade: near-plane fade scales with the puff size so a cloud never
   // fills the screen as a flat sheet; far fade keeps distant puffs cheap.
   float nearFade = smoothstep(uFade.x + size * 0.06, uFade.y + size * 0.32, dist);
-  // Approach fade: a puff dissolves once it looms 1.5–2.8× larger than it
+  // Approach fade: a puff dissolves once it looms 1.3–2.4× larger than it
   // framed the opening shot (flying through never shows a flat sheet).
   float growth = max(layer * uPartDepth, 2.5) / max(dist, 1e-3);
-  nearFade *= 1.0 - smoothstep(1.5, 2.8, growth);
+  nearFade *= 1.0 - smoothstep(1.3, 2.4, growth);
   float farFade = 1.0 - smoothstep(uFade.z, uFade.w, dist);
   // Adaptive-quality cross fade: instances beyond the damped count vanish softly.
   float rankFade = clamp(uCount - aPartTune.w, 0.0, 1.0);
@@ -227,8 +227,11 @@ void main() {
   float layer = vInst.w;
   float h = dot(uv, vUpLocal);
 
-  // Coverage thins as the curtain parts and erodes away during the dissolve.
-  float bias = uCoverage - part * 0.14 - uDissolve * 0.9;
+  // Coverage thins as the curtain parts, as a puff fades (approach, quality
+  // cross-fade) and erodes away during the dissolve, so fading clouds break
+  // up into wisps instead of turning into ghostly veils.
+  float fade = vInst.y;
+  float bias = uCoverage - part * 0.14 - uDissolve * 0.9 - (1.0 - fade) * 0.7;
 
   vec2 seedOffset = vec2(seed * 7.31, seed * 3.17);
   vec2 flow = vec2(uTime * 0.0042, -uTime * 0.0017) * (0.6 + seed * 0.8);
@@ -265,7 +268,7 @@ void main() {
   float rr = sqrt(r2);
   vec3 puffNormal = normalize(vec3(uv * 0.9, sqrt(max(1.0 - r2, 0.0)) + 0.15));
   vec3 sunLocal3 = vec3(sunDir * vSunLocal.w, vSunLocal.z);
-  float wrapLight = clamp(dot(puffNormal, sunLocal3) * 0.6 + 0.4, 0.0, 1.0);
+  float wrapLight = mix(0.42, 1.0, clamp(dot(puffNormal, sunLocal3) * 0.5 + 0.5, 0.0, 1.0));
 
   // Forward scattering when the view ray points toward the sun.
   vec3 viewRay = normalize(vViewPos);
@@ -280,10 +283,10 @@ void main() {
   // Thin parts let skylight through, so they never go as dark as dense cores.
   float shadowLevel = mix(0.4, 0.85, height) + (1.0 - powder) * 0.2;
   vec3 shadowBody = uShadowColor * shadowLevel;
-  vec3 litBody = uLitColor * mix(vec3(1.0), uSunColor, 0.45) * 1.22;
+  vec3 litBody = uLitColor * mix(vec3(1.0), uSunColor, 0.55) * 1.22;
   vec3 color = mix(shadowBody, litBody, smoothstep(0.04, 0.8, sunLight));
   color += uAmbientColor * (0.03 + 0.08 * height);
-  color += uSunColor * scattered * phase * 0.32;
+  color += uSunColor * scattered * phase * 0.4;
 
   // ---- silver lining: thin, sun-facing fringes of substantial puffs ----
   float thin = 1.0 - smoothstep(0.0, 0.5, density);
@@ -294,9 +297,9 @@ void main() {
   color += uLiningColor * silver * uLiningStrength;
 
   // Aerial perspective: deeper layers sink into the twilight haze.
-  color = mix(color, uHazeColor, layer * 0.2);
+  color = mix(color, uHazeColor, layer * layer * 0.32);
 
-  float alpha = (1.0 - exp(-density * uDensity)) * vInst.y * uCurtainOpacity;
+  float alpha = (1.0 - exp(-density * uDensity)) * smoothstep(0.0, 0.45, fade) * uCurtainOpacity;
   if (alpha < 0.002) discard;
 
   gl_FragColor = vec4(color, alpha);
@@ -361,7 +364,7 @@ export function createCloudCurtainUniforms(noise: THREE.Texture): CloudCurtainUn
     uDensity: { value: 5.0 },
     uShadowK: { value: 1.3 },
     uDissolve: { value: 0 },
-    uLiningStrength: { value: 1.6 },
+    uLiningStrength: { value: 2.0 },
     uSunView: { value: SUN_DIRECTION.clone() },
     uFade: { value: new THREE.Vector4(0.35, 1.6, 70, 120) },
     uDolly: { value: new THREE.Vector3() },
