@@ -374,7 +374,7 @@ export function createCloudCurtainUniforms(noise: THREE.Texture): CloudCurtainUn
     uDensity: { value: 5.0 },
     uShadowK: { value: 2.1 },
     uDissolve: { value: 0 },
-    uLiningStrength: { value: 2.6 },
+    uLiningStrength: { value: 2.3 },
     uSunView: { value: SUN_DIRECTION.clone() },
     uFade: { value: new THREE.Vector4(0.35, 1.6, 70, 120) },
     uDolly: { value: new THREE.Vector3() },

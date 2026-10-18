@@ -989,6 +989,19 @@ function* polygonise(cache: GroundCache, cell: number, fine: boolean): Generator
   // ---- Quads around every sign-changing grid edge leaving a cell's min corner.
   const idx = new GrowableU32(1 << 19);
   const p = pos.data;
+  /** Appends a triangle unless it is degenerate (coincident surface-net vertices). */
+  const tri = (a: number, b: number, c: number): void => {
+    const abx = p[b * 3] - p[a * 3];
+    const aby = p[b * 3 + 1] - p[a * 3 + 1];
+    const abz = p[b * 3 + 2] - p[a * 3 + 2];
+    const acx = p[c * 3] - p[a * 3];
+    const acy = p[c * 3 + 1] - p[a * 3 + 1];
+    const acz = p[c * 3 + 2] - p[a * 3 + 2];
+    const cx = aby * acz - abz * acy;
+    const cy = abz * acx - abx * acz;
+    const cz = abx * acy - aby * acx;
+    if (cx * cx + cy * cy + cz * cz > 1e-12) idx.push3(a, b, c);
+  };
   const emitQuad = (a: number, b: number, c: number, d: number, flip: boolean): void => {
     if (a < 0 || b < 0 || c < 0 || d < 0) return;
     const acx = p[c * 3] - p[a * 3];
@@ -1000,18 +1013,18 @@ function* polygonise(cache: GroundCache, cell: number, fine: boolean): Generator
     const splitAC = acx * acx + acy * acy + acz * acz <= bdx * bdx + bdy * bdy + bdz * bdz;
     if (!flip) {
       if (splitAC) {
-        idx.push3(a, b, c);
-        idx.push3(a, c, d);
+        tri(a, b, c);
+        tri(a, c, d);
       } else {
-        idx.push3(a, b, d);
-        idx.push3(b, c, d);
+        tri(a, b, d);
+        tri(b, c, d);
       }
     } else if (splitAC) {
-      idx.push3(a, c, b);
-      idx.push3(a, d, c);
+      tri(a, c, b);
+      tri(a, d, c);
     } else {
-      idx.push3(a, d, b);
-      idx.push3(b, d, c);
+      tri(a, d, b);
+      tri(b, d, c);
     }
   };
 

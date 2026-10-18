@@ -74,12 +74,58 @@ export const CLOUD_CURTAIN = {
   timeline: {
     openStart: 0.0,
     openEnd: 0.08,
-    returnStart: 0.92,
-    returnEnd: 0.98,
-    dissolveStart: 0.98,
+    /* The return waits until the paper is on the lens so the "last pull" hero
+     * shot (standing before the next mountain) stays clear. See ENDING. */
+    returnStart: 0.955,
+    returnEnd: 0.985,
+    dissolveStart: 0.985,
     dissolveEnd: 1.0,
   },
 } as const;
+
+/**
+ * Story ending (Scenes 8–10). The protagonist stands before the next big,
+ * continuous mountain — ready for the next journey. A gust tears a paper
+ * loose; it flies at the camera and sticks to the lens showing the contact
+ * details; scrolling on peels it away, the world dissolves to the void and
+ * the credits / footer section scrolls in after progress 1.0.
+ */
+export const ENDING = {
+  /** Over-the-shoulder reveal of the next mountain (Scene 8). */
+  revealStart: 0.86,
+  revealEnd: 0.92,
+  /** Camera pulls back: the protagonist standing before the next mountain. */
+  heroPullStart: 0.92,
+  heroPullEnd: 0.945,
+  /** The gust lifts the paper and carries it to the lens. */
+  paperGustStart: 0.945,
+  paperStick: 0.955,
+  /** Paper on the lens with the contact details (interactive). */
+  paperHoldEnd: 0.985,
+  /** Scrolling on peels the paper off and the wind takes it out of frame. */
+  paperPeelEnd: 0.995,
+  /** Progress 1.0 = the end of the 3D track; the footer section follows it. */
+  footerAfter: 1.0,
+} as const;
+
+/**
+ * The next journey: one huge, continuous mountain dead ahead on the horizon,
+ * clearly bigger than the climbed one (summit 55), flanked by the rest of the
+ * range. Sized so that from the Scene 8 camera [-1.2,56.7,-32.2] aiming at
+ * HORIZON_AIM, and from the final pull-back camera [0,56.5,-27], its summit
+ * sits in the upper third of a 42° (vertical fov) frame.
+ */
+export const NEXT_MOUNTAIN = {
+  summit: [0, 118, -235] as Vec3Tuple,
+  /** Approximate footprint half-extents of the massif's base (x, z). */
+  baseHalfWidth: 130,
+  baseHalfDepth: 70,
+  /** Valley floor the massif rises from (hidden in valley mist). */
+  baseY: -40,
+} as const;
+
+/** Where the Scene 8 over-the-shoulder shot aims (from the scene spec). */
+export const HORIZON_AIM: Vec3Tuple = [0, 68, -190];
 
 /** Direction *towards* the sun: low golden-hour sun to the right, slightly ahead. */
 export const SUN_DIRECTION = new THREE.Vector3(0.7, 0.45, -0.25).normalize();

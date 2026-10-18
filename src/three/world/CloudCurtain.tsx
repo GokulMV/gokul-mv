@@ -513,6 +513,10 @@ export function CloudCurtain(): JSX.Element {
       system.geometry.dispose();
       system.material.dispose();
       system.noise.dispose();
+      // Without a curtain nothing may keep the world dimmed or covered.
+      sceneFx.exposure = 1;
+      sceneFx.curtainOpacity = 0;
+      sceneFx.curtainPart = 1;
     },
     [system],
   );
