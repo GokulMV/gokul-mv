@@ -183,6 +183,8 @@ const BANDS: readonly Band[] = [
 
 interface CloudLayout {
   count: number;
+  /** Size multiplier baked into every diameter (sparser layouts use larger puffs). */
+  sizeMul: number;
   /** vec3 per instance — base centre in curtain (opening world) space. */
   center: Float32Array;
   /** vec4 — side, layer, seed, diameter. */
@@ -239,8 +241,10 @@ function bandQuotas(total: number): number[] {
  */
 export function buildCloudLayout(count: number, seed = 20241018): CloudLayout {
   const rand = mulberry32(seed);
+  const sizeMul = Math.min(1.9, Math.sqrt(REFERENCE_COUNT / Math.max(1, count)));
   const layout: CloudLayout = {
     count,
+    sizeMul,
     center: new Float32Array(count * 3),
     shape: new Float32Array(count * 4),
     motion: new Float32Array(count * 4),
@@ -253,7 +257,6 @@ export function buildCloudLayout(count: number, seed = 20241018): CloudLayout {
   const up = new THREE.Vector3().crossVectors(right, forward).normalize();
   const tanV = Math.tan(THREE.MathUtils.degToRad(CAMERA_CLIP.fov * 0.5));
   const tanH = tanV * OPENING_ASPECT_COVER;
-  const sizeMul = Math.min(1.9, Math.sqrt(REFERENCE_COUNT / Math.max(1, count)));
   const point = new THREE.Vector3();
 
   const quotas = bandQuotas(count);
@@ -385,6 +388,7 @@ function createCloudSystem(tier: GpuTier): CloudSystem {
   // Depth/size metadata in the layout (layer = depth / LAYER_SPAN) and the
   // shader's parting + approach fade share one reference distance.
   uniforms.uPartDepth.value = LAYER_SPAN;
+  uniforms.uLayoutScale.value = layout.sizeMul;
   if (tier <= 1) uniforms.uCoverage.value += 0.05;
 
   const material = new THREE.ShaderMaterial({

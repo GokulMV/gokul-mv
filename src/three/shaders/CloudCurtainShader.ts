@@ -50,6 +50,7 @@ uniform float uPart;
 uniform float uPartX;
 uniform float uPartDepth;
 uniform float uScaleMul;
+uniform float uLayoutScale;
 uniform float uCount;
 uniform float uDissolve;
 uniform vec3 uSunView;
@@ -93,6 +94,13 @@ void main() {
   // while the camera dollies through the curtain; a cloud at uPartDepth
   // travels exactly uPartX world units.
   float lateral = side * part * uPartX * aPartTune.y * clamp(dist / uPartDepth, 0.15, 1.6);
+  // Puffs enlarged beyond the reference layout (fewer instances on low tiers
+  // or after an adaptive-quality drop) also travel their extra half-width, so
+  // the inner edges clear the centre of the frame on the same schedule at
+  // every tier instead of keeping the curtain shut longer.
+  float stretch = 1.0 + part * 0.35 + uDissolve * 0.25;
+  float extraHalf = max(size - aShape.w / uLayoutScale, 0.0) * 0.5 * aMotion.w * stretch;
+  lateral += side * extraHalf * smoothstep(0.0, 0.3, part);
   vec4 mvCenter = mvBase + modelViewMatrix * vec4(lateral, 0.0, 0.0, 0.0);
 
   // Depth fade: near-plane fade scales with the puff size so a cloud never
@@ -110,7 +118,6 @@ void main() {
   float rot = aMotion.z + uTime * (seed - 0.5) * 0.018;
   float c = cos(rot);
   float s = sin(rot);
-  float stretch = 1.0 + part * 0.35 + uDissolve * 0.25;
   vec2 corner = position.xy * 2.0;
   vec2 halfExtent = vec2(aMotion.w * stretch, 1.0) * (size * 0.5);
   vec2 local = corner * halfExtent;
@@ -310,7 +317,9 @@ void main() {
   float rimFacing = smoothstep(0.25, 0.9, rr) * clamp(dot(uv / max(rr, 1e-3), sunDir), 0.0, 1.0);
   float facing = clamp((density - dA) * 2.5 + rimFacing * 0.7, 0.0, 1.0);
   float substantial = smoothstep(0.15, 0.65, body);
-  float silver = thin * facing * substantial * (0.55 + phase * 1.4);
+  // Evaporating fragments lose their lining first, so the dissolve never
+  // leaves bright hairline slivers behind.
+  float silver = thin * facing * substantial * (0.55 + phase * 1.4) * (1.0 - uDissolve * 0.8);
   color += uLiningColor * silver * uLiningStrength;
 
   // Aerial perspective: deeper layers sink into the twilight haze.
@@ -339,6 +348,12 @@ export type CloudCurtainUniforms = {
   uCurtainOpacity: THREE.IUniform<number>;
   /** Global puff size multiplier (adaptive-quality coverage compensation). */
   uScaleMul: THREE.IUniform<number>;
+  /**
+   * Size multiplier already baked into aShape.w by the layout (sparser tier
+   * layouts use larger puffs). Together with uScaleMul it gives each puff's
+   * growth over the reference layout, which the parting travel compensates.
+   */
+  uLayoutScale: THREE.IUniform<number>;
   /** Damped drawn-instance count; instances with rank ≥ this fade out. */
   uCount: THREE.IUniform<number>;
   /** Coverage bias added to the density field. */
@@ -376,6 +391,7 @@ export function createCloudCurtainUniforms(noise: THREE.Texture): CloudCurtainUn
     uPartDepth: { value: CLOUD_CURTAIN.zFar - CLOUD_CURTAIN.zNear - 2 },
     uCurtainOpacity: { value: 1 },
     uScaleMul: { value: 1 },
+    uLayoutScale: { value: 1 },
     uCount: { value: 1e4 },
     uCoverage: { value: 0.1 },
     uDensity: { value: 5.0 },
