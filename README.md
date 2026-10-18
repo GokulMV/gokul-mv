@@ -69,10 +69,10 @@ the kernel supports IPv6.
 | 1  | 0.00 – 0.08 | Volumetric clouds & welcome    | 0/4  |
 | 2  | 0.08 – 0.18 | Base camp                      | 0/4  |
 | 3  | 0.18 – 0.28 | Getting equipped               | 4/4  |
-| 4  | 0.28 – 0.45 | First ascent (backpack drops at 0.42)        | 3/4 |
-| 5  | 0.45 – 0.62 | First chasm jump (rope drops at 0.56)        | 2/4 |
-| 6  | 0.62 – 0.78 | Extreme chasm leap (axes + harness at 0.72)  | 0/4 |
-| 7  | 0.78 – 0.86 | The summit                     | 0/4  |
-| 8  | 0.86 – 0.92 | Horizon reveal                 | 0/4  |
-| 9  | 0.92 – 0.98 | Paper throw & returning clouds | 0/4  |
-| 10 | 0.98 – 1.00 | Blown away into nothingness    | 0/4  |
+| 4  | 0.28 – 0.45 | First ascent (rope coil drops at 0.42)       | 3/4 |
+| 5  | 0.45 – 0.62 | First chasm jump (harness drops at 0.56)     | 2/4 |
+| 6  | 0.62 – 0.78 | Extreme chasm leap (ice axes drop at 0.72)   | 1/4 |
+| 7  | 0.78 – 0.86 | The summit (only the backpack left)          | 1/4 |
+| 8  | 0.86 – 0.92 | Horizon reveal: the next big mountain        | 1/4 |
+| 9  | 0.92 – 0.98 | Last pull before the next mountain; a gust blows the contact paper out of the backpack onto the lens | 1/4 |
+| 10 | 0.98 – 1.00 | Scrolling peels the paper away; dissolve to the void, then the credits / footer section | 1/4 |

@@ -61,12 +61,18 @@ export const GEAR_EQUIP_AT: Readonly<Record<GearId, number>> = {
   harness: 0.255,
 };
 
-/** Progress at which each piece of gear detaches and falls away. */
+/**
+ * Progress at which each piece of gear detaches and falls away. The backpack
+ * is never dropped: it is the one thing carried to the summit, and in the
+ * ending the gust blows the contact paper out of it (see ENDING in
+ * three/world/worldLayout.ts). The ice axes go before the Chasm 2 leap, so the
+ * one-handed cliff catch is pure skill.
+ */
 export const GEAR_DROP_AT: Readonly<Record<GearId, number>> = {
-  backpack: 0.42,
-  rope: 0.56,
+  backpack: Number.POSITIVE_INFINITY,
+  rope: 0.42,
+  harness: 0.56,
   iceAxes: 0.72,
-  harness: 0.72,
 };
 
 /* ---------------------------------------------------------------------------

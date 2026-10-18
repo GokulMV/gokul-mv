@@ -27,6 +27,13 @@ import { CLOUD_CURTAIN, PALETTE, SUN_DIRECTION } from '../world/worldLayout';
  *                   (× uPartX), z vertical lift when parted, w importance rank
  * ========================================================================== */
 
+/**
+ * The curtain draws without depth test after every transparent pass with a
+ * lower renderOrder, so it covers the world. Anything that must stay in front
+ * of it (e.g. a paper stuck to the lens) needs a higher renderOrder.
+ */
+export const CLOUD_CURTAIN_RENDER_ORDER = 900;
+
 /** Size of the baked noise texture (texels per side, power of two). */
 export const CLOUD_NOISE_SIZE = 256;
 /** Lattice cells per tile of the baked gradient noise. */

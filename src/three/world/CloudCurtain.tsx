@@ -6,6 +6,7 @@ import { adaptiveQuality } from '../perf/adaptiveQuality';
 import { sceneFx } from '../fx/sceneFx';
 import {
   CLOUD_CURTAIN_FRAGMENT_SHADER,
+  CLOUD_CURTAIN_RENDER_ORDER,
   CLOUD_CURTAIN_VERTEX_SHADER,
   cloudCurtainDefines,
   createCloudCurtainUniforms,
@@ -15,27 +16,36 @@ import {
 import { CAMERA_CLIP, CLOUD_CURTAIN, SUN_DIRECTION } from './worldLayout';
 
 /* ==========================================================================
- * Cloud curtain — Scenes 1, 9 and 10.
+ * Cloud curtain — the opening, the return and the final dissolve.
  *
  * One instanced mesh of camera-facing volumetric puffs, laid out inside the
- * opening camera's frustum between world z = 26 and z = 6.
+ * opening camera's frustum between world z = 26 and z = 6. Every window
+ * comes from CLOUD_CURTAIN.timeline (never hard-coded here):
  *
- *  0.00 → 0.08  the curtain parts like a theatre curtain (left → −X,
- *               right → +X) while the camera dollies through it, and fades.
- *  0.08 → 0.92  hidden (mesh.visible = false, zero cost).
- *  0.92 → 0.98  the parting reverses; the layout is re-anchored to the
- *               camera (camera.matrixWorld × inverse(opening camera)) so the
- *               clouds sweep back across the summit view exactly as they
- *               framed the opening shot.
- *  0.98 → 1.00  the clouds erode and fade while sceneFx.exposure dissolves
- *               to 0, leaving the empty #040508 void.
+ *  open      (0.00 → 0.08) the curtain parts like a theatre curtain
+ *            (left → −X, right → +X) while the camera dollies through it,
+ *            and fades out.
+ *  between   hidden (mesh.visible = false, zero cost). This includes the
+ *            ending's "last pull" hero shot (ENDING.heroPull*) and the gust
+ *            that carries the paper to the lens: that frame stays clear.
+ *  return    (returnStart → returnEnd, 0.955 → 0.985) while the paper sits
+ *            on the lens, the parting reverses. The layout is re-anchored to
+ *            the camera (camera.matrixWorld × inverse(opening camera)) so the
+ *            clouds roll back in around and behind the paper exactly as they
+ *            framed the opening shot, rendering over the mountain, and seal
+ *            the view at RETURN_SEALED.
+ *  dissolve  (dissolveStart → dissolveEnd, 0.985 → 1.00) as the paper peels
+ *            away the clouds erode and fade while sceneFx.exposure falls to
+ *            0, leaving the empty #040508 void the footer scrolls in over.
+ *            Scrubbing back before dissolveStart damps exposure back to 1.
+ *
+ * The curtain draws with depthTest off at CLOUD_CURTAIN_RENDER_ORDER, so an
+ * element that must stay in front of it (the paper on the lens) has to be a
+ * transparent-pass object with a higher renderOrder, or a DOM overlay.
  *
  * Everything is driven from mutable singletons inside useFrame / the mesh's
  * onBeforeRender — no React state, no per-frame allocation.
  * ========================================================================== */
-
-/** Renders after every other transparent pass so the curtain covers the world. */
-const CLOUD_RENDER_ORDER = 900;
 
 /** Layout reference count: puff sizes are authored for this many instances. */
 const REFERENCE_COUNT = 72;
@@ -94,8 +104,15 @@ export interface CurtainTargets {
 }
 
 const T = CLOUD_CURTAIN.timeline;
+const OPEN_SPAN = T.openEnd - T.openStart;
+const RETURN_SPAN = T.returnEnd - T.returnStart;
+const DISSOLVE_SPAN = T.dissolveEnd - T.dissolveStart;
 /** Progress at which the returning curtain has fully sealed the view. */
-const RETURN_SEALED = T.returnEnd - 0.012;
+const RETURN_SEALED = T.returnStart + RETURN_SPAN * 0.8;
+/** Mid-journey window (curtain hidden) in which the anchor moves to the camera. */
+const HIDDEN_START = T.openEnd;
+const HIDDEN_SPAN = T.returnStart - T.openEnd;
+const HIDDEN_MID = HIDDEN_START + HIDDEN_SPAN * 0.5;
 
 /**
  * Parting profile (cubic, monotonic, f(0) = 0, f(1) = 1). It eases out so the
@@ -111,21 +128,24 @@ function partingProfile(t: number): number {
 /** Target curtain state for a given (damped) progress. Pure; writes into `out`. */
 export function curtainTargetsAt(progress: number, out: CurtainTargets): CurtainTargets {
   const p = clamp01(progress);
-  if (p < 0.5) {
-    // Scene 1: part and fade while the camera dollies through the curtain.
-    out.part = partingProfile((p - T.openStart) / (T.openEnd - T.openStart));
-    out.opacity = 1 - smoothstep(T.openStart + 0.044, T.openEnd - 0.002, p);
+  if (p < HIDDEN_MID) {
+    // Opening: part and fade while the camera dollies through the curtain.
+    out.part = partingProfile((p - T.openStart) / OPEN_SPAN);
+    out.opacity = 1 - smoothstep(T.openStart + OPEN_SPAN * 0.55, T.openEnd - OPEN_SPAN * 0.025, p);
     out.dissolve = 0;
   } else {
-    // Scene 9: the opening played in reverse — the halves glide back in from
-    // the frame edges and seal the view by RETURN_SEALED. Scene 10: erode + fade.
+    // Return: the opening played in reverse — the halves glide back in from
+    // the frame edges and seal the view by RETURN_SEALED. Dissolve: the clouds
+    // erode, then fade, while the exposure falls to the void.
     out.part = partingProfile(1 - (p - T.returnStart) / (RETURN_SEALED - T.returnStart));
     out.opacity =
-      smoothstep(T.returnStart, T.returnStart + 0.02, p) * (1 - smoothstep(T.dissolveStart + 0.003, T.dissolveEnd - 0.002, p));
-    out.dissolve = smoothstep(T.dissolveStart, T.dissolveEnd - 0.003, p);
+      smoothstep(T.returnStart, T.returnStart + RETURN_SPAN * 0.33, p) *
+      (1 - smoothstep(T.dissolveStart + DISSOLVE_SPAN * 0.15, T.dissolveEnd - DISSOLVE_SPAN * 0.1, p));
+    out.dissolve = smoothstep(T.dissolveStart, T.dissolveEnd - DISSOLVE_SPAN * 0.15, p);
   }
-  out.anchor = smoothstep(0.3, 0.7, p);
-  out.exposure = 1 - smoothstep(T.dissolveStart + 0.001, T.dissolveEnd - 0.002, p);
+  // Re-anchor from the world to the camera while nothing is visible.
+  out.anchor = smoothstep(HIDDEN_START + HIDDEN_SPAN * 0.25, HIDDEN_START + HIDDEN_SPAN * 0.75, p);
+  out.exposure = 1 - smoothstep(T.dissolveStart + DISSOLVE_SPAN * 0.05, T.dissolveEnd - DISSOLVE_SPAN * 0.1, p);
   return out;
 }
 
@@ -574,7 +594,7 @@ export function CloudCurtain(): JSX.Element {
       geometry={system.geometry}
       material={system.material}
       frustumCulled={false}
-      renderOrder={CLOUD_RENDER_ORDER}
+      renderOrder={CLOUD_CURTAIN_RENDER_ORDER}
       castShadow={false}
       receiveShadow={false}
     />

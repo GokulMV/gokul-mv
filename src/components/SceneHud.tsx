@@ -299,7 +299,7 @@ export function SceneHud() {
       <Card index={6} placement="right" register={register}>
         <Kicker index={6} />
         <h2 className="text-2xl font-semibold text-white">Skills earned on the way up</h2>
-        <p className="mt-1 text-sm text-white/60">No gear left — only skill.</p>
+        <p className="mt-1 text-sm text-white/60">Everything but the pack left behind — the rest was skill.</p>
         <ul className="mt-5 grid grid-cols-4 gap-3">
           {skills.map((skill) => {
             const logo = getTechLogo(skill.slug);
