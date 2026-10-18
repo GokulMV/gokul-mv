@@ -105,7 +105,7 @@ const RETURN_SEALED = T.returnEnd - 0.012;
  */
 function partingProfile(t: number): number {
   const k = clamp01(t);
-  return k * (1.747 + k * (-2.667 + k * 1.92));
+  return clamp01(k * (1.747 + k * (-2.667 + k * 1.92)));
 }
 
 /** Target curtain state for a given (damped) progress. Pure; writes into `out`. */
@@ -255,19 +255,17 @@ export function buildCloudLayout(count: number, seed = 20241018): CloudLayout {
     const k = emitted[bandIndex];
     emitted[bandIndex] += 1;
 
-    const hx = halton(k + 1, 2);
     const hy = halton(k + 1, 3);
     const hd = halton(k + 1, 5);
 
-    let nx: number;
-    let side: number;
-    if (band.peripheral) {
-      side = k % 2 === 0 ? -1 : 1;
-      nx = side * (0.78 + halton((k >> 1) + 1, 2) * 0.55);
-    } else {
-      nx = (hx * 2 - 1) * band.spreadX + (rand() - 0.5) * 0.08;
-      side = Math.abs(nx) < 0.03 ? (k % 2 === 0 ? -1 : 1) : Math.sign(nx);
-    }
+    // Sides alternate within every band, and successive bands start on
+    // opposite sides, so any prefix is balanced left/right.
+    const side = (k + bandIndex) % 2 === 0 ? -1 : 1;
+    const pair = (k >> 1) + 1 + (side > 0 ? 1 : 0);
+    const reach01 = halton(pair, 2);
+    const nx = band.peripheral
+      ? side * (0.78 + reach01 * 0.55)
+      : side * (0.04 + reach01 * band.spreadX) + (rand() - 0.5) * 0.08;
     const ny = (hy * 2 - 1) * band.spreadY + (rand() - 0.5) * 0.08;
     const d = band.dMin + (band.dMax - band.dMin) * hd;
     const reach = Math.max(d, 2.2);

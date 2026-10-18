@@ -36,7 +36,7 @@ export interface TerrainPiece {
 /** World-space Y of the rock surface directly under each standing waypoint. */
 export const STANDING_SURFACE_Y = {
   baseCamp: 0,
-  firstLedge: 17.9,
+  firstLedge: 17.75,
   chasmOneLanding: 21.92,
   chasmOneTop: 31.85,
   summit: 54.9,
@@ -461,15 +461,16 @@ function canyonCoord(x: number, z: number): number {
 const SY = STANDING_SURFACE_Y;
 
 /** Lip positions (z) of the faces right in front of each standing waypoint. */
-const LEDGE_ONE_LIP_Z = WAYPOINTS.firstLedge[2] + 0.035;
-const PILLAR_LIP_Z = WAYPOINTS.chasmOneTop[2] + 0.04;
+const LEDGE_ONE_LIP_Z = WAYPOINTS.firstLedge[2] + 0.24;
+const PILLAR_LIP_Z = WAYPOINTS.chasmOneTop[2] + 0.2;
 const SUMMIT_LIP_Z = WAYPOINTS.summit[2] + 0.05;
 
 /** Face of the Company-1 wall: z of the rock surface at (x, y). */
 function cliffOneFaceZ(x: number, y: number): number {
-  const yc = Math.min(y, 17.75);
-  let z = routeZ(ROUTE_ASCENT, yc) - 0.72;
-  z += (LEDGE_ONE_LIP_Z - z) * smoothstep(17.0, 17.75, y);
+  const yc = Math.min(y, SY.firstLedge);
+  let z = routeZ(ROUTE_ASCENT, yc) - 0.8;
+  // The face swings forward into a crisp lip just in front of the standing point.
+  z += (LEDGE_ONE_LIP_Z - z) * smoothstep(17.0, 17.45, y);
   // Plan shape: recedes toward the canyon arête on the right, steps forward on the left.
   if (x > 1.5) z -= 0.055 * (x - 1.5) * (x - 1.5);
   if (x < -1.8) z += Math.min(3.4, 0.34 * (-1.8 - x));
@@ -504,9 +505,9 @@ function cliffOneSdf(x: number, y: number, z: number): number {
 }
 
 function pillarFaceZ(y: number): number {
-  const yc = clamp(y, ROUTE_PILLAR.y0, 31.75);
+  const yc = clamp(y, ROUTE_PILLAR.y0, SY.chasmOneTop);
   const z = routeZ(ROUTE_PILLAR, yc) - 0.56;
-  return z + (PILLAR_LIP_Z - z) * smoothstep(31.15, 31.7, y);
+  return z + (PILLAR_LIP_Z - z) * smoothstep(31.2, 31.6, y);
 }
 
 function pillarSdf(x: number, y: number, z: number): number {
