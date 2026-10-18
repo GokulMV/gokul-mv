@@ -1,0 +1,103 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --void: #040508;
+  --glacier: #cfe8ff;
+  --summit: #f4c77b;
+  --beacon: #5eead4;
+  color-scheme: dark;
+}
+
+@layer base {
+  html,
+  body {
+    margin: 0;
+    padding: 0;
+    background: var(--void);
+    color: #e6edf6;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+    overscroll-behavior: none;
+  }
+
+  body {
+    @apply font-sans;
+  }
+
+  ::selection {
+    background: rgba(94, 234, 212, 0.35);
+    color: #ffffff;
+  }
+}
+
+/* ---- Lenis recommended base styles ---------------------------------------- */
+html.lenis,
+html.lenis body {
+  height: auto;
+}
+
+.lenis.lenis-smooth {
+  scroll-behavior: auto !important;
+}
+
+.lenis.lenis-smooth [data-lenis-prevent] {
+  overscroll-behavior: contain;
+}
+
+.lenis.lenis-stopped {
+  overflow: hidden;
+}
+
+.lenis.lenis-smooth iframe {
+  pointer-events: none;
+}
+
+/* ---- Layers ---------------------------------------------------------------- */
+.webgl-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.webgl-layer canvas {
+  display: block;
+  width: 100% !important;
+  height: 100% !important;
+}
+
+.hud-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  pointer-events: none;
+}
+
+.hud-layer .interactive {
+  pointer-events: auto;
+}
+
+@layer components {
+  .hud-glass {
+    @apply rounded-2xl border border-white/10 bg-white/[0.04] shadow-[0_8px_40px_rgba(0,0,0,0.45)] backdrop-blur-md;
+  }
+
+  .hud-kicker {
+    @apply font-mono text-[10px] uppercase tracking-hud text-glacier/60;
+  }
+
+  .hud-btn {
+    @apply rounded-full border border-white/15 bg-white/5 px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.18em] text-glacier/80 transition-colors hover:border-beacon/60 hover:text-beacon focus:outline-none focus-visible:ring-2 focus-visible:ring-beacon/60;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+  }
+}
