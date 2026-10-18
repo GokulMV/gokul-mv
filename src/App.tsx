@@ -6,49 +6,27 @@ import { TelemetryPanel } from './components/TelemetryPanel';
 import { LensPaperOverlay } from './components/LensPaperOverlay';
 import { CreditsFooter } from './components/CreditsFooter';
 import { Experience } from './three/Experience';
-import { altitudeAt } from './three/protagonistPath';
-import { ENDING } from './three/world/worldLayout';
 import { scrollStore } from './store/scrollStore';
 import { soundEngine } from './utils/soundEngine';
 import type { GpuInfo } from './utils/gpuTier';
 
-function useSoundDirector() {
+/**
+ * Without the WebGL layer there is no render loop to tick the sound engine
+ * (Experience's SoundDriver does it otherwise), so drive it from rAF.
+ */
+function useFallbackSoundDriver(active: boolean) {
   useEffect(() => {
-    const offGear = scrollStore.onGearChange((next, prev) => {
-      if (next > prev) soundEngine.playGearLock(next - 1);
-      else soundEngine.playGearDrop();
-    });
-    // Ending cues fire on forward threshold crossings of the ENDING timeline:
-    // the gust tearing the paper out of the pack, and the wind peeling it off
-    // the lens. A cue re-arms only after scrolling back past its threshold by
-    // HYSTERESIS, so scrubbing around a threshold never spams it.
-    const HYSTERESIS = 0.004;
-    let gustArmed = scrollStore.dampedProgress < ENDING.paperGustStart;
-    let peelArmed = scrollStore.dampedProgress < ENDING.paperHoldEnd;
+    if (!active) return undefined;
     let raf = 0;
-    const loop = () => {
-      const p = scrollStore.dampedProgress;
-      soundEngine.setAltitude(altitudeAt(p));
-      if (gustArmed && p >= ENDING.paperGustStart) {
-        gustArmed = false;
-        soundEngine.playPaperFlutter(0.6);
-      } else if (!gustArmed && p < ENDING.paperGustStart - HYSTERESIS) {
-        gustArmed = true;
-      }
-      if (peelArmed && p >= ENDING.paperHoldEnd) {
-        peelArmed = false;
-        soundEngine.playPaperFlutter(1);
-      } else if (!peelArmed && p < ENDING.paperHoldEnd - HYSTERESIS) {
-        peelArmed = true;
-      }
+    let last = performance.now();
+    const loop = (now: number) => {
+      soundEngine.updateOnFrame(scrollStore.dampedProgress, scrollStore.velocity, (now - last) / 1000);
+      last = now;
       raf = requestAnimationFrame(loop);
     };
     raf = requestAnimationFrame(loop);
-    return () => {
-      offGear();
-      cancelAnimationFrame(raf);
-    };
-  }, []);
+    return () => cancelAnimationFrame(raf);
+  }, [active]);
 }
 
 function WebGLUnavailable() {
@@ -66,8 +44,8 @@ function WebGLUnavailable() {
 }
 
 export default function App({ gpu }: { gpu: GpuInfo }) {
-  useSoundDirector();
   const canRender3D = useMemo(() => gpu.tier > 0, [gpu.tier]);
+  useFallbackSoundDriver(!canRender3D);
 
   return (
     <SmoothScrollProvider after={<CreditsFooter />}>

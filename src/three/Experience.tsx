@@ -5,6 +5,7 @@ import { Bloom, EffectComposer, Noise, ToneMapping, Vignette } from '@react-thre
 import { BlendFunction, ToneMappingMode } from 'postprocessing';
 import * as THREE from 'three';
 import { scrollStore, smoothstep } from '../store/scrollStore';
+import { soundEngine } from '../utils/soundEngine';
 import { CameraRig } from './camera/CameraRig';
 import { ExposureFade } from './fx/ExposureFade';
 import { sceneFx } from './fx/sceneFx';
@@ -55,6 +56,14 @@ function RendererExposure() {
   const gl = useThree((state) => state.gl);
   useFrame(() => {
     gl.toneMappingExposure = BASE_EXPOSURE * sceneFx.exposure;
+  });
+  return null;
+}
+
+/** Drives the sound engine from the render loop: beds, pad warmth and scroll-threshold foley. */
+function SoundDriver() {
+  useFrame((_state, delta) => {
+    soundEngine.updateOnFrame(scrollStore.dampedProgress, scrollStore.velocity, delta);
   });
   return null;
 }
@@ -132,6 +141,7 @@ export function Experience() {
         }}
       >
         <SceneAtmosphere />
+        <SoundDriver />
         {composer ? null : <RendererExposure />}
         <CameraRig />
         <Suspense fallback={null}>
