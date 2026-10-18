@@ -150,7 +150,6 @@ uniform float uHazeThin;
 uniform float uSnowLine;
 uniform float uAlpenglow;
 uniform float uReveal;
-uniform float uTime;
 
 varying vec3 vWorldPos;
 varying vec3 vWorldNormal;
@@ -190,6 +189,17 @@ void main() {
   float nBroad = texture2D( uNoise, xz * 0.0042 + vec2( 0.13, 0.71 ) ).r;
   float nMid = texture2D( uNoise, xz * 0.016 + vec2( 0.31, 0.05 ) ).g;
   float nFine = texture2D( uNoise, xz * 0.058 + vec2( 0.73, 0.41 ) ).b;
+#if HP_QUALITY > 0
+  // Fall-line streaks (snow runnels / rock ribs), stretched vertically.
+  float nStreak = texture2D( uNoise, vec2( xz.x * 0.15 + xz.y * 0.06, y * 0.04 ) + vec2( 0.37, 0.21 ) ).a;
+#else
+  float nStreak = 0.5;
+#endif
+#if HP_QUALITY > 1
+  float nGrain = texture2D( uNoise, vec2( xz.x * 0.42 + xz.y * 0.17, y * 0.16 ) + vec2( 0.81, 0.66 ) ).r;
+#else
+  float nGrain = 0.5;
+#endif
 
   // ---- Micro-relief normal (rock only; snow and glaciers stay smooth).
 #if HP_QUALITY > 0
@@ -216,14 +226,25 @@ void main() {
     + steepG * 14.0;
   float altSnow = smoothstep( line - 10.0, line + 12.0, y );
   float altitude01 = smoothstep( line, line + 95.0, y );
-  float hold = mix( 0.44, 0.64, altitude01 )
+  float hold = mix( 0.5, 0.7, altitude01 )
     + concave * 0.3
     + ( nMid - 0.5 ) * 0.14
     + ( nFine - 0.5 ) * 0.1
     + ( relief - 0.5 ) * 0.16
+    + ( nStreak - 0.5 ) * 0.18
+    + ( nGrain - 0.5 ) * 0.1
     + glacier * 0.35;
   float snow = altSnow * smoothstep( -0.045, 0.055, hold - steep );
   snow = max( snow, glacier * smoothstep( 0.55, 0.85, glacier ) * altSnow );
+  // Steep rock bands (strata) that shed snow: large-scale horizontal structure
+  // across the vertical gully pattern, broken up so they never read as stripes.
+  float bandY = y + ( nBroad - 0.5 ) * 16.0 + ( nMid - 0.5 ) * 7.0;
+  float bands = max(
+    1.0 - smoothstep( 1.0, 3.6, abs( bandY - 66.0 ) ),
+    ( 1.0 - smoothstep( 0.8, 2.6, abs( bandY - 91.0 ) ) ) * 0.9
+  );
+  bands *= smoothstep( 0.35, 0.65, nFine + ( nMid - 0.5 ) * 0.6 + 0.12 );
+  snow *= 1.0 - bands * smoothstep( 0.32, 0.58, steepG ) * ( 1.0 - glacier ) * 0.75;
   snow = clamp( snow, 0.0, 1.0 );
   vec3 N = normalize( mix( Nb, Ng, snow * 0.7 ) );
 
@@ -248,8 +269,9 @@ void main() {
   // Low sun: lit snow is tinted peach-gold rather than burning out to white.
   vec3 warmTint = mix( vec3( 1.0 ), vec3( 1.0, 0.8, 0.62 ), 0.55 * uAlpenglow );
   vec3 snowLit = uSnow * uSunColor * warmTint * sunSnow;
-  vec3 snowShade = uSnowShadow * ambient * 1.6;
-  vec3 snowCol = snowLit + snowShade;
+  vec3 snowShade = uSnowShadow * ambient * 2.5;
+  // Wind-sculpted snow surface: subtle brightness variation.
+  vec3 snowCol = ( snowLit + snowShade ) * ( 0.92 + 0.1 * nStreak + 0.06 * nGrain );
   // Glacier ice on steep snow (serac faces) shows a cold blue.
   float ice = glacier * smoothstep( 0.3, 0.6, steepG );
   snowCol = mix( snowCol, uIce * ( uSunColor * sun * 0.6 + ambient * 1.6 ), ice * 0.7 );
@@ -260,6 +282,9 @@ void main() {
   float high = 0.35 + 0.65 * smoothstep( 20.0, 118.0, y );
   col += uGlow * snow * sunSnow * high * 0.7 * uAlpenglow;
   col += uGlow * ( 1.0 - snow ) * sun * high * 0.14 * uAlpenglow;
+  // Sky glow from the sunset side warms the upper mountain even out of direct sun.
+  float upper = smoothstep( 58.0, 118.0, y );
+  col += uGlow * ( 0.025 + 0.07 * snow ) * upper * uAlpenglow * ( 0.4 + 0.6 * hemi );
 
   // Golden rim on sun-facing crests (grazing view, convex, lit).
   float facing = clamp( dot( Ng, V ), 0.0, 1.0 );
@@ -267,17 +292,20 @@ void main() {
   float crest = 0.35 + 0.65 * clamp( -concave * 1.5, 0.0, 1.0 );
   col += uGlow * uSunColor * rim * crest * ( 0.22 + 0.3 * snow ) * uAlpenglow;
 
-  // ---- Aerial perspective (linear scene fog, thinning with altitude).
+  // ---- Aerial perspective (linear scene fog, thinning with altitude). The
+  //      haze is sky-lit in-scattering: distant shadow faces lift toward a
+  //      luminous blue, so the range layers by depth instead of going flat.
   float fogF = smoothstep( uFogNear, uFogFar, vViewDepth );
   float thin = mix( 1.0, uHazeThin, smoothstep( -10.0, 125.0, y ) );
   float haze = fogF * thin;
   vec3 viewDir = -V;
   float sunward = pow( max( dot( viewDir, L ), 0.0 ), 4.0 );
-  vec3 hazeCol = mix( uFogColor, uHazeColor, smoothstep( -20.0, 130.0, y ) * 0.6 );
-  hazeCol += uGlow * sunward * 0.14;
+  float up01 = smoothstep( -20.0, 130.0, y );
+  vec3 hazeCol = mix( uFogColor, uHazeColor * 1.15, 0.45 + 0.4 * up01 );
+  hazeCol += uGlow * sunward * 0.16;
   // Valley mist pooled low between the peaks.
-  float pooled = ( 1.0 - smoothstep( -8.0, 42.0, y ) ) * smoothstep( 60.0, 160.0, vViewDepth );
-  col = mix( col, uMistColor, pooled * 0.45 );
+  float pooled = ( 1.0 - smoothstep( -8.0, 40.0, y ) ) * smoothstep( 60.0, 160.0, vViewDepth );
+  col = mix( col, uMistColor, pooled * 0.5 );
   col = mix( col, hazeCol, haze );
 
   // Build-in reveal: the range condenses out of the haze.
@@ -316,14 +344,13 @@ export interface HorizonPeakUniforms {
   uSnowLine: THREE.IUniform<number>;
   uAlpenglow: THREE.IUniform<number>;
   uReveal: THREE.IUniform<number>;
-  uTime: THREE.IUniform<number>;
 }
 
 export type HorizonPeakMaterial = THREE.ShaderMaterial & { uniforms: HorizonPeakUniforms };
 
 /** Linear-space light levels tuned against WorldLighting's sun (3.1) / hemisphere (0.55). */
 const SUN_LEVEL = 1.45;
-const SKY_LEVEL = 0.26;
+const SKY_LEVEL = 0.3;
 const GROUND_LEVEL = 0.22;
 
 export function createHorizonPeakMaterial(noise: THREE.Texture, quality: HorizonShaderQuality): HorizonPeakMaterial {
@@ -349,7 +376,6 @@ export function createHorizonPeakMaterial(noise: THREE.Texture, quality: Horizon
     uSnowLine: { value: 6 },
     uAlpenglow: { value: 0.7 },
     uReveal: { value: 0 },
-    uTime: { value: 0 },
   };
   const material = new THREE.ShaderMaterial({
     name: 'HorizonPeakMaterial',

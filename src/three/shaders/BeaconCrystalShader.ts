@@ -17,8 +17,11 @@ import { PALETTE, SUN_DIRECTION } from '../world/worldLayout';
  *              anti-aliased glowing facet edges (barycentric, diagonal-free).
  *   Beam     — two nested open cylinders, additive, view-profiled.
  *   Halo     — a camera-facing soft glow + faint anamorphic streak.
- *   Ground   — a horizontal light pool with emitted shock rings.
+ *   Ground   — a soft light pool laid on the rock below (oriented to its
+ *              normal), with shock rings emitted on the activation flare.
  *   Sparkles — GPU-animated orbiting / rising points (draw range per frame).
+ *   Fit      — fitBeaconToTerrain() sizes a cluster to the free space in
+ *              front of the rock using the terrain's signed distance field.
  *
  * Every material is tone mapped like the rest of the world AND multiplies its
  * output by `uExposure` (fed from sceneFx.exposure), so the Scene 10 dissolve
@@ -120,7 +123,7 @@ void main() {
   // ...float away from the cluster centre when the beacon is energised, and bob.
   vec3 away = aCenter / max( length( aCenter ), 1e-3 );
   float bob = sin( uTime * ( 0.7 + 0.6 * phase ) + phase * 23.0 ) * 0.045;
-  vec3 center = aCenter + ( away * 0.3 * uSpread + vec3( 0.0, bob, 0.0 ) ) * sat;
+  vec3 center = aCenter + ( away * 0.15 * uSpread + vec3( 0.0, bob, 0.0 ) ) * sat;
   vec3 objPos = center + local;
 
   vec4 world = modelMatrix * vec4( objPos, 1.0 );
@@ -141,6 +144,7 @@ void main() {
 
 export const CRYSTAL_FRAGMENT_SHADER = /* glsl */ `
 uniform vec3 uColor;
+uniform vec3 uSatColor;
 uniform vec3 uCoreColor;
 uniform vec3 uDeepColor;
 uniform vec3 uSunDir;
@@ -172,21 +176,29 @@ vec3 bcIridescence( float t ) {
   return 0.5 + 0.5 * cos( 6.28318 * ( t + vec3( 0.0, 0.33, 0.67 ) ) );
 }
 
-// Glow of the shard's inner filament as seen along the refracted ray R that
-// enters at P: Gaussian in the closest distance between that ray and the axis.
-float bcCore( vec3 P, vec3 R, vec3 A, float radius ) {
+// Closest distance between the refracted ray R entering at P and the shard
+// axis A, normalised by the shard radius: 0 = the ray grazes the filament.
+float bcAxisDistance( vec3 P, vec3 R, vec3 A, float radius ) {
   vec3 c = cross( R, A );
   float len = length( c );
   float d = len > 1e-4 ? abs( dot( P, c ) ) / len : length( P - A * dot( P, A ) );
-  float k = d / ( radius * 0.42 );
+  return d / radius;
+}
+
+// Thin, hot inner filament.
+float bcCore( vec3 P, vec3 R, vec3 A, float radius ) {
+  float k = bcAxisDistance( P, R, A, radius ) / 0.24;
   return exp( - k * k );
 }
 
-// Refraction bands: oblique planes inside the shard, sampled mid-way along R.
-float bcBands( vec3 P, vec3 R, float radius, float freq, float drift ) {
+// Refraction bands: irregular oblique planes inside the shard (growth
+// phantoms), sampled mid-way along the refracted ray R.
+float bcBands( vec3 P, vec3 R, float radius, float freq, float drift, vec3 plane ) {
   vec3 inside = P + R * radius * 1.25;
-  float b = dot( inside, normalize( vec3( 0.42, 1.0, -0.27 ) ) ) * freq + drift;
-  return pow( 0.5 + 0.5 * cos( 6.28318 * b ), 12.0 );
+  float x = dot( inside, plane ) * freq + drift;
+  // Warp the spacing so the planes never read as regular stripes.
+  x += 0.35 * sin( x * 2.3 + dot( inside, vec3( 3.1, 0.7, -2.3 ) ) / radius );
+  return pow( 0.5 + 0.5 * cos( 6.28318 * x ), 7.0 );
 }
 
 void main() {
@@ -210,38 +222,56 @@ void main() {
   vec3 No = normalize( vObjNormal );
 
   float E = uEnergy * ( 0.8 + 0.2 * uPulse ) + uFlare * 0.85;
+  // Hot parts (filament, flashes, edges) respond super-linearly: a claimed
+  // beacon glows steadily, only the active one burns.
+  float E2 = E * E;
 
   // ---- Fake refraction: inner filament + bands, per wavelength when allowed.
-  float bandFreq = 1.1 / radius;
+  float bandFreq = ( 0.75 + 0.5 * fract( phase * 5.3 ) ) / radius;
   float drift = uTime * 0.07 + phase * 3.0;
+  vec3 plane = normalize( vec3( 0.42 + phase * 0.6, 1.0, -0.27 + phase * 0.9 ) );
 #if CRYSTAL_QUALITY > 0
-  vec3 Rr = refract( - Vo, No, 1.0 / 1.46 );
+  vec3 Rr = refract( - Vo, No, 1.0 / 1.495 );
   vec3 Rg = refract( - Vo, No, 1.0 / 1.52 );
-  vec3 Rb = refract( - Vo, No, 1.0 / 1.60 );
-  vec3 core = vec3( bcCore( P, Rr, A, radius ), bcCore( P, Rg, A, radius ), bcCore( P, Rb, A, radius ) );
-  vec3 bands = vec3(
-    bcBands( P, Rr, radius, bandFreq, drift ),
-    bcBands( P, Rg, radius, bandFreq, drift ),
-    bcBands( P, Rb, radius, bandFreq, drift )
+  vec3 Rb = refract( - Vo, No, 1.0 / 1.555 );
+  // Dispersion stays a fringe: each channel is pulled back toward green.
+  float coreG = bcCore( P, Rg, A, radius );
+  vec3 core = mix( vec3( coreG ), vec3( bcCore( P, Rr, A, radius ), coreG, bcCore( P, Rb, A, radius ) ), 0.4 );
+  float bandG = bcBands( P, Rg, radius, bandFreq, drift, plane );
+  vec3 bands = mix(
+    vec3( bandG ),
+    vec3( bcBands( P, Rr, radius, bandFreq, drift, plane ), bandG, bcBands( P, Rb, radius, bandFreq, drift, plane ) ),
+    0.55
   );
 #else
   vec3 Rg = refract( - Vo, No, 1.0 / 1.52 );
   float c0 = bcCore( P, Rg, A, radius );
   vec3 core = vec3( c0 );
-  vec3 bands = vec3( bcBands( P, Rg, radius, bandFreq, drift ) ) * vec3( 0.85, 1.0, 1.15 );
+  vec3 bands = vec3( bcBands( P, Rg, radius, bandFreq, drift, plane ) ) * vec3( 0.85, 1.0, 1.15 );
 #endif
+  // Soft luminous volume around the filament.
+  float vk = bcAxisDistance( P, Rg, A, radius ) / 0.8;
+  float volume = exp( - vk * vk );
+
+  // Scintillation: each facet hides an internal mirror; as the cluster turns,
+  // the refracted ray sweeps across it and the facet flashes.
+  vec3 mirror = normalize( vec3( fract( facet * 13.17 ) - 0.5, fract( facet * 7.31 ) - 0.5, fract( facet * 3.71 ) - 0.5 ) + 1e-4 );
+  float flash = pow( max( dot( Rg, mirror ), 0.0 ), 22.0 );
 
   // ---- Dark tinted glass body.
-  vec3 col = uDeepColor * ( 0.55 + 0.9 * facet );
-  col += uColor * 0.035 * max( dot( N, uSunDir ), 0.0 );
+  vec3 col = uDeepColor * ( 0.35 + 1.3 * facet );
+  col += uColor * 0.02 * max( dot( N, uSunDir ), 0.0 );
 
   // ---- Inner light: facets fill with colour, the filament burns, bands refract.
-  vec3 inner = uColor * ( 0.05 + 0.16 * facet ) * ( 0.28 + 0.72 * E );
-  inner += uCoreColor * core * tipFade * ( 0.22 + 1.7 * E );
-  inner += mix( uColor, uCoreColor, 0.5 ) * bands * tipFade * ( 0.05 + 0.5 * E );
+  float fill = 0.05 + 0.95 * facet * facet * facet;
+  vec3 inner = uSatColor * fill * ( 0.012 + 0.42 * E );
+  inner += uColor * volume * tipFade * ( 0.01 + 0.24 * E );
+  inner += uCoreColor * core * tipFade * ( 0.1 + 0.35 * E + 1.9 * E2 );
+  inner += mix( uSatColor, uCoreColor, 0.4 ) * bands * tipFade * ( 0.012 + 0.06 * E + 0.24 * E2 );
+  inner += mix( uSatColor, uCoreColor, 0.55 ) * flash * ( 0.16 + 0.4 * E + 1.1 * E2 );
   float veins = pow( 0.5 + 0.5 * sin( along * 7.0 - uTime * ( 1.2 + 2.8 * E ) + facet * 6.28318 ), 14.0 );
-  inner += uCoreColor * veins * tipFade * E * 0.45;
-  col += inner * ( 0.5 + 0.5 * NoV );
+  inner += uCoreColor * veins * tipFade * E * 0.4;
+  col += inner * ( 0.45 + 0.55 * NoV );
 
   // ---- Reflections: procedural twilight sky + low sun glints.
   vec3 Rw = reflect( - V, N );
@@ -256,20 +286,20 @@ void main() {
   col += uSunColor * ( pow( RoL, 260.0 ) * 7.0 + pow( RoL, 28.0 ) * 0.22 ) * ( 0.35 + 0.65 * F );
 
   // ---- Fresnel rim and the iridescent sweep travelling up each shard.
-  col += mix( uColor, uCoreColor, 0.45 ) * fres * ( 0.08 + 0.9 * E );
+  col += mix( uColor, uCoreColor, 0.45 ) * fres * ( 0.05 + 0.3 * E + 0.6 * E2 );
   float sweepPos = fract( uTime * 0.09 + phase * 0.61 ) * 3.2 - 1.6;
   float sweep = exp( - pow( ( along - sweepPos ) * 2.6, 2.0 ) );
   vec3 irid = bcIridescence( fres * 1.3 + facet * 0.45 + along * 0.25 + uTime * 0.025 );
-  col += irid * mix( uColor, vec3( 1.0 ), 0.5 ) * ( fres * 0.35 + sweep * 0.55 ) * ( 0.04 + 0.36 * E );
+  col += irid * mix( uColor, vec3( 1.0 ), 0.5 ) * ( fres * 0.22 + sweep * 0.4 ) * ( 0.03 + 0.3 * E );
 
   // ---- Glowing facet edges (anti-aliased; fade out when facets get tiny).
   float d = min( min( vBary.x, vBary.y ), vBary.z );
   float fw = max( fwidth( d ), 1e-5 );
   float line = 1.0 - smoothstep( fw * 0.35, fw * 1.6, d );
-  float bevel = 1.0 - smoothstep( 0.0, 0.08, d );
+  float bevel = 1.0 - smoothstep( 0.0, 0.06, d );
   float lineFade = 1.0 - smoothstep( 0.06, 0.3, fw );
-  vec3 edgeColor = mix( uColor, vec3( 1.0 ), 0.3 );
-  col += edgeColor * ( line * 0.75 * lineFade + bevel * 0.22 ) * ( 0.14 + 1.15 * E );
+  vec3 edgeColor = mix( uColor, vec3( 1.0 ), 0.22 );
+  col += edgeColor * ( line * 0.62 * lineFade + bevel * 0.12 ) * ( 0.1 + 0.3 * E + 0.7 * E2 );
 
   col = min( col, vec3( 16.0 ) ) * uExposure;
 
@@ -286,6 +316,7 @@ void main() {
 export interface CrystalUniforms extends FogUniforms {
   [uniform: string]: THREE.IUniform;
   uColor: THREE.IUniform<THREE.Color>;
+  uSatColor: THREE.IUniform<THREE.Color>;
   uCoreColor: THREE.IUniform<THREE.Color>;
   uDeepColor: THREE.IUniform<THREE.Color>;
   uSunDir: THREE.IUniform<THREE.Vector3>;
@@ -305,17 +336,55 @@ export interface CrystalUniforms extends FogUniforms {
 
 export type BeaconCrystalMaterial = THREE.ShaderMaterial & { uniforms: CrystalUniforms };
 
+/**
+ * Deeper, more saturated version of a beacon colour (same luminance) for the
+ * facet fill, so tone mapping keeps the jewel's hue instead of whitening it.
+ */
+function saturatedColorFor(color: THREE.Color): THREE.Color {
+  const sat = new THREE.Color(Math.pow(color.r, 1.6), Math.pow(color.g, 1.6), Math.pow(color.b, 1.6));
+  return sat.multiplyScalar(luminance(color) / Math.max(luminance(sat), 1e-4));
+}
+
 /** Bright, slightly desaturated version of a beacon colour for the inner filament. */
 function coreColorFor(color: THREE.Color): THREE.Color {
-  return color.clone().lerp(new THREE.Color(1, 1, 1), 0.42).multiplyScalar(1.15);
+  return color.clone().lerp(new THREE.Color(1, 1, 1), 0.2).multiplyScalar(1.15);
+}
+
+const luminance = (c: THREE.Color): number => 0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b;
+
+/** Luminance of the reference beacon colour (violet #A78BFA, linear). */
+const REFERENCE_LUMINANCE = 0.336;
+
+/**
+ * Emissive gain that evens out the beacon colours' very different luminance
+ * (teal and gold are ~2× the violet), so every beacon blooms alike and none
+ * tone-maps to a white blob.
+ */
+export function beaconEmissiveGain(color: THREE.ColorRepresentation): number {
+  const lum = Math.max(luminance(new THREE.Color(color)), 1e-3);
+  return THREE.MathUtils.clamp(Math.pow(REFERENCE_LUMINANCE / lum, 0.75), 0.5, 1.4);
+}
+
+/** The colour triple every beacon material uses, gain-normalised. */
+function emissiveColors(color: THREE.ColorRepresentation): { base: THREE.Color; color: THREE.Color; sat: THREE.Color; core: THREE.Color } {
+  const base = new THREE.Color(color);
+  const gain = beaconEmissiveGain(base);
+  return {
+    base,
+    color: base.clone().multiplyScalar(gain),
+    sat: saturatedColorFor(base).multiplyScalar(gain),
+    core: coreColorFor(base).multiplyScalar(gain),
+  };
 }
 
 export function createBeaconCrystalMaterial(color: THREE.ColorRepresentation, quality: CrystalQuality): BeaconCrystalMaterial {
-  const base = new THREE.Color(color);
+  const c = emissiveColors(color);
+  const base = c.base;
   const uniforms: CrystalUniforms = {
     ...fogUniforms(),
-    uColor: { value: base.clone() },
-    uCoreColor: { value: coreColorFor(base) },
+    uColor: { value: c.color },
+    uSatColor: { value: c.sat },
+    uCoreColor: { value: c.core },
     uDeepColor: { value: base.clone().lerp(new THREE.Color(PALETTE.skyZenith), 0.55).multiplyScalar(0.07) },
     uSunDir: { value: SUN_DIRECTION.clone().normalize() },
     uSunColor: { value: new THREE.Color(PALETTE.sun) },
@@ -388,20 +457,20 @@ void main() {
   vec2 vr = normalize( V.xz + vec2( 1e-5, 0.0 ) );
   float facing = abs( dot( nr, vr ) );
   float isCore = 1.0 - step( 0.5, vLayer );
-  float profile = mix( pow( facing, 3.0 ), pow( facing, 1.6 ), isCore );
+  float profile = mix( pow( facing, 2.2 ), pow( facing, 1.6 ), isCore );
 
   float h = vUv.y;
   float len = max( uLength, 1e-3 );
   float lengthMask = 1.0 - smoothstep( len * 0.3, len, h );
   float base = smoothstep( 0.0, 0.03, h );
-  float decay = exp( - h * 2.6 );
+  float decay = exp( - h * 3.4 );
   float wy = h * uHeight;
   float streak = 0.7 + 0.3 * sin( wy * 1.7 - uTime * 5.0 + vUv.x * 6.28318 * 3.0 );
   float packet = exp( - pow( ( h - fract( uTime * 0.2 + vLayer * 0.13 ) * 1.25 + 0.08 ) * 10.0, 2.0 ) );
   float flicker = 0.93 + 0.07 * sin( uTime * 11.0 + wy * 0.9 );
   float k = profile * lengthMask * base * ( decay * streak + packet * 0.6 ) * flicker;
 
-  vec3 col = mix( uColor * 0.16, uCoreColor * 0.95, isCore );
+  vec3 col = mix( uColor * 0.42, uCoreColor * 0.4, isCore );
   col *= k * uIntensity * uExposure * ( 1.0 - bcFogFactor() );
   gl_FragColor = vec4( col, 1.0 );
   #include <tonemapping_fragment>
@@ -423,11 +492,11 @@ export interface BeamUniforms extends FogUniforms {
 export type BeaconBeamMaterial = THREE.ShaderMaterial & { uniforms: BeamUniforms };
 
 export function createBeaconBeamMaterial(color: THREE.ColorRepresentation, height: number): BeaconBeamMaterial {
-  const base = new THREE.Color(color);
+  const c = emissiveColors(color);
   const uniforms: BeamUniforms = {
     ...fogUniforms(),
-    uColor: { value: base.clone() },
-    uCoreColor: { value: coreColorFor(base) },
+    uColor: { value: c.color },
+    uCoreColor: { value: c.core },
     uTime: { value: 0 },
     uIntensity: { value: 0 },
     uLength: { value: 0 },
@@ -556,11 +625,11 @@ export interface HaloUniforms extends FogUniforms {
 export type BeaconHaloMaterial = THREE.ShaderMaterial & { uniforms: HaloUniforms };
 
 export function createBeaconHaloMaterial(color: THREE.ColorRepresentation): BeaconHaloMaterial {
-  const base = new THREE.Color(color);
+  const c = emissiveColors(color);
   const uniforms: HaloUniforms = {
     ...fogUniforms(),
-    uColor: { value: base.clone() },
-    uCoreColor: { value: coreColorFor(base) },
+    uColor: { value: c.color },
+    uCoreColor: { value: c.core },
     uScale: { value: 2 },
     uIntensity: { value: 0 },
     uStreak: { value: 0 },
@@ -582,7 +651,7 @@ export function createBeaconHaloMaterial(color: THREE.ColorRepresentation): Beac
 }
 
 /* ---------------------------------------------------------------------------
- * Ground glow (horizontal light pool + shock rings)
+ * Ground glow (light pool on the rock below + flare shock rings)
  * ------------------------------------------------------------------------- */
 
 const GROUND_VERTEX_SHADER = /* glsl */ `
@@ -611,19 +680,19 @@ void main() {
   float r = length( vUv ) * 2.0;
   if ( r >= 1.0 ) discard;
   float edge = 1.0 - smoothstep( 0.55, 1.0, r );
-  float pool = ( exp( - r * r * 7.0 ) * 0.7 + exp( - r * 3.5 ) * 0.3 ) * edge;
-  // A faint engraved circle that breathes...
+  float pool = ( exp( - r * r * 6.0 ) * 0.6 + exp( - r * 3.2 ) * 0.4 ) * edge;
+  // A faint circle that breathes (only while energised)...
   float ang = atan( vUv.y, vUv.x );
   float dash = 0.55 + 0.45 * smoothstep( 0.2, 0.8, 0.5 + 0.5 * sin( ang * 18.0 + uTime * 0.4 ) );
-  float circle = exp( - pow( ( r - 0.42 ) / 0.012, 2.0 ) ) * dash * 0.5;
-  // ...and shock rings emitted outwards while active.
+  float circle = exp( - pow( ( r - 0.42 ) / 0.012, 2.0 ) ) * dash * 0.12;
+  // ...and shock rings emitted outwards (driven by uRing: the activation flare).
   float rings = 0.0;
   for ( int i = 0; i < 2; i ++ ) {
     float ph = fract( uRingPhase + float( i ) * 0.5 );
     float rr = 0.12 + ph * 0.85;
     rings += exp( - pow( ( r - rr ) / ( 0.018 + 0.03 * ph ), 2.0 ) ) * ( 1.0 - ph ) * ( 1.0 - ph );
   }
-  vec3 col = uColor * pool + uCoreColor * ( circle * ( 0.3 + 0.7 * uRing ) + rings * uRing * 0.8 ) * edge;
+  vec3 col = uColor * pool + uCoreColor * ( circle * uRing + rings * uRing * 0.55 ) * edge;
   col *= uIntensity * uExposure * ( 1.0 - bcFogFactor() );
   gl_FragColor = vec4( col, 1.0 );
   #include <tonemapping_fragment>
@@ -645,11 +714,11 @@ export interface GroundUniforms extends FogUniforms {
 export type BeaconGroundMaterial = THREE.ShaderMaterial & { uniforms: GroundUniforms };
 
 export function createBeaconGroundMaterial(color: THREE.ColorRepresentation): BeaconGroundMaterial {
-  const base = new THREE.Color(color);
+  const c = emissiveColors(color);
   const uniforms: GroundUniforms = {
     ...fogUniforms(),
-    uColor: { value: base.clone() },
-    uCoreColor: { value: coreColorFor(base) },
+    uColor: { value: c.color },
+    uCoreColor: { value: c.core },
     uIntensity: { value: 0 },
     uRing: { value: 0 },
     uRingPhase: { value: 0 },
@@ -752,11 +821,11 @@ export interface SparkleUniforms extends FogUniforms {
 export type BeaconSparkleMaterial = THREE.ShaderMaterial & { uniforms: SparkleUniforms };
 
 export function createBeaconSparkleMaterial(color: THREE.ColorRepresentation): BeaconSparkleMaterial {
-  const base = new THREE.Color(color);
+  const c = emissiveColors(color);
   const uniforms: SparkleUniforms = {
     ...fogUniforms(),
-    uColor: { value: base.clone() },
-    uCoreColor: { value: coreColorFor(base) },
+    uColor: { value: c.color },
+    uCoreColor: { value: c.core },
     uTime: { value: 0 },
     uOrbit: { value: 0 },
     uRise: { value: 0 },
@@ -967,9 +1036,11 @@ function buildShard(out: ClusterBuffers, shard: ShardSpec, rand: () => number): 
 
 /**
  * Builds a beacon crystal cluster: an elongated hexagonal bipyramid (main
- * shard) with 2 – 4 satellites sprouting up/outward (and one downward, so the
- * floating cluster reads balanced). Non-indexed, flat normals, with the
- * attributes BeaconCrystal's shaders expect.
+ * shard, raised so its short lower tip and long upper tip suit a beacon that
+ * hovers just above sloping rock) with 2 – 4 satellites sprouting up and out
+ * of its mid-section. Non-indexed, flat normals, with the attributes
+ * BeaconCrystal's shaders expect. The envelope flares upward like the free
+ * space in front of a back-leaning cliff, so it can rotate close to the rock.
  */
 export function createCrystalClusterGeometry(options: CrystalClusterOptions): CrystalClusterGeometry {
   const rand = mulberry32(options.seed);
@@ -978,36 +1049,34 @@ export function createCrystalClusterGeometry(options: CrystalClusterOptions): Cr
 
   const shards: ShardSpec[] = [];
   shards.push({
-    center: new THREE.Vector3(0, 0, 0),
-    axis: new THREE.Vector3((rand() - 0.5) * 0.06, 1, (rand() - 0.5) * 0.06).normalize(),
-    radius: 0.3 * scale,
-    prismHalf: 0.55 * scale,
-    topCap: 0.8 * scale,
-    bottomCap: 0.56 * scale,
+    center: new THREE.Vector3(0, 0.28 * scale, 0),
+    axis: new THREE.Vector3((rand() - 0.5) * 0.12, 1, (rand() - 0.5) * 0.12).normalize(),
+    radius: 0.27 * scale,
+    prismHalf: 0.52 * scale,
+    topCap: 0.72 * scale,
+    bottomCap: 0.36 * scale,
     sides: 6,
     twist: 0.1,
     jitter: 0.07,
     phase: 0,
   });
 
-  const down = 1;
-  const up = satellites - down;
   const azimuth0 = rand() * Math.PI * 2;
+  // Golden-angle azimuths so no two satellites line up; lower ones are smaller
+  // and lean further out, upper ones stand steeper.
+  const golden = Math.PI * (3 - Math.sqrt(5));
   for (let k = 0; k < satellites; k += 1) {
-    const isDown = k >= up;
-    const az = isDown
-      ? azimuth0 + Math.PI / up + (rand() - 0.5) * 0.5
-      : azimuth0 + (k / up) * Math.PI * 2 + (rand() - 0.5) * 0.45;
-    const s = (isDown ? 0.4 : 0.44 + 0.18 * rand()) * scale;
-    const tilt = isDown ? 0.55 + rand() * 0.25 : 0.42 + rand() * 0.35;
-    const dirY = isDown ? -Math.cos(tilt) : Math.cos(tilt);
-    const axis = new THREE.Vector3(Math.sin(tilt) * Math.cos(az), dirY, Math.sin(tilt) * Math.sin(az)).normalize();
-    const radius = 0.3 * s * (0.95 + rand() * 0.15);
-    const prismHalf = 0.5 * s * (0.8 + rand() * 0.4);
-    const topCap = 0.75 * s;
-    const bottomCap = 0.3 * s;
-    const rootY = isDown ? -0.42 * scale : (-0.38 + rand() * 0.3) * scale;
-    const root = new THREE.Vector3(Math.cos(az) * 0.17 * scale, rootY, Math.sin(az) * 0.17 * scale);
+    const u = satellites > 1 ? k / (satellites - 1) : 0.5;
+    const az = azimuth0 + k * golden * 1.6 + (rand() - 0.5) * 0.35;
+    const s = (0.38 + 0.2 * u + 0.12 * rand()) * scale;
+    const tilt = 0.62 - 0.3 * u + (rand() - 0.5) * 0.1;
+    const axis = new THREE.Vector3(Math.sin(tilt) * Math.cos(az), Math.cos(tilt), Math.sin(tilt) * Math.sin(az)).normalize();
+    const radius = 0.25 * s * (0.95 + rand() * 0.15);
+    const prismHalf = 0.42 * s * (0.85 + rand() * 0.3);
+    const topCap = 0.62 * s;
+    const bottomCap = 0.26 * s;
+    const rootY = (0.1 + 0.46 * u + (rand() - 0.5) * 0.08) * scale;
+    const root = new THREE.Vector3(Math.cos(az) * 0.1 * scale, rootY, Math.sin(az) * 0.1 * scale);
     // Sink the satellite's lower tip into the main shard so the cluster reads as grown together.
     const center = root.clone().addScaledVector(axis, prismHalf + bottomCap * 0.4);
     shards.push({
@@ -1036,16 +1105,177 @@ export function createCrystalClusterGeometry(options: CrystalClusterOptions): Cr
   geometry.setAttribute('aShape', new THREE.Float32BufferAttribute(buffers.shape, 4));
   geometry.computeBoundingBox();
   geometry.computeBoundingSphere();
-  // The vertex stage floats satellites up to ~0.35 away and bobs them.
-  if (geometry.boundingSphere) geometry.boundingSphere.radius += 0.45 * scale;
-  if (geometry.boundingBox) geometry.boundingBox.expandByScalar(0.45 * scale);
-
   const box = geometry.boundingBox ?? new THREE.Box3();
+  const bottomDepth = Math.max(0, -box.min.y);
+  // The vertex stage floats satellites up to SATELLITE_SPREAD_MAX away and bobs them.
+  if (geometry.boundingSphere) geometry.boundingSphere.radius += SATELLITE_SPREAD_MAX + 0.1;
+  if (geometry.boundingBox) geometry.boundingBox.expandByScalar(SATELLITE_SPREAD_MAX + 0.1);
+
   const main = shards[0];
   return {
     geometry,
     shards,
-    topTip: main.prismHalf + main.topCap,
-    bottomDepth: Math.max(0, -box.min.y - 0.45 * scale),
+    topTip: main.center.y + main.prismHalf + main.topCap,
+    bottomDepth,
   };
+}
+
+/* ---------------------------------------------------------------------------
+ * Fitting a beacon to the terrain
+ * ------------------------------------------------------------------------- */
+
+/** Signed distance to the rock (negative inside), e.g. terrainGeometry's mountainSdf. */
+export type SdfFunction = (x: number, y: number, z: number) => number;
+
+export interface BeaconTerrainFitOptions {
+  /** Extra clearance kept between crystal and rock (mesh tessellation error, noise). */
+  margin?: number;
+  minScale?: number;
+  maxScale?: number;
+  /** Peak vertical hover of the cluster (world units). */
+  hover?: number;
+  /** Peak precession tilt of the cluster (radians). */
+  tilt?: number;
+}
+
+export interface BeaconTerrainFit {
+  /** Uniform scale for the crystal cluster so it rotates clear of the rock. */
+  scale: number;
+  /** Worst clearance at that scale (negative = still touching at minScale). */
+  clearance: number;
+  /** SDF at the beacon position (free radius around its centre). */
+  distance: number;
+  /** Unit direction away from the nearest rock (SDF gradient). */
+  outward: THREE.Vector3;
+  /** Ground glow placement relative to the beacon position, or null when no rock lies below. */
+  ground: { offset: THREE.Vector3; normal: THREE.Vector3; depth: number } | null;
+}
+
+/** Maximum distance (object units) the satellites float out when a beacon flares. */
+export const SATELLITE_SPREAD_MAX = 0.15 * 1.35;
+
+function sdfGradient(sdf: SdfFunction, x: number, y: number, z: number, out: THREE.Vector3): THREE.Vector3 {
+  const e = 0.04;
+  out.set(sdf(x + e, y, z) - sdf(x - e, y, z), sdf(x, y + e, z) - sdf(x, y - e, z), sdf(x, y, z + e) - sdf(x, y, z - e));
+  const len = out.length();
+  return len > 1e-8 ? out.multiplyScalar(1 / len) : out.set(0, 1, 0);
+}
+
+/**
+ * Fits a beacon to the rock around it (runs once at mount, ~0.3 ms):
+ *   - the largest cluster scale whose rotating, hovering, flaring envelope
+ *     keeps `margin` away from the rock (the free radius at each height is the
+ *     SDF on the beacon's vertical axis),
+ *   - where the rock lies straight below (for the ground glow) and its normal,
+ *   - which way is "out of the rock" (to keep the point light off the face).
+ */
+export function fitBeaconToTerrain(
+  position: readonly [number, number, number],
+  cluster: THREE.BufferGeometry,
+  sdf: SdfFunction,
+  options: BeaconTerrainFitOptions = {},
+): BeaconTerrainFit {
+  const [px, py, pz] = position;
+  const margin = options.margin ?? 0.12;
+  const minScale = options.minScale ?? 0.6;
+  const maxScale = options.maxScale ?? 1;
+  const hover = options.hover ?? 0.08;
+  const tilt = options.tilt ?? 0.06;
+
+  // Free radius on the vertical axis, every 5 cm from −3 to +3.
+  const step = 0.05;
+  const half = 60;
+  const free = new Float64Array(half * 2 + 1);
+  for (let i = 0; i <= half * 2; i += 1) free[i] = sdf(px, py + (i - half) * step, pz);
+  const freeAt = (y: number): number => {
+    const f = Math.min(half * 2, Math.max(0, y / step + half));
+    const i = Math.min(half * 2 - 1, Math.floor(f));
+    const t = f - i;
+    return free[i] + (free[i + 1] - free[i]) * t;
+  };
+  const freeOver = (y0: number, y1: number): number => {
+    let m = Math.min(freeAt(y0), freeAt(y1));
+    for (let y = y0 + step; y < y1; y += step) m = Math.min(m, freeAt(y));
+    return m;
+  };
+
+  // Envelope samples: for each vertex, the horizontal radius it can sweep
+  // (rotation about y, satellite self-spin, flare spread) and its height span.
+  const pos = cluster.getAttribute('position') as THREE.BufferAttribute;
+  const cen = cluster.getAttribute('aCenter') as THREE.BufferAttribute;
+  const ax = cluster.getAttribute('aAxis') as THREE.BufferAttribute;
+  const shape = cluster.getAttribute('aShape') as THREE.BufferAttribute;
+  const radii: number[] = [];
+  const lows: number[] = [];
+  const highs: number[] = [];
+  const v = new THREE.Vector3();
+  const c = new THREE.Vector3();
+  const a = new THREE.Vector3();
+  const base = new THREE.Vector3();
+  for (let i = 0; i < pos.count; i += 1) {
+    v.fromBufferAttribute(pos, i);
+    if (shape.getZ(i) <= 0.001) {
+      radii.push(Math.hypot(v.x, v.z));
+      lows.push(v.y);
+      highs.push(v.y);
+      continue;
+    }
+    c.fromBufferAttribute(cen, i);
+    a.fromBufferAttribute(ax, i).normalize();
+    const h = v.clone().sub(c).dot(a);
+    base.copy(c).addScaledVector(a, h);
+    const rho = v.distanceTo(base);
+    const sideways = rho * Math.sqrt(Math.max(0, 1 - a.y * a.y));
+    const away = c.clone().normalize();
+    const lift = SATELLITE_SPREAD_MAX * away.y;
+    radii.push(Math.hypot(base.x, base.z) + rho + SATELLITE_SPREAD_MAX * Math.hypot(away.x, away.z));
+    lows.push(base.y - sideways - 0.05);
+    highs.push(base.y + sideways + 0.05 + Math.max(0, lift));
+  }
+
+  const worstAt = (s: number): number => {
+    let worst = Number.POSITIVE_INFINITY;
+    for (let i = 0; i < radii.length; i += 1) {
+      const y0 = lows[i] * s - hover;
+      const y1 = highs[i] * s + hover;
+      const reach = radii[i] * s + tilt * Math.max(Math.abs(y0), Math.abs(y1));
+      worst = Math.min(worst, freeOver(y0, y1) - reach - margin);
+    }
+    return worst;
+  };
+
+  let scale = minScale;
+  let clearance = worstAt(minScale);
+  for (let s = maxScale; s >= minScale - 1e-6; s -= 0.025) {
+    const w = worstAt(s);
+    if (w >= 0) {
+      scale = s;
+      clearance = w;
+      break;
+    }
+  }
+
+  const outward = sdfGradient(sdf, px, py, pz, new THREE.Vector3());
+
+  // Rock straight below: march down, then bisect onto the surface.
+  let ground: BeaconTerrainFit['ground'] = null;
+  let prev = 0;
+  for (let t = 0.04; t <= 8; t += 0.04) {
+    if (sdf(px, py - t, pz) < 0) {
+      let lo = prev;
+      let hi = t;
+      for (let k = 0; k < 8; k += 1) {
+        const mid = (lo + hi) * 0.5;
+        if (sdf(px, py - mid, pz) < 0) hi = mid;
+        else lo = mid;
+      }
+      const depth = (lo + hi) * 0.5;
+      const normal = sdfGradient(sdf, px, py - depth, pz, new THREE.Vector3());
+      ground = { offset: new THREE.Vector3(0, -depth, 0).addScaledVector(normal, 0.05), normal, depth };
+      break;
+    }
+    prev = t;
+  }
+
+  return { scale, clearance, distance: sdf(px, py, pz), outward, ground };
 }

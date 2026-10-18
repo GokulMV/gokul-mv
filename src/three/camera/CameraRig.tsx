@@ -226,38 +226,45 @@ interface RigState {
   monitor: MonitorState;
 }
 
-export function CameraRig(): null {
-  const camera = useThree((state) => state.camera);
-  const rig = useRef<RigState>({
+function createRigState(): RigState {
+  return {
     initialised: false,
     nudge: 0,
     previousProgress: 0,
     impactAge: Number.POSITIVE_INFINITY,
     reducedMotion: false,
     monitor: createMonitorState(),
-  });
+  };
+}
+
+export function CameraRig(): null {
+  const camera = useThree((state) => state.camera);
+  // Mutable per-instance rig state, created once (never React state: nothing here re-renders).
+  const rigRef = useRef<RigState | null>(null);
+  if (rigRef.current === null) rigRef.current = createRigState();
+  const rig = rigRef.current;
 
   useLayoutEffect(() => {
     if (camera instanceof THREE.PerspectiveCamera) camera.fov = CAMERA_CLIP.fov;
     camera.near = CAMERA_CLIP.near;
     camera.far = CAMERA_CLIP.far;
     camera.updateProjectionMatrix();
-    rig.current.initialised = false;
-  }, [camera]);
+    rig.initialised = false;
+  }, [camera, rig]);
 
   useEffect(() => {
     if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return undefined;
     const query = window.matchMedia('(prefers-reduced-motion: reduce)');
     const apply = () => {
-      rig.current.reducedMotion = query.matches;
+      rig.reducedMotion = query.matches;
     };
     apply();
     query.addEventListener('change', apply);
     return () => query.removeEventListener('change', apply);
-  }, []);
+  }, [rig]);
 
   useFrame((state, delta) => {
-    const s = rig.current;
+    const s = rig;
     updateFrameMonitor(s.monitor, delta);
 
     const p = scrollStore.dampedProgress;

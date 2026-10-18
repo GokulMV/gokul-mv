@@ -84,15 +84,14 @@ vec3 skyStars( vec3 d ) {
   vec3 delta = p - star;
   delta -= d * dot( delta, d );
   float dist = length( delta );
-  // Keep every star at least ~1px wide so it never sparkles in and out.
+  // Every star is ~1px wide at any resolution, so it never sparkles in and out.
   float footprint = length( fwidth( p ) );
-  float radius = max( footprint * 0.8, 0.045 );
+  float radius = max( footprint * 0.9, 0.05 );
   float core = 1.0 - smoothstep( 0.0, radius, dist );
-  float energy = 0.045 / radius;
-  float magnitude = 0.12 + 2.2 * pow( r.x, 7.0 );
-  float twinkle = 0.72 + 0.28 * sin( uTime * ( 1.3 + 5.0 * r.y ) + r.z * 41.0 );
+  float magnitude = 0.22 + 1.6 * pow( r.x, 6.0 );
+  float twinkle = 0.75 + 0.25 * sin( uTime * ( 1.3 + 5.0 * r.y ) + r.z * 41.0 );
   vec3 tint = mix( vec3( 0.72, 0.82, 1.0 ), vec3( 1.0, 0.86, 0.7 ), r.z );
-  return tint * core * energy * energy * magnitude * twinkle;
+  return tint * core * core * magnitude * twinkle;
 }
 
 void main() {
@@ -122,8 +121,8 @@ void main() {
   // ---- Sun halo and disc: warm light mixed in (not added) so it never turns muddy purple.
   float mu = max( dot( d, L ), 0.0 );
   vec3 haloTint = mix( uGlow, uSunColor, 0.55 );
-  col = mix( col, haloTint * 0.5, pow( mu, 12.0 ) * 0.42 * uWarmth );
-  col += haloTint * ( pow( mu, 64.0 ) * 0.26 + pow( mu, 700.0 ) * 1.2 ) * uWarmth;
+  col = mix( col, haloTint * 0.45, pow( mu, 48.0 ) * 0.34 * uWarmth );
+  col += haloTint * ( pow( mu, 90.0 ) * 0.22 + pow( mu, 900.0 ) * 1.1 ) * uWarmth;
   float disc = smoothstep( 0.999935, 0.999962, mu );
   col += uSunColor * disc * 26.0;
 
@@ -133,15 +132,15 @@ void main() {
   if ( guard > 0.0 ) {
     vec2 cuv = d.xz / ( e + 0.16 );
     vec2 axis = normalize( vec2( 0.82, -0.57 ) );
-    vec2 st = vec2( dot( cuv, axis ), dot( cuv, vec2( -axis.y, axis.x ) ) ) * vec2( 0.11, 0.55 );
+    vec2 st = vec2( dot( cuv, axis ), dot( cuv, vec2( -axis.y, axis.x ) ) ) * vec2( 0.09, 0.8 );
     st.x += uTime * 0.0022;
     float c1 = texture2D( uNoise, st + vec2( 0.13, 0.57 ) ).r;
     float c2 = texture2D( uNoise, st * 2.7 + vec2( 0.37, 0.11 ) ).g;
     float c3 = texture2D( uNoise, st * 6.1 + vec2( 0.71, 0.53 ) ).b;
     float cn = c1 * 0.58 + c2 * 0.3 + c3 * 0.12;
-    float cover = smoothstep( 0.6, 0.82, cn ) * guard * uCirrus;
+    float cover = smoothstep( 0.6, 0.84, cn ) * guard * uCirrus;
     vec3 lit = mix( uMid * 1.5 + uHorizon * 0.25, uGlow * 0.75, clamp( pow( az, 2.5 ) * 0.7 + pow( mu, 6.0 ) * 0.6, 0.0, 1.0 ) );
-    col = mix( col, lit, cover * 0.16 );
+    col = mix( col, lit, cover * 0.13 );
   }
 #endif
 
