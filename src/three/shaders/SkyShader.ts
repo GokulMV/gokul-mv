@@ -119,10 +119,11 @@ void main() {
   col *= 1.0 - anti * 0.28 * ( 1.0 - smoothstep( 0.0, 0.1, eh ) );
   col += uBelt * anti * exp( -pow( ( eh - 0.13 ) / 0.07, 2.0 ) ) * 0.16 * uWarmth;
 
-  // ---- Sun halo and disc.
+  // ---- Sun halo and disc: warm light mixed in (not added) so it never turns muddy purple.
   float mu = max( dot( d, L ), 0.0 );
-  float halo = pow( mu, 5.0 ) * 0.11 + pow( mu, 42.0 ) * 0.32 + pow( mu, 420.0 ) * 1.1;
-  col += uGlow * halo * uWarmth;
+  vec3 haloTint = mix( uGlow, uSunColor, 0.55 );
+  col = mix( col, haloTint * 0.5, pow( mu, 12.0 ) * 0.42 * uWarmth );
+  col += haloTint * ( pow( mu, 64.0 ) * 0.26 + pow( mu, 700.0 ) * 1.2 ) * uWarmth;
   float disc = smoothstep( 0.999935, 0.999962, mu );
   col += uSunColor * disc * 26.0;
 
@@ -132,15 +133,15 @@ void main() {
   if ( guard > 0.0 ) {
     vec2 cuv = d.xz / ( e + 0.16 );
     vec2 axis = normalize( vec2( 0.82, -0.57 ) );
-    vec2 st = vec2( dot( cuv, axis ), dot( cuv, vec2( -axis.y, axis.x ) ) ) * vec2( 0.075, 0.34 );
+    vec2 st = vec2( dot( cuv, axis ), dot( cuv, vec2( -axis.y, axis.x ) ) ) * vec2( 0.11, 0.55 );
     st.x += uTime * 0.0022;
     float c1 = texture2D( uNoise, st + vec2( 0.13, 0.57 ) ).r;
     float c2 = texture2D( uNoise, st * 2.7 + vec2( 0.37, 0.11 ) ).g;
     float c3 = texture2D( uNoise, st * 6.1 + vec2( 0.71, 0.53 ) ).b;
     float cn = c1 * 0.58 + c2 * 0.3 + c3 * 0.12;
-    float cover = smoothstep( 0.54, 0.74, cn ) * guard * uCirrus;
-    vec3 lit = mix( uMid * 1.9 + uHorizon * 0.3, uGlow * 0.9, pow( az, 2.0 ) * 0.75 + pow( mu, 6.0 ) * 0.6 );
-    col = mix( col, lit, cover * 0.42 );
+    float cover = smoothstep( 0.6, 0.82, cn ) * guard * uCirrus;
+    vec3 lit = mix( uMid * 1.5 + uHorizon * 0.25, uGlow * 0.75, clamp( pow( az, 2.5 ) * 0.7 + pow( mu, 6.0 ) * 0.6, 0.0, 1.0 ) );
+    col = mix( col, lit, cover * 0.16 );
   }
 #endif
 

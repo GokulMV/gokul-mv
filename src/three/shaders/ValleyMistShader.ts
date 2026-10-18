@@ -28,7 +28,7 @@ export const VALLEY_MIST_FIELD = {
   yHigh: 45,
 } as const;
 
-/** World height encoding of the R8 terrain height map used for soft contact. */
+/** World height encoding of the RG8 terrain height map used for soft contact. */
 export const MIST_HEIGHT_ENCODING = {
   min: -140,
   range: 280,
@@ -113,20 +113,20 @@ void main() {
 
   // Large-scale banding: the mist gathers in long drifting banks.
   float band = texture2D( uNoise, ( xz + drift * 0.35 ) * 0.0017 + vLayer.y * 1.37 ).g;
-  float cover = mix( 0.6, 0.4, smoothstep( 0.32, 0.68, band ) );
-  float dens = smoothstep( cover - 0.07, cover + 0.2, n );
+  float cover = mix( 0.56, 0.36, smoothstep( 0.3, 0.7, band ) );
+  float dens = smoothstep( cover - 0.08, cover + 0.18, n );
 
   // Field bounds: always fade out well before the sheet ends.
   float ex = smoothstep( uBounds.x, uBounds.x + 110.0, xz.x ) * ( 1.0 - smoothstep( uBounds.y - 110.0, uBounds.y, xz.x ) );
   float ez = smoothstep( uBounds.z, uBounds.z + 55.0, xz.y ) * ( 1.0 - smoothstep( uBounds.w - 45.0, uBounds.w, xz.y ) );
   dens *= ex * ez;
 
-  // Soft contact with the terrain below / around the sheet.
-  float ground = texture2D( uHeight, ( xz - uHeightRect.xy ) * uHeightRect.zw ).r * uHeightEncoding.y + uHeightEncoding.x;
-  float clearance = vLayer.x - ground;
-  dens *= smoothstep( 0.0, 11.0, clearance );
+  // Soft contact with the terrain below / around the sheet: R is the ground
+  // dilated horizontally, so the sheet also thins out near steep faces.
+  vec2 g = texture2D( uHeight, ( xz - uHeightRect.xy ) * uHeightRect.zw ).rg * uHeightEncoding.y + uHeightEncoding.x;
+  dens *= smoothstep( 0.0, 12.0, vLayer.x - g.x );
   // Pooling: deep valleys under the sheet hold thicker mist.
-  dens *= mix( 0.5, 1.0, smoothstep( 8.0, 70.0, clearance ) );
+  dens *= mix( 0.45, 1.0, smoothstep( 8.0, 70.0, vLayer.x - g.y ) );
 
   float alpha = dens * vLayer.z * vFade * uOpacity;
   if ( alpha < 0.002 ) discard;
@@ -231,7 +231,7 @@ export function createValleyMistGeometry(maxLayers: number): THREE.InstancedBuff
     layer[i * 4 + 0] = y;
     layer[i * 4 + 1] = (i * 0.618034) % 1;
     // Dense low banks, wispy high veils.
-    layer[i * 4 + 2] = 0.5 - 0.3 * t;
+    layer[i * 4 + 2] = 0.62 - 0.32 * t;
     layer[i * 4 + 3] = 1 / (150 - 50 * t + (i % 3) * 9);
     const speed = 0.7 + 0.9 * t + (i % 2) * 0.25;
     const angle = 0.12 + (i % 3) * 0.09 - 0.1 * t;
