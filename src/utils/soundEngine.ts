@@ -10,8 +10,9 @@ import { ENDING } from '../three/world/worldLayout';
  *                                     ├─► dry (72 %) ──────────────┐
  *                                     └─► convolver ─► wet (28 %) ─┴─► output ─► speakers
  *   The convolver holds a procedural 3 s stereo canyon impulse response
- *   (25 ms pre-delay, sparse early reflections, pink noise decaying 60 dB
- *   over 3 s with air absorption), so every sound sits in the same space.
+ *   (25 ms pre-delay, sparse early reflections as smooth 6 ms noise bursts,
+ *   pink noise decaying 60 dB over 3 s with air absorption), so the beds sit
+ *   in one space. Foley takes its own bus (see below).
  *   `output` follows the mute ramp too, so reverb tails fade instead of
  *   being cut when the context suspends.
  *
@@ -27,18 +28,23 @@ import { ENDING } from '../three/world/worldLayout';
  *     0.035. Over the summit (0.78 → 0.92) the filter opens to 950 Hz and a
  *     soft F#4 shimmer fades in.
  *
- * Foley — filtered noise transients only (no oscillator: nothing pings at a
- * musical pitch), peaks under the wind. One-shots fire on forward threshold
- * crossings, with hysteresis, per-cue cooldowns and seek detection so a
- * scrubbed or jumped threshold never machine-guns a sound:
- *   • playGearEquip       — canvas pack settling, webbing pull, matte buckle
- *                           latch (GEAR_EQUIP_AT)
- *   • playGearDrop        — fabric unclip + low air rustle (GEAR_DROP_AT)
+ * Foley — the gear and the climbing contacts are pre-computed mono PCM
+ * buffers (4 variants each): low-passed noise and a sub thump, shaped by
+ * smooth raised-cosine envelopes, with zero DC and exactly 64 zero samples at
+ * both ends, played from sample 0, so a start or a stop can never click.
+ * They run on a separate foley bus — warm 1.1 kHz low-pass, its own
+ * compressor, only 4 % canyon reverb — so no transient reaches the 3 s canyon
+ * and comes back as slap-back. One-shots fire on forward threshold crossings,
+ * with hysteresis, per-cue cooldowns and seek detection so a scrubbed or
+ * jumped threshold never machine-guns a sound, and a gear one-shot never
+ * plays twice within 80 ms (a direct call and a cue on the same threshold):
+ *   • playGearEquip       — cloth and leather brush (GEAR_EQUIP_AT)
+ *   • playGearDrop        — low air-and-cloth release (GEAR_DROP_AT)
  *   • playChasmJumpWhoosh — resonant swept air (both chasm take-offs)
  *   • playPaperThrowAndFlutter — paper rustle bursts (the gust that tears the
  *     note out of the backpack, and a lighter one when it peels off the lens)
- * plus climbing contacts (boot / glove thud + granite grit) while scrolling
- * through the three climbs, at least 380 ms apart (updateClimbingFoley).
+ * plus soft boot contacts while scrolling through the three climbs, at
+ * least 380 ms apart (updateClimbingFoley).
  *
  * Muted by default. The AudioContext is created on the first user gesture
  * (browser autoplay policy) from `setEnabled(true)` / `toggle()`, and is
@@ -61,7 +67,19 @@ const IR_PREDELAY = 0.025;
 
 const BROWN_SECONDS = 5;
 const BROWN_LEAK = 0.998;
-const FOLEY_BROWN_LEAK = 0.99;
+
+/** Foley bus: warm low-pass, and the canyon-reverb share it keeps (wet, of the total). */
+const FOLEY_LOWPASS_HZ = 1100;
+const FOLEY_WET = 0.04;
+/** Pre-computed foley: samples held at exactly 0 at both ends, and variants per sound. */
+const FOLEY_EDGE = 64;
+const FOLEY_VARIANTS = 4;
+/** Playback gains of the normalised foley buffers. */
+const BOOT_STEP_GAIN = 0.055;
+const GEAR_EQUIP_GAIN = 0.075;
+const GEAR_DROP_GAIN = 0.07;
+/** A gear one-shot never plays twice within this window (s). */
+const GEAR_ONE_SHOT_GUARD = 0.08;
 
 const WIND_MAX = 0.14;
 const RUMBLE_MIN_HZ = 110;
@@ -198,12 +216,148 @@ function createBrownNoiseBuffer(ctx: BaseAudioContext, seconds: number, channels
   return buffer;
 }
 
-function createWhiteNoiseBuffer(ctx: BaseAudioContext, seconds: number): AudioBuffer {
-  const length = Math.floor(ctx.sampleRate * seconds);
-  const buffer = ctx.createBuffer(1, length, ctx.sampleRate);
+/* --- Pre-computed foley -------------------------------------------------- */
+
+function mulberry32(seed: number): () => number {
+  let a = seed >>> 0;
+  return () => {
+    a = (a + 0x6d2b79f5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/** Two cascaded one-pole low-passes (12 dB / octave); cutoff may change per sample. */
+class SoftLowpass {
+  private y1 = 0;
+  private y2 = 0;
+
+  constructor(private readonly rate: number) {}
+
+  next(x: number, cutoffHz: number): number {
+    const a = 1 - Math.exp((-2 * Math.PI * cutoffHz) / this.rate);
+    this.y1 += a * (x - this.y1);
+    this.y2 += a * (this.y1 - this.y2);
+    return this.y2;
+  }
+}
+
+/** Hann rise over [start, start + rise], hold, Hann fall over [end - fall, end]; 0 outside. */
+function hannGate(t: number, start: number, end: number, rise: number, fall: number): number {
+  if (t <= start || t >= end) return 0;
+  if (t < start + rise) return 0.5 - 0.5 * Math.cos((Math.PI * (t - start)) / rise);
+  if (t > end - fall) return 0.5 - 0.5 * Math.cos((Math.PI * (end - t)) / fall);
+  return 1;
+}
+
+/**
+ * Builds one mono foley buffer: `sample(t, rand)` is the raw signal and
+ * `envelope(t)` its smooth amplitude. The result has zero DC (the mean is
+ * removed in proportion to the envelope, so the ends stay silent), a peak of
+ * 1, and exactly FOLEY_EDGE zero samples at both ends.
+ */
+function createFoleyBuffer(
+  ctx: BaseAudioContext,
+  seconds: number,
+  seed: number,
+  render: (rate: number, rand: () => number) => (t: number) => number,
+  envelope: (t: number) => number,
+): AudioBuffer {
+  const rate = ctx.sampleRate;
+  const length = Math.floor(seconds * rate);
+  const buffer = ctx.createBuffer(1, length, rate);
   const data = buffer.getChannelData(0);
-  for (let i = 0; i < length; i += 1) data[i] = (Math.random() * 2 - 1) * 0.9;
+  const weight = new Float32Array(length);
+  const sample = render(rate, mulberry32(seed));
+  const usable = (length - 2 * FOLEY_EDGE) / rate;
+  let sum = 0;
+  let weightSum = 0;
+  for (let i = 0; i < length; i += 1) {
+    const t = (i - FOLEY_EDGE) / rate;
+    const raw = sample(Math.max(0, t));
+    const w = i < FOLEY_EDGE || i >= length - FOLEY_EDGE ? 0 : envelope(Math.min(t, usable));
+    weight[i] = w;
+    data[i] = raw * w;
+    sum += data[i];
+    weightSum += w;
+  }
+  const dc = weightSum > 0 ? sum / weightSum : 0;
+  let peak = 0;
+  for (let i = 0; i < length; i += 1) {
+    data[i] -= dc * weight[i];
+    peak = Math.max(peak, Math.abs(data[i]));
+  }
+  const k = peak > 0 ? 1 / peak : 0;
+  for (let i = 0; i < length; i += 1) data[i] = i < FOLEY_EDGE || i >= length - FOLEY_EDGE ? 0 : data[i] * k;
   return buffer;
+}
+
+/**
+ * Boot on granite, 110 ms: a sub body gliding 55 → 32 Hz under an
+ * exponential decay, plus "velvet" pink noise low-passed at 220 Hz. No
+ * gravel, no high frequencies.
+ */
+function createBootStepBuffer(ctx: BaseAudioContext, seed: number): AudioBuffer {
+  const seconds = 0.11;
+  return createFoleyBuffer(
+    ctx,
+    seconds,
+    seed,
+    (rate, rand) => {
+      const pink = new PinkFilter();
+      const lp = new SoftLowpass(rate);
+      let phase = rand() * Math.PI * 2;
+      let lastT = 0;
+      return (t) => {
+        const f = 32 + (55 - 32) * Math.exp(-t / 0.03);
+        phase += 2 * Math.PI * f * Math.max(0, t - lastT);
+        lastT = t;
+        const sub = Math.sin(phase) * Math.exp(-t / 0.035);
+        const velvet = lp.next(pink.next(rand() * 2 - 1), 220) * 4 * Math.exp(-t / 0.028);
+        return 0.7 * sub + 0.6 * velvet;
+      };
+    },
+    (t) => hannGate(t, 0, seconds - (2 * FOLEY_EDGE) / ctx.sampleRate, 0.004, 0.05),
+  );
+}
+
+/** Cloth and leather brush, 220 ms: two overlapping Hann swells of pink noise low-passed at 480 and 680 Hz. */
+function createGearEquipBuffer(ctx: BaseAudioContext, seed: number): AudioBuffer {
+  const seconds = 0.22;
+  return createFoleyBuffer(
+    ctx,
+    seconds,
+    seed,
+    (rate, rand) => {
+      const pinkA = new PinkFilter();
+      const pinkB = new PinkFilter();
+      const lpA = new SoftLowpass(rate);
+      const lpB = new SoftLowpass(rate);
+      return (t) =>
+        lpA.next(pinkA.next(rand() * 2 - 1), 480) * hannGate(t, 0, 0.15, 0.075, 0.075) +
+        0.8 * lpB.next(pinkB.next(rand() * 2 - 1), 680) * hannGate(t, 0.07, 0.217, 0.07, 0.077);
+    },
+    () => 1,
+  );
+}
+
+/** Air-and-cloth release, 360 ms: pink noise through a low-pass gliding 320 → 120 Hz, smooth cosine envelope. */
+function createGearDropBuffer(ctx: BaseAudioContext, seed: number): AudioBuffer {
+  const seconds = 0.36;
+  const usable = seconds - (2 * FOLEY_EDGE) / ctx.sampleRate;
+  return createFoleyBuffer(
+    ctx,
+    seconds,
+    seed,
+    (rate, rand) => {
+      const pink = new PinkFilter();
+      const lp = new SoftLowpass(rate);
+      return (t) => lp.next(pink.next(rand() * 2 - 1), 320 * Math.pow(120 / 320, Math.min(1, t / usable)));
+    },
+    (t) => hannGate(t, 0, usable, usable * 0.22, usable * 0.78),
+  );
 }
 
 function createPinkNoiseBuffer(ctx: BaseAudioContext, seconds: number): AudioBuffer {
@@ -218,7 +372,7 @@ function createPinkNoiseBuffer(ctx: BaseAudioContext, seconds: number): AudioBuf
 
 /**
  * Procedural canyon impulse response: 25 ms of silence, a few sparse early
- * reflections (different per ear), then pink noise decaying by 60 dB over
+ * reflections (different per ear, smooth noise bursts), then pink noise decaying by 60 dB over
  * IR_SECONDS through a one-pole low-pass whose cutoff falls from 9 kHz to
  * 1.4 kHz (air absorption: the tail darkens as it dies).
  */
@@ -253,9 +407,16 @@ function createCanyonImpulse(ctx: BaseAudioContext): AudioBuffer {
       const attack = i - pre < fadeIn ? (i - pre) / fadeIn : 1;
       data[i] = lp * Math.exp(-decay * t) * attack;
     }
+    // Early reflections as smooth 6 ms Hann-windowed pink-noise bursts (a single-sample spike would
+    // turn every transient into a metallic slap-back).
+    const burst = Math.floor(0.006 * rate);
+    const reflection = new PinkFilter();
     for (const [time, gain] of early[channel]) {
       const at = pre + Math.floor(time * rate);
-      if (at < length) data[at] += gain * (channel === 0 ? 1 : -1);
+      for (let k = 0; k < burst && at + k < length; k += 1) {
+        const w = 0.5 - 0.5 * Math.cos((2 * Math.PI * k) / (burst - 1));
+        data[at + k] += gain * 0.35 * w * reflection.next(Math.random() * 2 - 1) * 9;
+      }
     }
     normalizePeak(data, 0.6);
   }
@@ -286,9 +447,12 @@ export class SoundGraph {
   private readonly output: GainNode;
   private readonly convolver: ConvolverNode;
   private readonly pinkNoise: AudioBuffer;
-  /** Mono one-shot sources for the foley transients. */
-  private readonly brownNoise: AudioBuffer;
-  private readonly whiteNoise: AudioBuffer;
+  /** Foley bus (bypasses the canyon reverb but for FOLEY_WET); follows the mute ramp like `master`. */
+  private readonly foleyBus: GainNode;
+  /** Pre-computed foley buffers (FOLEY_VARIANTS each). */
+  private readonly bootSteps: AudioBuffer[] = [];
+  private readonly gearEquips: AudioBuffer[] = [];
+  private readonly gearDrops: AudioBuffer[] = [];
 
   private readonly windSource: AudioBufferSourceNode;
   private readonly windBus: GainNode;
@@ -328,9 +492,32 @@ export class SoundGraph {
     compressor.connect(this.convolver).connect(wet).connect(this.output);
     this.output.connect(ctx.destination);
 
+    // Foley bus: warm low-pass -> its own compressor -> straight to the output, with only a FOLEY_WET share
+    // through the canyon convolver (the send is scaled so the wet part ends up at FOLEY_WET after `wet`).
+    this.foleyBus = ctx.createGain();
+    this.foleyBus.gain.value = 0;
+    const foleyLowpass = ctx.createBiquadFilter();
+    foleyLowpass.type = 'lowpass';
+    foleyLowpass.frequency.value = FOLEY_LOWPASS_HZ;
+    foleyLowpass.Q.value = 0.5;
+    const foleyCompressor = ctx.createDynamicsCompressor();
+    foleyCompressor.threshold.value = -18;
+    foleyCompressor.ratio.value = 3;
+    foleyCompressor.knee.value = 12;
+    foleyCompressor.attack.value = 0.006;
+    foleyCompressor.release.value = 0.2;
+    const foleySend = ctx.createGain();
+    foleySend.gain.value = FOLEY_WET / REVERB_WET;
+    this.foleyBus.connect(foleyLowpass).connect(foleyCompressor);
+    foleyCompressor.connect(this.output);
+    foleyCompressor.connect(foleySend).connect(this.convolver);
+
     this.pinkNoise = createPinkNoiseBuffer(ctx, 2);
-    this.brownNoise = createBrownNoiseBuffer(ctx, 2, 1, FOLEY_BROWN_LEAK);
-    this.whiteNoise = createWhiteNoiseBuffer(ctx, 1);
+    for (let v = 0; v < FOLEY_VARIANTS; v += 1) {
+      this.bootSteps.push(createBootStepBuffer(ctx, 101 + v));
+      this.gearEquips.push(createGearEquipBuffer(ctx, 211 + v));
+      this.gearDrops.push(createGearDropBuffer(ctx, 307 + v));
+    }
 
     // --- Wind -------------------------------------------------------------
     this.windSource = ctx.createBufferSource();
@@ -422,6 +609,7 @@ export class SoundGraph {
   /** Mute / unmute: master and post-reverb output glide together. */
   setLevel(level: number, at: number, timeConstant = MUTE_TIME_CONSTANT): void {
     glide(this.master.gain, level, at, timeConstant);
+    glide(this.foleyBus.gain, level, at, timeConstant);
     glide(this.output.gain, level > 0 ? 1 : 0, at, timeConstant);
   }
 
@@ -462,64 +650,27 @@ export class SoundGraph {
   /* --- Foley ------------------------------------------------------------ */
 
   /*
-   * Gear and climbing foley are pure filtered-noise transients: no oscillator
-   * anywhere, so nothing rings at a musical pitch. Peaks stay under the wind
-   * (FOLEY_PEAK) and every hit goes through the canyon reverb.
+   * Gear and climbing foley: pre-computed PCM buffers on the foley bus. A
+   * buffer starts and ends on exact zeros and plays from sample 0, so no
+   * start or stop can click; every hit picks one of FOLEY_VARIANTS and a
+   * slight rate / level / pan variation, so no two sound identical.
    */
 
-  /**
-   * Tactical nylon / canvas strap lock, three staggered noise transients:
-   *   0 ms   heavy pack settling — 90 ms of Brownian noise, low-pass 320 → 110 Hz
-   *   35 ms  webbing pull — 55 ms of pink noise, band-pass 900 → 1600 Hz (Q 2.2)
-   *   75 ms  matte buckle latch — a 6 ms white-noise impulse, band-pass 2.8 kHz
-   *          (Q 4), gone in 12 ms (no tonal tail)
-   */
+  /** Cloth and leather brush as a piece of gear locks on. */
   gearEquip(itemIndex: number, when: number): void {
-    const vary = 1 + ((itemIndex % 4) - 1.5) * 0.04 + (Math.random() - 0.5) * 0.08;
-    const pan = this.panner(((itemIndex % 4) - 1.5) * 0.12, when);
-    pan.connect(this.master);
-    const parts = [
-      this.transient(this.brownNoise, when, 0.09, 'lowpass', 320 * vary, 110 * vary, 0.7, 0.16, 0.004, pan),
-      this.transient(this.pinkNoise, when + 0.035, 0.055, 'bandpass', 900 * vary, 1600 * vary, 2.2, 0.06, 0.035, pan),
-      this.transient(this.whiteNoise, when + 0.075, 0.006, 'bandpass', 2800 * vary, 2800 * vary, 4, 0.08, 0, pan, 0.012),
-    ];
-    parts[parts.length - 1].onended = () => pan.disconnect();
+    this.playFoley(this.gearEquips, when, GEAR_EQUIP_GAIN * (0.9 + 0.2 * Math.random()), ((itemIndex % 4) - 1.5) * 0.12, 0.97 + 0.06 * Math.random());
   }
 
-  /**
-   * Gear released into the chasm: a 10 ms fabric unclip (noise at 1.9 kHz),
-   * then a quiet low-passed (240 Hz) Brownian air rustle buffeting away over
-   * 400 ms, drifting outward in the stereo field.
-   */
+  /** Low air-and-cloth release as a piece of gear falls away. */
   gearDrop(shedStage: number, when: number): void {
     const side = shedStage % 2 === 0 ? -0.15 : 0.15;
-    const pan = this.panner(side, when);
-    pan.pan.linearRampToValueAtTime(side * 3, when + 0.45);
-    pan.connect(this.master);
-    this.transient(this.whiteNoise, when, 0.01, 'bandpass', 1900, 1900, 2, 0.1, 0, pan, 0.012);
-    const rustle = this.transient(this.brownNoise, when + 0.012, 0.4, 'lowpass', 240, 240, 0.7, 0.14, 0.06, pan);
-    rustle.onended = () => pan.disconnect();
+    this.playFoley(this.gearDrops, when, GEAR_DROP_GAIN * (0.9 + 0.2 * Math.random()), side, 0.96 + 0.08 * Math.random());
   }
 
-  /**
-   * One climbing contact: a rubber boot / glove on granite (45 ms of
-   * Brownian noise low-passed at ~165 Hz) and 2–3 grains of crushed grit
-   * (8 ms band-passed noise bursts between 1.4 and 2.2 kHz, 12 ms apart).
-   * Cutoffs vary by ±15 % and the pan by ±0.2 on every step.
-   */
+  /** One soft boot contact on granite (subtle level, varied rate and pan). */
   climbStep(when: number, intensity: number): void {
-    const k = 0.6 + 0.4 * clamp01(intensity);
-    const jitter = (): number => 1 + (Math.random() * 2 - 1) * 0.15;
-    const pan = this.panner((Math.random() * 2 - 1) * 0.2, when);
-    pan.connect(this.master);
-    let last = this.transient(this.brownNoise, when, 0.045, 'lowpass', 165 * jitter(), 165 * jitter(), 0.8, 0.11 * k, 0.003, pan);
-    const grains = 2 + (Math.random() < 0.5 ? 1 : 0);
-    for (let i = 0; i < grains; i += 1) {
-      const at = when + 0.004 + i * 0.012 + Math.random() * 0.003;
-      const hz = (1400 + Math.random() * 800) * jitter();
-      last = this.transient(this.pinkNoise, at, 0.008, 'bandpass', hz, hz, 3, 0.035 * k, 0.001, pan);
-    }
-    last.onended = () => pan.disconnect();
+    const level = BOOT_STEP_GAIN * (0.75 + 0.25 * clamp01(intensity)) * (0.85 + 0.3 * Math.random());
+    this.playFoley(this.bootSteps, when, level, (Math.random() * 2 - 1) * 0.2, 0.94 + 0.12 * Math.random());
   }
 
   /** Resonant swept air for a leap: 180 → 900 → 220 Hz over 650 ms, panning across. */
@@ -650,48 +801,20 @@ export class SoundGraph {
     return src;
   }
 
-  /**
-   * One filtered noise transient: `buffer` through a `type` filter swept
-   * exponentially from `fromHz` to `toHz` over `duration`, with an envelope
-   * that rises to `level` over `attack`, then decays to silence by `decay`
-   * (default: the end of the burst). Returns the source (for onended).
-   */
-  private transient(
-    buffer: AudioBuffer,
-    when: number,
-    duration: number,
-    type: BiquadFilterType,
-    fromHz: number,
-    toHz: number,
-    q: number,
-    level: number,
-    attack: number,
-    destination: AudioNode,
-    decay = duration,
-  ): AudioBufferSourceNode {
-    const src = this.noiseSource(when, Math.max(duration, decay) + 0.005, buffer);
-    const filter = this.ctx.createBiquadFilter();
-    filter.type = type;
-    filter.Q.value = q;
-    filter.frequency.setValueAtTime(fromHz, when);
-    if (toHz !== fromHz) filter.frequency.exponentialRampToValueAtTime(toHz, when + duration);
-    const env = this.ctx.createGain();
-    if (attack > 0) {
-      env.gain.setValueAtTime(0, when);
-      env.gain.linearRampToValueAtTime(level, when + attack);
-    } else {
-      env.gain.setValueAtTime(level, when);
-    }
-    if (attack === 0) {
-      // Impulse: straight to zero, no exponential tail.
-      env.gain.linearRampToValueAtTime(0, when + decay);
-    } else {
-      env.gain.exponentialRampToValueAtTime(0.0005, when + decay);
-      env.gain.linearRampToValueAtTime(0, when + decay + 0.004);
-    }
-    src.connect(filter).connect(env).connect(destination);
-    src.addEventListener('ended', () => env.disconnect());
-    return src;
+  /** Plays one of `buffers` from sample 0 on the foley bus. */
+  private playFoley(buffers: readonly AudioBuffer[], when: number, gain: number, pan: number, rate: number): void {
+    const src = this.ctx.createBufferSource();
+    src.buffer = buffers[Math.floor(Math.random() * buffers.length) % buffers.length];
+    src.playbackRate.value = rate;
+    const level = this.ctx.createGain();
+    level.gain.value = gain;
+    const panner = this.panner(pan, when);
+    src.connect(level).connect(panner).connect(this.foleyBus);
+    src.start(when);
+    src.onended = () => {
+      level.disconnect();
+      panner.disconnect();
+    };
   }
 }
 
@@ -841,8 +964,7 @@ export class SoundEngine {
             this.clock - this.lastOneShot >= ONE_SHOT_SPACING
           ) {
             this.lastFired[i] = this.clock;
-            this.lastOneShot = this.clock;
-            this.fire(cue.kind, cue.arg);
+            this.fire(cue.kind, cue.arg); // the play method claims the one-shot slot
           }
         }
       }
@@ -863,6 +985,8 @@ export class SoundEngine {
   private updateClimbingFoley(p: number, velocity: number, seeking: boolean): void {
     const speed = Math.abs(velocity);
     if (seeking || speed <= CLIMB_MIN_SPEED || this.clock < this.nextClimbStep) return;
+    // A gear sound just played: leave it room.
+    if (this.clock - this.lastOneShot < 0.15) return;
     let climbing = false;
     for (let i = 0; i < CLIMB_ZONES.length; i += 1) {
       if (p >= CLIMB_ZONES[i][0] && p <= CLIMB_ZONES[i][1]) climbing = true;
@@ -875,19 +999,24 @@ export class SoundEngine {
 
   /* --- one-shots (also fired automatically by updateOnFrame) -------------- */
 
+  /** Gear locking on. Never plays twice within GEAR_ONE_SHOT_GUARD (a direct call and a cue on one threshold). */
   playGearEquip(itemIndex = 0): void {
     const ctx = this.readyContext();
-    if (ctx && this.graph) this.graph.gearEquip(itemIndex, ctx.currentTime + 0.005);
+    if (!ctx || !this.graph || !this.claimOneShot(GEAR_ONE_SHOT_GUARD)) return;
+    this.graph.gearEquip(itemIndex, ctx.currentTime + 0.005);
   }
 
+  /** Gear falling away. Never plays twice within GEAR_ONE_SHOT_GUARD. */
   playGearDrop(shedStage = 0): void {
     const ctx = this.readyContext();
-    if (ctx && this.graph) this.graph.gearDrop(shedStage, ctx.currentTime + 0.005);
+    if (!ctx || !this.graph || !this.claimOneShot(GEAR_ONE_SHOT_GUARD)) return;
+    this.graph.gearDrop(shedStage, ctx.currentTime + 0.005);
   }
 
   playChasmJumpWhoosh(intensity = 1): void {
     const ctx = this.readyContext();
-    if (ctx && this.graph) this.graph.chasmWhoosh(intensity, ctx.currentTime + 0.005);
+    if (!ctx || !this.graph || !this.claimOneShot(0)) return;
+    this.graph.chasmWhoosh(intensity, ctx.currentTime + 0.005);
   }
 
   /** One boot / glove contact on granite (fired automatically while climbing). */
@@ -898,7 +1027,8 @@ export class SoundEngine {
 
   playPaperThrowAndFlutter(intensity = 1): void {
     const ctx = this.readyContext();
-    if (ctx && this.graph) this.graph.paperFlutter(intensity, ctx.currentTime + 0.005);
+    if (!ctx || !this.graph || !this.claimOneShot(0)) return;
+    this.graph.paperFlutter(intensity, ctx.currentTime + 0.005);
   }
 
   dispose(): void {
@@ -914,6 +1044,13 @@ export class SoundEngine {
   }
 
   /* ---------------------------------------------------------------------- */
+
+  /** Takes the one-shot slot unless another one-shot played less than `minGap` ago (frame clock). */
+  private claimOneShot(minGap: number): boolean {
+    if (this.clock - this.lastOneShot < minGap) return false;
+    this.lastOneShot = this.clock;
+    return true;
+  }
 
   private fire(kind: CueKind, arg: number): void {
     switch (kind) {
