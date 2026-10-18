@@ -61,9 +61,42 @@ const _restB = new THREE.Vector3();
 const _restC = new THREE.Vector3();
 const _worldC = new THREE.Vector3();
 const _hinge = new THREE.Vector3();
-const _mRest = new THREE.Matrix4();
-const _mWorld = new THREE.Matrix4();
+const _c0 = new THREE.Vector3();
+const _c1 = new THREE.Vector3();
+const _c2 = new THREE.Vector3();
 const _fallback = new THREE.Vector3();
+
+/**
+ * Quaternion of the rotation matrix whose COLUMNS are c0, c1, c2 (orthonormal). Written out instead of going
+ * through Matrix4.makeBasis + setFromRotationMatrix: no numbers cross non-inlined calls, so nothing is boxed
+ * on the heap in the per-frame solver.
+ */
+export function quaternionFromColumns(c0: THREE.Vector3, c1: THREE.Vector3, c2: THREE.Vector3, out: THREE.Quaternion): THREE.Quaternion {
+  const m11 = c0.x;
+  const m21 = c0.y;
+  const m31 = c0.z;
+  const m12 = c1.x;
+  const m22 = c1.y;
+  const m32 = c1.z;
+  const m13 = c2.x;
+  const m23 = c2.y;
+  const m33 = c2.z;
+  const trace = m11 + m22 + m33;
+  if (trace > 0) {
+    const s = 0.5 / Math.sqrt(trace + 1);
+    return out.set((m32 - m23) * s, (m13 - m31) * s, (m21 - m12) * s, 0.25 / s);
+  }
+  if (m11 > m22 && m11 > m33) {
+    const s = 2 * Math.sqrt(1 + m11 - m22 - m33);
+    return out.set(0.25 * s, (m12 + m21) / s, (m13 + m31) / s, (m32 - m23) / s);
+  }
+  if (m22 > m33) {
+    const s = 2 * Math.sqrt(1 + m22 - m11 - m33);
+    return out.set((m12 + m21) / s, 0.25 * s, (m23 + m32) / s, (m13 - m31) / s);
+  }
+  const s = 2 * Math.sqrt(1 + m33 - m11 - m22);
+  return out.set((m13 + m31) / s, (m23 + m32) / s, 0.25 * s, (m21 - m12) / s);
+}
 
 /**
  * Rotation that takes the orthonormalised rest basis (axis, pole) onto the
@@ -87,12 +120,12 @@ export function basisRotation(
   }
   _v.normalize();
   _worldC.crossVectors(dir, _v);
-  _mRest.makeBasis(restAxis, _restB, _restC);
-  _mWorld.makeBasis(dir, _v, _worldC);
-  // R = World · Restᵀ (the rest basis is orthonormal, so its transpose is its inverse).
-  _mRest.transpose();
-  _mWorld.multiply(_mRest);
-  return out.setFromRotationMatrix(_mWorld);
+  // R = World · Restᵀ (the rest basis is orthonormal, so its transpose is its inverse); column j of R is
+  // dir·restAxis_j + v·restB_j + worldC·restC_j.
+  _c0.copy(dir).multiplyScalar(restAxis.x).addScaledVector(_v, _restB.x).addScaledVector(_worldC, _restC.x);
+  _c1.copy(dir).multiplyScalar(restAxis.y).addScaledVector(_v, _restB.y).addScaledVector(_worldC, _restC.y);
+  _c2.copy(dir).multiplyScalar(restAxis.z).addScaledVector(_v, _restB.z).addScaledVector(_worldC, _restC.z);
+  return quaternionFromColumns(_c0, _c1, _c2, out);
 }
 
 /**
@@ -219,7 +252,6 @@ export function yawRotation(yaw: number, out: THREE.Quaternion): THREE.Quaternio
 const _fx = new THREE.Vector3();
 const _fy = new THREE.Vector3();
 const _fz = new THREE.Vector3();
-const _fm = new THREE.Matrix4();
 
 /**
  * World rotation whose local +Z points along `forward` and whose local +Y is
@@ -235,8 +267,7 @@ export function lookRotation(forward: THREE.Vector3, up: THREE.Vector3, out: THR
   }
   _fx.normalize();
   _fy.crossVectors(_fz, _fx);
-  _fm.makeBasis(_fx, _fy, _fz);
-  return out.setFromRotationMatrix(_fm);
+  return quaternionFromColumns(_fx, _fy, _fz, out);
 }
 
 /**
@@ -252,6 +283,5 @@ export function frameFromYZ(yAxis: THREE.Vector3, zHint: THREE.Vector3, out: THR
   }
   _fz.normalize();
   _fx.crossVectors(_fy, _fz);
-  _fm.makeBasis(_fx, _fy, _fz);
-  return out.setFromRotationMatrix(_fm);
+  return quaternionFromColumns(_fx, _fy, _fz, out);
 }

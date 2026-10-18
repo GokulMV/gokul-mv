@@ -46,6 +46,11 @@ export interface LimbPose {
   readonly fkEnd: THREE.Quaternion;
   /** Contact weight reported to consumers (1 = planted on rock or ground). */
   plant: number;
+  /**
+   * Weight of this limb's goal in the pelvis reach constraint. Usually equals `plant`; a climbing limb hands
+   * its share over gradually across the whole move, so the hips never spring when a hold is let go.
+   */
+  reach: number;
   /** Surface normal at the contact (world). */
   readonly normal: THREE.Vector3;
 }
@@ -81,6 +86,7 @@ function createLimbPose(): LimbPose {
     fkLower: new THREE.Quaternion(),
     fkEnd: new THREE.Quaternion(),
     plant: 0,
+    reach: 0,
     normal: new THREE.Vector3(0, 1, 0),
   };
 }
@@ -112,6 +118,7 @@ function copyLimb(src: LimbPose, dst: LimbPose): void {
   dst.fkLower.copy(src.fkLower);
   dst.fkEnd.copy(src.fkEnd);
   dst.plant = src.plant;
+  dst.reach = src.reach;
   dst.normal.copy(src.normal);
 }
 
@@ -155,6 +162,7 @@ function blendLimb(a: LimbPose, b: LimbPose, w: number, out: LimbPose): void {
   slerpInto(a.fkLower, b.fkLower, w, out.fkLower);
   slerpInto(a.fkEnd, b.fkEnd, w, out.fkEnd);
   out.plant = a.plant + (b.plant - a.plant) * w;
+  out.reach = a.reach + (b.reach - a.reach) * w;
   out.normal.lerpVectors(a.normal, b.normal, w);
   if (out.normal.lengthSq() < 1e-8) out.normal.copy(b.normal);
   out.normal.normalize();
