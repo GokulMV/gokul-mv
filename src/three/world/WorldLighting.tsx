@@ -21,11 +21,14 @@ const { damp } = THREE.MathUtils;
 /** Distance from the focus point back to the sun light (along SUN_DIRECTION). */
 const SUN_DISTANCE = 150;
 const SUN_INTENSITY = 4.6;
-const HEMI_INTENSITY = 2.9;
-const FILL_INTENSITY = 1.45;
-const ENV_INTENSITY = 1.0;
+const HEMI_INTENSITY = 4.0;
+const FILL_INTENSITY = 1.9;
+const ENV_INTENSITY = 0.85;
 
-/** Cool fill from the side opposite the sun, low over the horizon. */
+/** Cool fill from the side opposite the sun, low over the horizon (sky bounce: blue, but not navy). */
+const FILL_COLOR = '#8EA2C6';
+/** Sky half of the hemisphere light: the palette sky blue, a little less saturated so shaded granite stays grey. */
+const HEMI_SKY = new THREE.Color(PALETTE.hemisphereSky).lerp(new THREE.Color('#C4C8CF'), 0.3);
 const FILL_DIRECTION = new THREE.Vector3(-SUN_DIRECTION.x, 0.32, -SUN_DIRECTION.z + 0.2).normalize();
 
 const SUN_START = SUN_DIRECTION.clone().multiplyScalar(SUN_DISTANCE);
@@ -248,8 +251,8 @@ export function WorldLighting(): JSX.Element {
         position={SUN_START}
         castShadow={shadows}
       />
-      <directionalLight ref={fill} color="#6F88B8" intensity={FILL_INTENSITY} position={FILL_START} />
-      <hemisphereLight args={[PALETTE.hemisphereSky, PALETTE.hemisphereGround, HEMI_INTENSITY]} />
+      <directionalLight ref={fill} color={FILL_COLOR} intensity={FILL_INTENSITY} position={FILL_START} />
+      <hemisphereLight args={[HEMI_SKY, PALETTE.hemisphereGround, HEMI_INTENSITY]} />
     </>
   );
 }

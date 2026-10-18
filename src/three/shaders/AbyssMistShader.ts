@@ -45,7 +45,8 @@ export function chasmFxQualityFor(tier: GpuTier): ChasmFxQuality {
 
 export const CHASM_NOISE_SIZE = 128;
 
-function mulberry32(seed: number): () => number {
+/** Deterministic PRNG (mulberry32) returning [0, 1). */
+export function chasmRandom(seed: number): () => number {
   let a = seed >>> 0;
   return () => {
     a = (a + 0x6d2b79f5) >>> 0;
@@ -118,7 +119,7 @@ export function createChasmNoiseTexture(size = CHASM_NOISE_SIZE): THREE.DataText
   const values = new Float32Array(size * size);
   for (let c = 0; c < NOISE_CHANNELS.length; c += 1) {
     const spec = NOISE_CHANNELS[c];
-    const rand = mulberry32(spec.seed);
+    const rand = chasmRandom(spec.seed);
     const lattices: Lattice[] = [];
     for (let o = 0; o < spec.octaves; o += 1) lattices.push(makeLattice(spec.basePeriod << o, rand));
     let min = Infinity;
