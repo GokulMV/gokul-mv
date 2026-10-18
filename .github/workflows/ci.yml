@@ -96,6 +96,21 @@ jobs:
           test "$workers" -le 4
           if [ -s err.log ]; then echo "unexpected stderr:"; cat err.log; exit 1; fi
 
+      - name: Check IPv4 + IPv6 listeners (Railway private networking is IPv6)
+        run: |
+          set -euo pipefail
+          docker exec portfolio netstat -ltn
+          docker exec portfolio sh -c "netstat -ltn | grep -qE '0\.0\.0\.0:$PORT[[:space:]]'"
+          if docker exec portfolio test -f /proc/net/if_inet6; then
+            grep -q "IPv4 + IPv6 listeners on port $PORT" <(docker logs portfolio 2>/dev/null)
+            docker exec portfolio sh -c "netstat -ltn | grep -qE ':::$PORT[[:space:]]'"
+            docker exec portfolio wget -qO- "http://[::1]:$PORT/healthz"
+            echo
+            echo "IPv6 listener verified"
+          else
+            echo "IPv6 not available on this runner; IPv4-only path exercised"
+          fi
+
       - name: Container logs
         if: always()
         run: docker logs portfolio || true

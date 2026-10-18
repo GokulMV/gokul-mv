@@ -13,7 +13,9 @@ if [ ! -f "$CONF" ]; then
   exit 0
 fi
 
-if [ -s /proc/net/if_inet6 ]; then
+# Same test as the stock 10-listen-on-ipv6-by-default.sh. Note: `-s` would be
+# wrong here — procfs files always report a size of 0.
+if [ -f /proc/net/if_inet6 ]; then
   if ! grep -q "listen \[::\]:${PORT};" "$CONF"; then
     sed -i "s|^\(\s*\)listen ${PORT};|\1listen ${PORT};\n\1listen [::]:${PORT};|" "$CONF"
   fi
