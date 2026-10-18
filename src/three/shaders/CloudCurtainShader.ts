@@ -17,6 +17,13 @@ import { CLOUD_CURTAIN, PALETTE, SUN_DIRECTION } from '../world/worldLayout';
  * marched toward the sun, and adds a warm silver lining on thin, sun-facing
  * edges boosted by a Henyey–Greenstein forward-scatter phase.
  *
+ * The puffs are fill-bound (≈18 rasterized layers per pixel when the curtain
+ * is closed), so they are accumulated into a reduced-resolution, linear
+ * half-float target with premultiplied "over" blending and then composited
+ * over the world by one fullscreen triangle (CLOUD_COMPOSITE_*). The target
+ * is sized from CSS pixels (never the device pixel ratio) per GPU tier, and
+ * its viewport shrinks further when adaptive quality lowers the density.
+ *
  * Per-instance attributes (InstancedBufferAttribute):
  *   aCenter   vec3  base offset (curtain space = world space of the opening)
  *   aShape    vec4  x side (-1 left / +1 right), y layer depth (0 near → 1 far),
@@ -28,9 +35,10 @@ import { CLOUD_CURTAIN, PALETTE, SUN_DIRECTION } from '../world/worldLayout';
  * ========================================================================== */
 
 /**
- * The curtain draws without depth test after every transparent pass with a
- * lower renderOrder, so it covers the world. Anything that must stay in front
- * of it (e.g. a paper stuck to the lens) needs a higher renderOrder.
+ * The curtain composite draws without depth test after every transparent
+ * object with a lower renderOrder, so it covers the world. Anything that must
+ * stay in front of it (e.g. a paper stuck to the lens) needs a higher
+ * renderOrder (and depthTest off), or must be a DOM overlay.
  */
 export const CLOUD_CURTAIN_RENDER_ORDER = 900;
 
@@ -427,6 +435,99 @@ export function cloudCurtainDefines(tier: GpuTier): CloudCurtainDefines {
   if (tier >= 3) return { CLOUD_SHADOW_TAPS: 2, CLOUD_SHADOW_OCTAVES: 3, CLOUD_WARP_OCTAVES: 2 };
   if (tier === 2) return { CLOUD_SHADOW_TAPS: 2, CLOUD_SHADOW_OCTAVES: 2, CLOUD_WARP_OCTAVES: 2 };
   return { CLOUD_SHADOW_TAPS: 1, CLOUD_SHADOW_OCTAVES: 2, CLOUD_WARP_OCTAVES: 1 };
+}
+
+/* ---------------------------------------------------------------------------
+ * Offscreen accumulation + composite
+ * ------------------------------------------------------------------------- */
+
+/**
+ * Cloud target resolution in CSS pixels per GPU tier (the drawing buffer's
+ * device pixel ratio never inflates the cloud fill cost; soft volumes gain
+ * nothing from retina density). Never exceeds the drawing buffer.
+ */
+export function cloudCurtainResolution(tier: GpuTier): number {
+  if (tier >= 3) return 0.8;
+  if (tier === 2) return 0.65;
+  if (tier === 1) return 0.55;
+  return 0.45;
+}
+
+/** Fraction of the target's viewport kept at the lowest adaptive density (fill ≈ this²). */
+export const CLOUD_MIN_VIEWPORT_FRACTION = 0.62;
+
+/**
+ * Puffs blend into a cleared (0,0,0,0) target with
+ *   rgb = src.rgb · src.a + dst.rgb · (1 − src.a)
+ *   a   = src.a + dst.a · (1 − src.a)
+ * so the target holds premultiplied colour and coverage of the whole stack.
+ */
+export function applyCloudAccumulationBlending(material: THREE.Material): void {
+  material.blending = THREE.CustomBlending;
+  material.blendEquation = THREE.AddEquation;
+  material.blendSrc = THREE.SrcAlphaFactor;
+  material.blendDst = THREE.OneMinusSrcAlphaFactor;
+  material.blendEquationAlpha = THREE.AddEquation;
+  material.blendSrcAlpha = THREE.OneFactor;
+  material.blendDstAlpha = THREE.OneMinusSrcAlphaFactor;
+  material.premultipliedAlpha = false;
+}
+
+/** Fullscreen triangle in clip space (no camera transform). */
+export const CLOUD_COMPOSITE_VERTEX_SHADER = /* glsl */ `
+varying vec2 vUv;
+
+void main() {
+  vUv = position.xy * 0.5 + 0.5;
+  gl_Position = vec4(position.xy, 0.0, 1.0);
+}
+`;
+
+/**
+ * Upsamples the premultiplied cloud target (bilinear on premultiplied data,
+ * so silhouettes never get dark fringes), un-premultiplies and blends it
+ * over the world with ordinary alpha blending. Tone mapping and the output
+ * colour space are applied here, exactly once, like every other material.
+ */
+export const CLOUD_COMPOSITE_FRAGMENT_SHADER = /* glsl */ `
+uniform sampler2D uClouds;
+uniform vec2 uUvScale;
+uniform vec2 uUvMax;
+
+varying vec2 vUv;
+
+void main() {
+  vec2 uv = min(vUv * uUvScale, uUvMax);
+  vec4 clouds = texture2D(uClouds, uv);
+  if (clouds.a < 0.002) discard;
+  gl_FragColor = vec4(clouds.rgb / clouds.a, clouds.a);
+
+  #include <tonemapping_fragment>
+  #include <colorspace_fragment>
+}
+`;
+
+export type CloudCompositeUniforms = {
+  uClouds: THREE.IUniform<THREE.Texture | null>;
+  /** Used viewport of the target relative to its full size. */
+  uUvScale: THREE.IUniform<THREE.Vector2>;
+  /** Upper uv clamp (half a texel inside the used viewport). */
+  uUvMax: THREE.IUniform<THREE.Vector2>;
+};
+
+export function createCloudCompositeUniforms(): CloudCompositeUniforms {
+  return {
+    uClouds: { value: null },
+    uUvScale: { value: new THREE.Vector2(1, 1) },
+    uUvMax: { value: new THREE.Vector2(1, 1) },
+  };
+}
+
+/** One triangle covering the whole viewport (positions are clip space). */
+export function createFullscreenTriangle(): THREE.BufferGeometry {
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array([-1, -1, 0, 3, -1, 0, -1, 3, 0]), 3));
+  return geometry;
 }
 
 /* ---------------------------------------------------------------------------

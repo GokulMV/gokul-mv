@@ -5,12 +5,20 @@ import { clamp01, scrollStore, smoothstep, type GpuTier } from '../../store/scro
 import { adaptiveQuality } from '../perf/adaptiveQuality';
 import { sceneFx } from '../fx/sceneFx';
 import {
+  CLOUD_COMPOSITE_FRAGMENT_SHADER,
+  CLOUD_COMPOSITE_VERTEX_SHADER,
   CLOUD_CURTAIN_FRAGMENT_SHADER,
   CLOUD_CURTAIN_RENDER_ORDER,
   CLOUD_CURTAIN_VERTEX_SHADER,
+  CLOUD_MIN_VIEWPORT_FRACTION,
+  applyCloudAccumulationBlending,
   cloudCurtainDefines,
+  cloudCurtainResolution,
+  createCloudCompositeUniforms,
   createCloudCurtainUniforms,
   createCloudNoiseTexture,
+  createFullscreenTriangle,
+  type CloudCompositeUniforms,
   type CloudCurtainUniforms,
 } from '../shaders/CloudCurtainShader';
 import { CAMERA_CLIP, CLOUD_CURTAIN, SUN_DIRECTION } from './worldLayout';
@@ -19,32 +27,42 @@ import { CAMERA_CLIP, CLOUD_CURTAIN, SUN_DIRECTION } from './worldLayout';
  * Cloud curtain — the opening, the return and the final dissolve.
  *
  * One instanced mesh of camera-facing volumetric puffs, laid out inside the
- * opening camera's frustum between world z = 26 and z = 6. Every window
- * comes from CLOUD_CURTAIN.timeline (never hard-coded here):
+ * opening camera's frustum (eye [0,3,24] → [0,1.4,0], fov 42) between world
+ * z = CLOUD_CURTAIN.zFar (26) and z = CLOUD_CURTAIN.zNear (6). Every window
+ * comes from CLOUD_CURTAIN.timeline / ENDING (never hard-coded here):
  *
- *  open      (0.00 → 0.08) the curtain parts like a theatre curtain
- *            (left → −X, right → +X) while the camera dollies through it,
- *            and fades out.
- *  between   hidden (mesh.visible = false, zero cost). This includes the
- *            ending's "last pull" hero shot (ENDING.heroPull*) and the gust
- *            that carries the paper to the lens: that frame stays clear.
- *  return    (returnStart → returnEnd, 0.955 → 0.985) while the paper sits
- *            on the lens, the parting reverses. The layout is re-anchored to
- *            the camera (camera.matrixWorld × inverse(opening camera)) so the
- *            clouds roll back in around and behind the paper exactly as they
- *            framed the opening shot, rendering over the mountain, and seal
- *            the view at RETURN_SEALED.
- *  dissolve  (dissolveStart → dissolveEnd, 0.985 → 1.00) as the paper peels
- *            away the clouds erode and fade while sceneFx.exposure falls to
- *            0, leaving the empty #040508 void the footer scrolls in over.
- *            Scrubbing back before dissolveStart damps exposure back to 1.
+ *  open      openStart → openEnd (0.00 → 0.08). Closed and opaque at 0; the
+ *            curtain parts like a theatre curtain (left half → −X, right
+ *            half → +X, CLOUD_CURTAIN.partX) while the camera dollies through
+ *            it, fades from ≈0.044 and is fully clear at 0.08.
+ *  between   0.08 → returnStart: hidden (composite visible = false, so the
+ *            offscreen pass is skipped too: zero cost). While hidden the
+ *            layout is re-anchored from the world to the camera. This
+ *            includes the Scene 8 reveal (0.86 – 0.92), the "last pull" hero
+ *            shot of the protagonist before the next mountain (ENDING
+ *            heroPull, 0.92 – 0.945) and the gust carrying the paper to the
+ *            lens (0.945 – 0.955): all of them stay perfectly clear.
+ *  return    returnStart → returnEnd (0.955 → 0.985) while the paper sits on
+ *            the lens: the opening played backwards in camera space (anchor
+ *            = camera.matrixWorld × inverse(opening camera)), so the two
+ *            halves glide back in from the frame edges around and behind the
+ *            paper, render over the mountain, and seal the view at
+ *            RETURN_SEALED (80% of the window, ≈0.979).
+ *  dissolve  dissolveStart → dissolveEnd (0.985 → 1.00), as the paper peels
+ *            away: the clouds erode into wisps, drift apart and fade while
+ *            sceneFx.exposure damps 1 → 0, leaving the #040508 void the
+ *            footer scrolls in over. Scrubbing back damps exposure back to 1.
  *
- * The curtain draws with depthTest off at CLOUD_CURTAIN_RENDER_ORDER, so an
- * element that must stay in front of it (the paper on the lens) has to be a
- * transparent-pass object with a higher renderOrder, or a DOM overlay.
+ * Rendering: the puffs are fill-bound, so they accumulate (premultiplied)
+ * into a reduced-resolution half-float target sized from CSS pixels per GPU
+ * tier; one fullscreen triangle composites it with depthTest off at
+ * CLOUD_CURTAIN_RENDER_ORDER. Adaptive quality lowers both the drawn
+ * instance count (balanced prefix, soft cross-fade) and the target viewport.
+ * Anything that must stay in front of the clouds (the paper on the lens)
+ * needs a higher renderOrder with depthTest off, or a DOM overlay.
  *
- * Everything is driven from mutable singletons inside useFrame / the mesh's
- * onBeforeRender — no React state, no per-frame allocation.
+ * Everything is driven from mutable singletons inside useFrame / the
+ * composite's onBeforeRender — no React state, no per-frame allocation.
  * ========================================================================== */
 
 /** Layout reference count: puff sizes are authored for this many instances. */
@@ -337,6 +355,9 @@ export function buildCloudLayout(count: number, seed = 20241018): CloudLayout {
 interface CloudSystem {
   budget: TierBudget;
   layout: CloudLayout;
+  /** Private scene holding the puffs; rendered offscreen, never part of the main graph. */
+  cloudScene: THREE.Scene;
+  cloudMesh: THREE.Mesh;
   geometry: THREE.InstancedBufferGeometry;
   material: THREE.ShaderMaterial;
   uniforms: CloudCurtainUniforms;
@@ -347,13 +368,25 @@ interface CloudSystem {
     motion: THREE.InstancedBufferAttribute;
     partTune: THREE.InstancedBufferAttribute;
   };
+  /** Premultiplied cloud accumulation target (reduced resolution). */
+  target: THREE.WebGLRenderTarget;
+  /** Target size = CSS size × this, clamped to the drawing buffer. */
+  resolution: number;
+  compositeGeometry: THREE.BufferGeometry;
+  compositeMaterial: THREE.ShaderMaterial;
+  compositeUniforms: CloudCompositeUniforms;
   /** Scratch draw order (layout indices), preallocated. */
   order: Int32Array;
   /** Number of instances currently written to the GPU buffers. */
   built: number;
 }
 
-function createCloudSystem(tier: GpuTier): CloudSystem {
+/** Half-float targets keep the premultiplied HDR stack free of banding. */
+function supportsHalfFloatTarget(renderer: THREE.WebGLRenderer): boolean {
+  return renderer.extensions.has('EXT_color_buffer_float') || renderer.extensions.has('EXT_color_buffer_half_float');
+}
+
+function createCloudSystem(tier: GpuTier, halfFloat: boolean): CloudSystem {
   const budget = TIER_BUDGET[tier];
   const layout = buildCloudLayout(budget.max);
 
@@ -399,10 +432,49 @@ function createCloudSystem(tier: GpuTier): CloudSystem {
     defines: cloudCurtainDefines(tier),
     transparent: true,
     depthWrite: false,
+    depthTest: false,
+    side: THREE.FrontSide,
+    fog: false,
+    // Rendering into a render target never tone-maps (three uses
+    // NoToneMapping + linear output there); the composite applies both once.
+    toneMapped: true,
+  });
+  applyCloudAccumulationBlending(material);
+
+  const cloudMesh = new THREE.Mesh(geometry, material);
+  cloudMesh.name = 'CloudCurtainPuffs';
+  cloudMesh.frustumCulled = false;
+  cloudMesh.matrixAutoUpdate = false;
+  const cloudScene = new THREE.Scene();
+  cloudScene.name = 'CloudCurtainOffscreen';
+  cloudScene.add(cloudMesh);
+
+  const target = new THREE.WebGLRenderTarget(1, 1, {
+    type: halfFloat ? THREE.HalfFloatType : THREE.UnsignedByteType,
+    format: THREE.RGBAFormat,
+    minFilter: THREE.LinearFilter,
+    magFilter: THREE.LinearFilter,
+    wrapS: THREE.ClampToEdgeWrapping,
+    wrapT: THREE.ClampToEdgeWrapping,
+    generateMipmaps: false,
+    depthBuffer: false,
+    stencilBuffer: false,
+    colorSpace: THREE.NoColorSpace,
+  });
+  target.texture.name = 'CloudCurtainTarget';
+
+  const compositeUniforms = createCloudCompositeUniforms();
+  compositeUniforms.uClouds.value = target.texture;
+  const compositeMaterial = new THREE.ShaderMaterial({
+    name: 'CloudCurtainComposite',
+    vertexShader: CLOUD_COMPOSITE_VERTEX_SHADER,
+    fragmentShader: CLOUD_COMPOSITE_FRAGMENT_SHADER,
+    uniforms: compositeUniforms,
+    transparent: true,
+    depthWrite: false,
     // The curtain always sits between the camera and the world it hides.
     depthTest: false,
     blending: THREE.NormalBlending,
-    side: THREE.FrontSide,
     fog: false,
     toneMapped: true,
   });
@@ -410,14 +482,34 @@ function createCloudSystem(tier: GpuTier): CloudSystem {
   return {
     budget,
     layout,
+    cloudScene,
+    cloudMesh,
     geometry,
     material,
     uniforms,
     noise,
     attributes,
+    target,
+    resolution: cloudCurtainResolution(tier),
+    compositeGeometry: createFullscreenTriangle(),
+    compositeMaterial,
+    compositeUniforms,
     order: new Int32Array(budget.max),
     built: -1,
   };
+}
+
+/**
+ * Frees every GPU resource. The CPU-side objects stay intact, so a system
+ * reused after a StrictMode effect replay simply re-uploads on its next draw.
+ */
+function disposeCloudSystem(system: CloudSystem): void {
+  system.geometry.dispose();
+  system.material.dispose();
+  system.noise.dispose();
+  system.target.dispose();
+  system.compositeGeometry.dispose();
+  system.compositeMaterial.dispose();
 }
 
 /**
@@ -471,6 +563,8 @@ interface CurtainState {
   anchor: number;
   /** Damped drawn-instance count (float, for soft cross-fades). */
   count: number;
+  /** Damped fraction of the cloud target's viewport in use (adaptive quality). */
+  resolution: number;
   time: number;
 }
 
@@ -482,6 +576,85 @@ const _relativeScale = new THREE.Vector3();
 const _anchorPosition = new THREE.Vector3();
 const _anchorQuaternion = new THREE.Quaternion();
 const _cameraPosition = new THREE.Vector3();
+const _cssSize = new THREE.Vector2();
+const _bufferSize = new THREE.Vector2();
+const _savedClearColor = new THREE.Color();
+
+/**
+ * Resolves the anchor and camera-dependent uniforms, then renders the puffs
+ * into the reduced-resolution target. Called from the composite's
+ * onBeforeRender, i.e. after every useFrame (including the camera rig) has
+ * moved the camera this frame, and only while the curtain is visible.
+ * Every piece of renderer state it touches is restored. Allocation free.
+ */
+function renderCloudTarget(
+  system: CloudSystem,
+  s: CurtainState,
+  renderer: THREE.WebGLRenderer,
+  renderCamera: THREE.Camera,
+  mainCamera: THREE.Camera,
+): void {
+  const { cloudMesh, uniforms, target, compositeUniforms } = system;
+
+  // World-anchored opening layout → camera-anchored return layout
+  // (camera.matrixWorld × inverse(opening camera)), blended by s.anchor.
+  if (s.anchor <= 1e-4) {
+    cloudMesh.matrix.identity();
+  } else {
+    _relative.multiplyMatrices(mainCamera.matrixWorld, OPENING_INVERSE);
+    _relative.decompose(_relativePosition, _relativeQuaternion, _relativeScale);
+    _anchorPosition.copy(_relativePosition).multiplyScalar(s.anchor);
+    _anchorQuaternion.identity().slerp(_relativeQuaternion, s.anchor);
+    cloudMesh.matrix.compose(_anchorPosition, _anchorQuaternion, UNIT_SCALE);
+  }
+  cloudMesh.matrixWorldNeedsUpdate = true;
+
+  // Opening dolly (world-anchored phase only): how far the camera has moved
+  // from the opening eye, consumed by the per-layer parallax follow.
+  _cameraPosition.setFromMatrixPosition(mainCamera.matrixWorld);
+  uniforms.uDolly.value.subVectors(_cameraPosition, OPENING_EYE).multiplyScalar(1 - s.anchor);
+  uniforms.uSunView.value.copy(SUN_DIRECTION).transformDirection(renderCamera.matrixWorldInverse);
+
+  // Target size follows the canvas in CSS pixels; the used viewport shrinks
+  // with adaptive quality (no reallocation, the composite rescales its uvs).
+  renderer.getSize(_cssSize);
+  renderer.getDrawingBufferSize(_bufferSize);
+  const fullWidth = Math.max(1, Math.min(_bufferSize.x, Math.round(_cssSize.x * system.resolution)));
+  const fullHeight = Math.max(1, Math.min(_bufferSize.y, Math.round(_cssSize.y * system.resolution)));
+  if (target.width !== fullWidth || target.height !== fullHeight) target.setSize(fullWidth, fullHeight);
+  const usedWidth = Math.max(1, Math.round(fullWidth * s.resolution));
+  const usedHeight = Math.max(1, Math.round(fullHeight * s.resolution));
+  target.viewport.set(0, 0, usedWidth, usedHeight);
+  compositeUniforms.uUvScale.value.set(usedWidth / fullWidth, usedHeight / fullHeight);
+  compositeUniforms.uUvMax.value.set((usedWidth - 0.5) / fullWidth, (usedHeight - 0.5) / fullHeight);
+
+  const previousTarget = renderer.getRenderTarget();
+  const previousCubeFace = renderer.getActiveCubeFace();
+  const previousMipmapLevel = renderer.getActiveMipmapLevel();
+  const previousAutoClear = renderer.autoClear;
+  const previousClearAlpha = renderer.getClearAlpha();
+  renderer.getClearColor(_savedClearColor);
+  const previousInfoReset = renderer.info.autoReset;
+  const previousXr = renderer.xr.enabled;
+  const previousShadowAutoUpdate = renderer.shadowMap.autoUpdate;
+
+  renderer.xr.enabled = false;
+  renderer.shadowMap.autoUpdate = false;
+  // Count the cloud draw in this frame's stats instead of resetting them.
+  renderer.info.autoReset = false;
+  renderer.autoClear = false;
+  renderer.setRenderTarget(target);
+  renderer.setClearColor(0x000000, 0);
+  renderer.clear(true, false, false);
+  renderer.render(system.cloudScene, renderCamera);
+
+  renderer.setRenderTarget(previousTarget, previousCubeFace, previousMipmapLevel);
+  renderer.setClearColor(_savedClearColor, previousClearAlpha);
+  renderer.autoClear = previousAutoClear;
+  renderer.info.autoReset = previousInfoReset;
+  renderer.shadowMap.autoUpdate = previousShadowAutoUpdate;
+  renderer.xr.enabled = previousXr;
+}
 
 /* ---------------------------------------------------------------------------
  * Component
@@ -489,12 +662,13 @@ const _cameraPosition = new THREE.Vector3();
 
 export function CloudCurtain(): JSX.Element {
   const meshRef = useRef<THREE.Mesh>(null);
+  const gl = useThree((state) => state.gl);
   const camera = useThree((state) => state.camera);
   const cameraRef = useRef<THREE.Camera>(camera);
   cameraRef.current = camera;
 
   // Detail is fixed by the GPU tier at mount; density changes never rebuild GPU resources.
-  const system = useMemo(() => createCloudSystem(scrollStore.gpuTier), []);
+  const system = useMemo(() => createCloudSystem(scrollStore.gpuTier, supportsHalfFloatTarget(gl)), [gl]);
   const state = useRef<CurtainState>({
     initialized: false,
     part: 0,
@@ -503,43 +677,36 @@ export function CloudCurtain(): JSX.Element {
     exposure: 1,
     anchor: 0,
     count: system.budget.max,
+    resolution: 1,
     time: 0,
   });
 
   useLayoutEffect(() => {
     const mesh = meshRef.current;
     if (!mesh) return undefined;
-    mesh.matrixAutoUpdate = false;
-    // Anchor + camera uniforms are resolved right before the draw, after every
-    // useFrame (including the camera rig) has moved the camera this frame.
-    mesh.onBeforeRender = (_renderer, _scene, renderCamera) => {
-      const s = state.current;
-      if (s.anchor <= 1e-4) {
-        mesh.matrixWorld.identity();
-      } else {
-        const main = cameraRef.current;
-        _relative.multiplyMatrices(main.matrixWorld, OPENING_INVERSE);
-        _relative.decompose(_relativePosition, _relativeQuaternion, _relativeScale);
-        _anchorPosition.copy(_relativePosition).multiplyScalar(s.anchor);
-        _anchorQuaternion.identity().slerp(_relativeQuaternion, s.anchor);
-        mesh.matrixWorld.compose(_anchorPosition, _anchorQuaternion, UNIT_SCALE);
-      }
-      // Opening dolly (world-anchored phase only): how far the camera has moved
-      // from the opening eye, consumed by the per-layer parallax follow.
-      _cameraPosition.setFromMatrixPosition(cameraRef.current.matrixWorld);
-      system.uniforms.uDolly.value.subVectors(_cameraPosition, OPENING_EYE).multiplyScalar(1 - s.anchor);
-      system.uniforms.uSunView.value.copy(SUN_DIRECTION).transformDirection(renderCamera.matrixWorldInverse);
+    // Inspection handle for tooling (overdraw / debug views); never read at runtime.
+    mesh.userData.cloudScene = system.cloudScene;
+    mesh.onBeforeRender = (renderer, _scene, renderCamera) => {
+      renderCloudTarget(system, state.current, renderer, renderCamera, cameraRef.current);
     };
     return () => {
       mesh.onBeforeRender = NOOP_BEFORE_RENDER;
+      delete mesh.userData.cloudScene;
     };
   }, [system]);
 
+  // Compile the offscreen variant (linear, no tone mapping) up front so the
+  // return at the end of the journey never hitches on a shader compile.
+  useLayoutEffect(() => {
+    const previousTarget = gl.getRenderTarget();
+    gl.setRenderTarget(system.target);
+    gl.compile(system.cloudScene, camera);
+    gl.setRenderTarget(previousTarget);
+  }, [gl, camera, system]);
+
   useLayoutEffect(
     () => () => {
-      system.geometry.dispose();
-      system.material.dispose();
-      system.noise.dispose();
+      disposeCloudSystem(system);
       // Without a curtain nothing may keep the world dimmed or covered.
       sceneFx.exposure = 1;
       sceneFx.curtainOpacity = 0;
@@ -555,6 +722,10 @@ export function CloudCurtain(): JSX.Element {
     const s = state.current;
     const targets = curtainTargetsAt(scrollStore.dampedProgress, _targets);
     const targetCount = adaptiveQuality.countFor(system.budget.max, system.budget.floor);
+    const densityRange = adaptiveQuality.maxDensity - adaptiveQuality.minDensity;
+    const densityK =
+      densityRange > 1e-3 ? clamp01((adaptiveQuality.particleDensity - adaptiveQuality.minDensity) / densityRange) : 1;
+    const targetResolution = CLOUD_MIN_VIEWPORT_FRACTION + (1 - CLOUD_MIN_VIEWPORT_FRACTION) * densityK;
 
     if (!s.initialized) {
       // First frame: start from the state the current progress implies.
@@ -565,6 +736,7 @@ export function CloudCurtain(): JSX.Element {
       s.exposure = targets.exposure;
       s.anchor = targets.anchor;
       s.count = targetCount;
+      s.resolution = targetResolution;
     } else {
       s.part = THREE.MathUtils.damp(s.part, targets.part, DAMP.part, dt);
       s.opacity = THREE.MathUtils.damp(s.opacity, targets.opacity, DAMP.opacity, dt);
@@ -572,6 +744,7 @@ export function CloudCurtain(): JSX.Element {
       s.exposure = THREE.MathUtils.damp(s.exposure, targets.exposure, DAMP.exposure, dt);
       s.anchor = THREE.MathUtils.damp(s.anchor, targets.anchor, DAMP.anchor, dt);
       s.count = THREE.MathUtils.damp(s.count, targetCount, DAMP.count, dt);
+      s.resolution = THREE.MathUtils.damp(s.resolution, targetResolution, DAMP.count, dt);
     }
     s.time += dt;
 
@@ -579,6 +752,7 @@ export function CloudCurtain(): JSX.Element {
     sceneFx.curtainPart = s.part;
     sceneFx.exposure = s.exposure;
 
+    // Hidden → the composite is skipped and so is the offscreen pass: zero cost.
     const visible = s.opacity > 0.003;
     mesh.visible = visible;
     if (!visible) return;
@@ -598,16 +772,21 @@ export function CloudCurtain(): JSX.Element {
   return (
     <mesh
       ref={meshRef}
-      geometry={system.geometry}
-      material={system.material}
+      name="CloudCurtainComposite"
+      geometry={system.compositeGeometry}
+      material={system.compositeMaterial}
       frustumCulled={false}
       renderOrder={CLOUD_CURTAIN_RENDER_ORDER}
       castShadow={false}
       receiveShadow={false}
+      raycast={NOOP_RAYCAST}
     />
   );
 }
 
 function NOOP_BEFORE_RENDER(): void {}
+
+/** The composite triangle lives in clip space; it must never be hit by scene raycasts. */
+function NOOP_RAYCAST(): void {}
 
 export default CloudCurtain;
