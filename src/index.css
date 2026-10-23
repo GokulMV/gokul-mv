@@ -275,3 +275,49 @@ html.lenis body {
     transition: none;
   }
 }
+
+/* ---- Holding page (served while the site is rebuilt; see main.tsx) -------- */
+.holding {
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: 24px 16px;
+  background: radial-gradient(120% 90% at 50% 100%, #10182a 0%, var(--void) 60%);
+}
+.holding__card {
+  max-width: 560px;
+  width: 100%;
+}
+.holding__eyebrow {
+  margin: 0 0 12px;
+  font-size: 13px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--beacon);
+}
+.holding__title {
+  margin: 0 0 20px;
+  font-size: clamp(22px, 4.2vw, 34px);
+  line-height: 1.2;
+  font-weight: 600;
+  color: var(--glacier);
+}
+.holding__body {
+  margin: 0 0 20px;
+  font-size: 16px;
+  line-height: 1.6;
+  color: #aab6c8;
+}
+.holding__links {
+  margin: 0;
+  font-size: 16px;
+  line-height: 1.6;
+}
+.holding__links a {
+  color: #e6edf6;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.holding__links a:hover {
+  color: var(--summit);
+}
