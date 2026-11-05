@@ -1,0 +1,2078 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Gokul MV — the shelf, close up</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;700&family=Courier+Prime:wght@400;700&family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:inherit}
+.tap{appearance:none;border:0;background:transparent;padding:0;margin:0;cursor:pointer;font:inherit;color:inherit;display:block;pointer-events:auto}
+.tap:focus-visible{outline:2px solid #c8714a;outline-offset:3px}
+.holding,.holding *{cursor:none !important}
+.lift{transition:transform 260ms cubic-bezier(.2,.8,.2,1)}
+.can{transition:transform 620ms cubic-bezier(.3,.7,.3,1);transform-origin:52.5px 42px}
+@keyframes flick{0%,100%{transform:scaleY(1)}45%{transform:scaleY(1.14) translateY(-1px)}75%{transform:scaleY(0.9)}}
+.flame{transform-origin:50% 100%;transform-box:fill-box;animation:flick 1s ease-in-out infinite}
+@keyframes ignite{0%{transform:scale(0.1);opacity:0}60%{transform:scale(1.35);opacity:1}100%{transform:scale(1)}}
+.ignite{transform-origin:50% 100%;transform-box:fill-box;animation:ignite 0.55s ease-out}
+@keyframes rise{0%{opacity:0.75;transform:translateY(0) scaleX(1)}100%{opacity:0;transform:translateY(-36px) scaleX(1.7)}}
+.smoke{transform-origin:50% 100%;transform-box:fill-box;animation:rise 1.4s ease-out forwards}
+@keyframes sp1{0%{opacity:1;transform:translate(0,0)}100%{opacity:0;transform:translate(-12px,-10px)}}
+@keyframes sp2{0%{opacity:1;transform:translate(0,0)}100%{opacity:0;transform:translate(10px,-13px)}}
+@keyframes sp3{0%{opacity:1;transform:translate(0,0)}100%{opacity:0;transform:translate(14px,2px)}}
+@keyframes sp4{0%{opacity:1;transform:translate(0,0)}100%{opacity:0;transform:translate(-9px,6px)}}
+.s1{animation:sp1 0.45s ease-out infinite}.s2{animation:sp2 0.45s ease-out 0.1s infinite}.s3{animation:sp3 0.45s ease-out 0.2s infinite}.s4{animation:sp4 0.45s ease-out 0.05s infinite}
+@keyframes drip{0%{transform:translateY(0);opacity:0}12%{opacity:1}100%{transform:translateY(42px);opacity:0}}
+.drip{animation:drip 0.7s ease-in infinite}
+@keyframes perk{0%,100%{transform:scale(1)}40%{transform:scale(1.04,1.07)}}
+.perk{transform-origin:50% 100%;transform-box:fill-box;animation:perk 0.9s ease-in-out 2}
+@keyframes drive{0%{transform:translateX(0)}30%{transform:translateX(22px)}66%{transform:translateX(-28px)}100%{transform:translateX(0)}}
+.drive{animation:drive 1.6s ease-in-out}
+@keyframes spin{to{transform:rotate(360deg)}}
+.wheel{transform-origin:50% 50%;transform-box:fill-box}
+.drive .wheel{animation:spin 0.4s linear infinite}
+@keyframes walk{0%,100%{transform:translateX(0)}25%,75%{transform:translateX(-12px)}50%{transform:translateX(0)}}
+@keyframes bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-3px)}}
+@keyframes leg{0%,100%{transform:rotate(-10deg)}50%{transform:rotate(10deg)}}
+@keyframes wave{0%,100%{transform:rotate(0)}50%{transform:rotate(120deg)}}
+.walking{animation:walk 3s ease-in-out}
+.walking .bob{animation:bob 0.375s ease-in-out infinite}
+.walking .legL,.walking .legR{transform-origin:50% 0;transform-box:fill-box;animation:leg 0.375s ease-in-out infinite}
+.walking .legR{animation-direction:reverse}
+.walking .arm{transform-origin:50% 8%;transform-box:fill-box;animation:wave 0.75s ease-in-out infinite}
+.walking .key{transform-origin:50% 50%;transform-box:fill-box;animation:spin 0.6s linear infinite}
+@keyframes ncL{0%{transform:rotate(0);animation-timing-function:ease-out}25%{transform:rotate(32deg);animation-timing-function:ease-in}50%,100%{transform:rotate(0)}}
+@keyframes ncR{0%,50%{transform:rotate(0);animation-timing-function:ease-out}75%{transform:rotate(-32deg);animation-timing-function:ease-in}100%{transform:rotate(0)}}
+.swing .pl{animation:ncL 0.9s 5}
+.swing .pr{animation:ncR 0.9s 5}
+@keyframes twist{0%{transform:rotate(0)}40%{transform:rotate(-7deg)}100%{transform:rotate(0)}}
+.twist{transform-origin:50% 100%;animation:twist 0.26s ease-out}
+@keyframes tug{0%,100%{transform:translateY(0)}40%{transform:translateY(10px)}}
+.tug{animation:tug 0.42s ease-out}
+@keyframes pop{0%{transform:scale(0.6);opacity:0}100%{transform:scale(1);opacity:1}}
+.pop{transform-origin:50% 100%;animation:pop 0.22s ease-out}
+@keyframes rainfall{from{transform:translateY(0)}to{transform:translateY(120px)}}
+.rainfall{animation:rainfall 0.42s linear infinite}
+@keyframes snowfall{from{transform:translateY(0)}to{transform:translateY(150px)}}
+.snowfall{animation:snowfall 6s linear infinite}
+@keyframes sway{0%,100%{transform:translateX(-5px)}50%{transform:translateX(5px)}}
+.sway{animation:sway 3.2s ease-in-out infinite}
+@keyframes drift{0%,100%{transform:translateX(-14px)}50%{transform:translateX(14px)}}
+.drift{animation:drift 18s ease-in-out infinite}
+@keyframes leafFall{0%{transform:translate(0,0) rotate(0);opacity:0}8%{opacity:1}100%{transform:translate(-50px,420px) rotate(560deg);opacity:0.9}}
+.leafFall{transform-box:fill-box;transform-origin:50% 50%;animation:leafFall 9s linear infinite}
+@keyframes twinkle{0%,100%{opacity:0.9}50%{opacity:0.4}}
+.twinkle{animation:twinkle 3s ease-in-out infinite}
+@keyframes poof{0%{transform:scale(0.4);opacity:0.9}100%{transform:scale(1.9);opacity:0}}
+.poof{transform-box:fill-box;transform-origin:50% 50%;animation:poof 0.6s ease-out forwards}
+@keyframes boing{0%{transform:scale(0.3) rotate(-8deg);opacity:0}60%{transform:scale(1.08) rotate(2deg);opacity:1}100%{transform:scale(1) rotate(-1.5deg)}}
+.boing{animation:boing 0.45s cubic-bezier(.3,1.4,.5,1) both;transform-origin:50% 50%}
+@keyframes dangle{0%,100%{transform:translateY(0)}50%{transform:translateY(6px)}}
+.dangle{animation:dangle 2.4s ease-in-out infinite}
+@keyframes hang{0%,100%{transform:rotate(-1.1deg)}50%{transform:rotate(1.1deg)}}
+.hang{transform-origin:164px 24px;transform-box:view-box;animation:hang 7s ease-in-out infinite}
+@keyframes unroll{0%{transform:scaleY(0.05);opacity:0}100%{transform:scaleY(1);opacity:1}}
+.unroll{transform-origin:50% 0;animation:unroll 0.38s cubic-bezier(.2,.9,.3,1.2)}
+@keyframes confetti{0%{transform:translate(0,0) rotate(0)}100%{transform:translate(var(--sway),1080px) rotate(760deg)}}
+.confetti{animation:confetti 3.4s linear infinite}
+@keyframes spark{0%{transform:translate(0,0) scale(1);opacity:1}80%{opacity:1}100%{transform:translate(var(--dx),var(--dy)) scale(0.3);opacity:0}}
+.spark{animation:spark 1.2s cubic-bezier(.1,.7,.3,1) infinite}
+@keyframes candleFlicker{0%,100%{opacity:1}20%{opacity:0.86}35%{opacity:0.97}60%{opacity:0.82}80%{opacity:0.94}}
+.candleLight{animation:candleFlicker 1.7s ease-in-out infinite}
+.gusty .candleLight{animation-duration:0.5s}
+@keyframes wobble{0%,100%{transform:rotate(0)}20%{transform:rotate(-5deg)}45%{transform:rotate(4deg)}70%{transform:rotate(-2deg)}}
+.wobble{transform-box:fill-box;transform-origin:50% 100%;animation:wobble 1.2s ease-in-out}
+@keyframes tipOut{0%,100%{transform:rotate(0)}25%,70%{transform:rotate(-10deg)}}
+.tipOut{transform-origin:15% 100%;animation:tipOut 1.6s ease-in-out}
+@keyframes tipHang{0%,100%{transform:rotate(0)}25%,70%{transform:rotate(7deg)}}
+.tipHang{transform-origin:164px 24px;animation:tipHang 1.6s ease-in-out}
+@keyframes stream{0%{stroke-dashoffset:120;opacity:0}15%{opacity:1}80%{opacity:1}100%{stroke-dashoffset:0;opacity:0}}
+.spillStream{stroke-dasharray:120;animation:stream 1.6s ease-in-out forwards}
+@keyframes puddle{0%{transform:scale(0);opacity:0}40%{transform:scale(1);opacity:0.85}100%{transform:scale(1.1);opacity:0}}
+.puddle{transform-box:fill-box;transform-origin:50% 50%;animation:puddle 2.2s ease-out forwards}
+@keyframes dripLong{0%{transform:translateY(0);opacity:0}10%{opacity:1}100%{transform:translateY(260px);opacity:0}}
+.dripLong{animation:dripLong 0.9s ease-in infinite}
+@keyframes hangGust{0%,100%{transform:rotate(-1deg)}30%{transform:rotate(5deg)}65%{transform:rotate(-3deg)}}
+.gusty .hang{animation:hangGust 1.6s ease-in-out 3}
+@keyframes treeGust{0%,100%{transform:rotate(0)}35%{transform:rotate(3.5deg)}70%{transform:rotate(-1.5deg)}}
+.treeTop{transform-box:fill-box;transform-origin:15% 100%}
+.gusty .treeTop{animation:treeGust 1.2s ease-in-out 4}
+@keyframes flickWind{0%,100%{transform:skewX(0) scaleY(1)}40%{transform:skewX(-16deg) scaleY(0.9)}70%{transform:skewX(8deg) scaleY(1.05)}}
+.gusty .flame{animation:flickWind 0.5s ease-in-out infinite}
+@keyframes flutter{0%,100%{transform:rotate(0)}50%{transform:rotate(-6deg)}}
+.note{transform-box:fill-box;transform-origin:50% 0}
+.gusty .note{animation:flutter 0.42s ease-in-out 8}
+@keyframes windLine{0%{stroke-dashoffset:1600;opacity:0}15%{opacity:0.9}85%{opacity:0.9}100%{stroke-dashoffset:0;opacity:0}}
+.windLine{stroke-dasharray:180 1420;animation:windLine 2.4s ease-in-out infinite}
+@keyframes blowLeaf{0%{transform:translate(0,0) rotate(0);opacity:0}10%{opacity:1}100%{transform:translate(1300px,-120px) rotate(900deg);opacity:0.9}}
+.blowLeaf{animation:blowLeaf 4.2s cubic-bezier(.3,.1,.5,1) forwards}
+@keyframes blowLeafL{0%{transform:translate(0,0) rotate(0);opacity:0}10%{opacity:1}100%{transform:translate(-1300px,-120px) rotate(-900deg);opacity:0.9}}
+.blowLeafL{animation:blowLeafL 4.2s cubic-bezier(.3,.1,.5,1) forwards}
+.cturn{transition:transform var(--turn) ease-in-out}
+.typed{font-family:'Courier Prime','Courier New',monospace}
+.hand{font-family:Caveat,cursive}
+.scribble{appearance:none;border:0;background-color:transparent;cursor:pointer;pointer-events:auto;padding:0 2px 9px;font-family:Caveat,cursive;font-size:26px;font-weight:700;line-height:1;color:inherit;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='8' viewBox='0 0 40 8'%3E%3Cpath d='M0 5 Q5 1.5 10 5 T20 5 T30 5 T40 5' fill='none' stroke='%23c8714a' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E");background-repeat:repeat-x;background-position:0 100%;background-size:40px 8px;transition:transform 160ms}
+.scribble:hover{transform:rotate(-2deg) translateY(-1px)}
+.scribble:focus-visible{outline:2px dashed #c8714a;outline-offset:4px}
+.stamp{display:inline-block;padding:7px 14px;border:3px double #b3372f;border-radius:3px;color:#b3372f;font-family:'Courier Prime',monospace;font-weight:700;font-size:13px;letter-spacing:0.14em;text-transform:uppercase;text-decoration:none;transform:rotate(-4deg);opacity:0.9;transition:transform 180ms,opacity 180ms;pointer-events:auto}
+.stamp:hover{transform:rotate(0) scale(1.05);opacity:1}
+@keyframes folderIn{0%{transform:translateY(70px) scale(0.84);opacity:0}100%{transform:none;opacity:1}}
+.folderIn{animation:folderIn 0.4s cubic-bezier(.2,.8,.2,1) both}
+@keyframes coverOpen{0%{transform:rotateY(178deg)}100%{transform:rotateY(0)}}
+.folderIn .cover{animation:coverOpen 0.8s 0.3s cubic-bezier(.3,.7,.2,1) both}
+@keyframes folderOut{0%{transform:none;opacity:1}100%{transform:translateY(70px) scale(0.84);opacity:0}}
+.folderOut{animation:folderOut 0.26s ease-in both}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+.fadeIn{animation:fadeIn 0.3s both}
+.fadeOut{animation:fadeIn 0.26s reverse both}
+@media (prefers-reduced-motion: reduce){.flame,.ignite,.smoke,.drip,.perk,.drive,.drive .wheel,.walking,.walking *,.swing .pl,.swing .pr,.twist,.tug,.pop,.s1,.s2,.s3,.s4,.rainfall,.snowfall,.sway,.drift,.leafFall,.twinkle,.poof,.boing,.dangle,.hang,.gusty .hang,.gusty .treeTop,.gusty .flame,.gusty .note,.windLine,.candleLight,.wobble,.tipOut,.tipHang,.spillStream,.puddle,.dripLong,.blowLeaf,.blowLeafL,.folderIn,.folderIn .cover,.folderOut,.fadeIn,.fadeOut,.confetti,.spark,.unroll{animation:none !important}.lift,.can{transition:none}}
+</style>
+</helmet>
+<div data-room="1" class="{{v.rootClass}}" onPointerMove="{{move}}" onPointerUp="{{up}}" onPointerLeave="{{up}}" style="width: 1400px; height: 1000px; position: relative; overflow: hidden; background: linear-gradient(90deg, {{v.wallL}} 0%, {{v.wallR}} 100%); font-family: Inter, system-ui, sans-serif; color: #2a2420">
+<!-- the room, 1000px wide and centred; the windows sit in the 200px either side -->
+<div style="position: absolute; left: 200px; top: 0; width: 1000px; height: 1000px">
+
+  <!-- wall grain and the boards' shadows on the wall -->
+  <svg width="1400" height="1000" viewBox="-200 0 1400 1000" aria-hidden="true" style="position: absolute; left: -200px; top: 0">
+    <defs>
+      <filter id="plaster" x="0" y="0" width="100%" height="100%"><feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" seed="7"/><feColorMatrix values="0 0 0 0 0.45  0 0 0 0 0.38  0 0 0 0 0.3  0 0 0 0.045 0"/></filter>
+    </defs>
+    <rect x="-200" width="1400" height="1000" filter="url(#plaster)"/>
+    <g fill="#3a2614" opacity="{{v.boardShadow}}" transform="translate({{v.bsx}} 0)">
+      <rect x="262" y="300" width="650" height="26" rx="13" style="filter: blur(9px)"/>
+      <rect x="262" y="588" width="650" height="22" rx="11" style="filter: blur(8px)"/>
+      <rect x="262" y="872" width="650" height="18" rx="9" style="filter: blur(8px)"/>
+    </g>
+  </svg>
+
+  <!-- an old portrait on the right wall, above the lamp: after Vermeer's Girl with a Pearl Earring (1665) -->
+  <svg width="180" height="240" viewBox="0 0 180 240" aria-hidden="true" style="position: absolute; left: 815px; top: 70px">
+    <path d="M90 18 L40 60 M90 18 L140 60" stroke="#2a2420" stroke-width="1.2" fill="none"/>
+    <circle cx="90" cy="18" r="3" fill="#2a2420"/>
+    <rect x="25" y="66" width="120" height="160" fill="#2a2420" opacity="0.16"/>
+    <rect x="30" y="60" width="120" height="160" rx="3" fill="#b8892f" stroke="#2a2420" stroke-width="1.5"/>
+    <rect x="36" y="66" width="108" height="148" fill="none" stroke="#e6c25e" stroke-width="2.5"/>
+    <g fill="#e9c46a" stroke="#7a5a1c" stroke-width="0.8"><circle cx="34.5" cy="64.5" r="3.2"/><circle cx="145.5" cy="64.5" r="3.2"/><circle cx="34.5" cy="215.5" r="3.2"/><circle cx="145.5" cy="215.5" r="3.2"/><circle cx="90" cy="62.5" r="2.4"/><circle cx="90" cy="217.5" r="2.4"/></g>
+    <rect x="42" y="72" width="96" height="136" fill="#7a5a1c"/>
+    <g transform="translate(44 74)">
+      <rect width="92" height="132" fill="#15120f"/>
+      <path d="M8 132 C12 110 28 98 48 96 C66 98 80 110 86 132 Z" fill="#9c7a3e"/>
+      <path d="M60 98 C72 104 82 116 86 132 L66 132 C66 118 64 106 60 98 Z" fill="#7a5c2a"/>
+      <path d="M30 101 C40 107 54 107 64 100 L63 106 C53 113 41 113 31 107 Z" fill="#efe6d6"/>
+      <path d="M40 80 L54 80 L57 101 L38 101 Z" fill="#dcb68a"/>
+      <path d="M50 80 L54 80 L57 101 L50 101 Z" fill="#b98f66"/>
+      <ellipse cx="45" cy="62" rx="15" ry="19" fill="#ecd0a8"/>
+      <path d="M52 45 C62 52 62 74 52 81 C56 70 56 56 52 45 Z" fill="#c9a27a"/>
+      <path d="M29 58 C26 38 40 26 56 29 C66 32 68 44 64 52 C56 45 40 46 29 58 Z" fill="#3e5c9c"/>
+      <path d="M30 52 C38 44 54 42 64 50 L64 54 C54 48 40 49 31 57 Z" fill="#2f4a85"/>
+      <path d="M56 29 C66 22 78 27 77 40 C76 56 70 66 65 72 C66 58 64 46 60 38 Z" fill="#d6b04a"/>
+      <path d="M70 32 C76 40 74 56 66 70 C70 56 71 44 70 32 Z" fill="#b8902f"/>
+      <ellipse cx="38" cy="54" rx="4" ry="2.5" fill="#fff6e2" opacity="0.5"/>
+      <path d="M35 56 q4 -2 7 0 M46 55 q3 -1.5 6 0" stroke="#8a6a48" stroke-width="0.9" fill="none"/>
+      <ellipse cx="39" cy="61" rx="2.4" ry="1.8" fill="#2a2420"/><ellipse cx="49" cy="60" rx="2.2" ry="1.7" fill="#2a2420"/>
+      <circle cx="39.6" cy="60.4" r="0.6" fill="#fff"/><circle cx="49.6" cy="59.4" r="0.6" fill="#fff"/>
+      <path d="M44 62 L43 69 L46 69" stroke="#b98f66" stroke-width="0.9" fill="none"/>
+      <path d="M40 73.5 C42 72 46 72 48 73.5 C46 76.5 42 76.5 40 73.5 Z" fill="#c0504a"/>
+      <circle cx="58" cy="74" r="3.4" fill="#d9d6ce" stroke="#2a2420" stroke-width="0.6"/><circle cx="57" cy="73" r="1.1" fill="#fff"/>
+    </g>
+  </svg>
+
+  <!-- the name, as a sticker slapped on the wall -->
+  <svg width="232" height="100" viewBox="0 0 232 100" aria-hidden="true" style="position: absolute; left: 196px; top: 34px; transform: rotate(-4deg); transform-origin: 0 0; overflow: visible">
+    <path d="M14 2 H206 Q218 2 218 14 V62 L194 86 H14 Q2 86 2 74 V14 Q2 2 14 2 Z" fill="#2a2420" opacity="0.16" transform="translate(3 5)"/>
+    <path d="M14 2 H206 Q218 2 218 14 V62 L194 86 H14 Q2 86 2 74 V14 Q2 2 14 2 Z" fill="#ffffff" stroke="#2a2420" stroke-width="1.5"/>
+    <path d="M18 8 H202 Q212 8 212 18 V60 L192 80 H18 Q8 80 8 70 V18 Q8 8 18 8 Z" fill="#fbf6ec"/>
+    <path d="M218 62 L194 86 L198 66 Z" fill="#e3dbcd" stroke="#2a2420" stroke-width="1.2" stroke-linejoin="round"/>
+    <text x="22" y="47" font-family="'Instrument Serif', Georgia, serif" font-size="36" fill="#2a2420">Gokul MV</text>
+    <text x="23" y="67" font-family="Inter, system-ui, sans-serif" font-size="10" font-weight="600" letter-spacing="1.4" fill="#a9573a">AI FULL STACK ENGINEER</text>
+    <path d="M190 20 l2.4 5 5.4 0.6 -4 3.6 1.2 5.4 -5 -2.8 -5 2.8 1.2 -5.4 -4 -3.6 5.4 -0.6 Z" fill="#d9a541" stroke="#2a2420" stroke-width="1"/>
+  </svg>
+  <!-- pull the thread for contact details and the résumé -->
+  <svg width="80" height="200" viewBox="0 0 80 200" aria-hidden="true" style="position: absolute; left: 312px; top: 100px; pointer-events: none; overflow: visible">
+    <line x1="40" y1="6" x2="40" y2="{{contact.threadY}}" stroke="#6b5a46" stroke-width="1.5"/>
+    <g transform="translate(0 {{contact.pull}})" style="transition: transform 280ms cubic-bezier(.3,1.6,.5,1)">
+      <path d="M4 59 H70 L78 70 L70 81 H4 Z" fill="#d8b98a" stroke="#2a2420" stroke-width="1.3" stroke-linejoin="round"/>
+      <circle cx="70" cy="70" r="2.2" fill="#fbf6ec" stroke="#2a2420" stroke-width="0.8"/>
+      <text x="35" y="73.3" text-anchor="middle" font-family="'Courier Prime', monospace" font-size="9" font-weight="700" letter-spacing="0.6" fill="#2a2420">PULL ME</text>
+    </g>
+  </svg>
+  <button class="tap" type="button" onPointerDown="{{tagDown}}" onClick="{{tagClick}}" aria-expanded="{{contact.expanded}}" aria-label="Pull the thread: contact details and résumé" style="position: absolute; left: 314px; top: 150px; width: 78px; height: 40px; transform: translateY({{contact.pull}}px); touch-action: none"></button>
+
+  <!-- the shelf, centred: everything inside uses shelf coordinates, 75px right of the room's -->
+  <div style="position: absolute; left: -75px; top: 0; width: 1000px; height: 1000px; pointer-events: none">
+  <sc-for list="{{boards}}" as="bd" hint-placeholder-count="3">
+    <div style="position: absolute; left: 250px; top: {{bd.ty}}px; width: 650px; height: {{bd.ts}}px; background: {{v.boardTop}}; clip-path: polygon(1.6% 0, 98.4% 0, 100% 100%, 0 100%)"></div>
+    <div style="position: absolute; left: 250px; top: {{bd.yf}}px; width: 650px; height: 40px; background: {{v.boardFace}}; border-top: 1px solid {{v.edge}}; box-sizing: border-box"></div>
+    <div style="position: absolute; left: 250px; top: {{bd.yu}}px; width: 650px; height: {{bd.us}}px; background: {{v.boardUnder}}; clip-path: polygon(0 0, 100% 0, 98.4% 100%, 1.6% 100%)"></div>
+  </sc-for>
+
+  <!-- ============ TOP BOARD · WORK ============ -->
+  <div style="position: absolute; left: 0; top: 0; width: 1000px; height: 1000px; pointer-events: none; filter: {{v.rowShadow}}">
+    <!-- the toy roadster: drag it along the board, or click to give it a push -->
+    <button class="tap" type="button" onPointerDown="{{carDown}}" onKeyDown="{{carKey}}" aria-label="Toy car: drag it along the shelf (or use the arrow keys)" style="position: absolute; left: {{car.x}}px; top: 204px; width: 84px; height: 52px; cursor: grab; touch-action: none">
+      <svg width="84" height="52" viewBox="0 0 116 72" aria-hidden="true" style="display: block">
+        <rect x="48" y="19" width="12" height="15" rx="4" fill="#2f4058" stroke="#2a2420" stroke-width="1.3"/>
+        <circle cx="54" cy="12" r="8.5" fill="#f0d2a8" stroke="#2a2420" stroke-width="1.3"/>
+        <path d="M45.5 10.5 C45.5 2 62.5 2 62.5 10.5 Z" fill="#c9473b" stroke="#2a2420" stroke-width="1.3"/>
+        <path d="M6 50 C6 38 14 32 28 32 L40 32 L44 26 L70 26 L76 32 L96 32 C106 32 112 40 112 50 Z" fill="#d9a541" stroke="#2a2420" stroke-width="1.5"/>
+        <path d="M13 42 H105" stroke="#c9473b" stroke-width="4"/>
+        <rect x="6" y="49" width="106" height="7" rx="2" fill="#b07a48" stroke="#2a2420" stroke-width="1.3"/>
+        <circle cx="108" cy="41" r="3" fill="{{car.light}}" stroke="#2a2420" stroke-width="1"/>
+        <g class="wheel" style="transform: rotate({{car.wheel}}deg)"><circle cx="28" cy="56" r="15" fill="#2a2420"/><circle cx="28" cy="56" r="7" fill="#efe6d6"/><path d="M28 49.5 V62.5 M21.5 56 H34.5" stroke="#2a2420" stroke-width="1.6"/></g>
+        <g class="wheel" style="transform: rotate({{car.wheel}}deg)"><circle cx="90" cy="56" r="15" fill="#2a2420"/><circle cx="90" cy="56" r="7" fill="#efe6d6"/><path d="M90 49.5 V62.5 M83.5 56 H96.5" stroke="#2a2420" stroke-width="1.6"/></g>
+      </svg>
+    </button>
+
+    <!-- the work files: lever-arch spines, dated -->
+    <sc-for list="{{work}}" as="b" hint-placeholder-count="3">
+      <button class="tap" type="button" onMouseEnter="{{b.hover}}" onMouseLeave="{{b.leave}}" onFocus="{{b.hover}}" onBlur="{{b.leave}}" onClick="{{b.open}}" aria-label="{{b.aria}}" style="position: absolute; left: {{b.x}}px; top: {{b.hy}}px; width: {{b.w}}px; height: {{b.hh}}px; z-index: {{b.z}}">
+        <span class="lift" style="position: absolute; left: 0; top: {{b.ht}}px; width: {{b.w}}px; height: {{b.h}}px; transform: translateY({{b.lift}}px) rotate({{b.tilt}}deg); background: {{b.color}}; border: 1.5px solid #2a2420; box-sizing: border-box; box-shadow: inset -7px 0 0 rgba(0,0,0,0.16); display: flex; flex-direction: column; align-items: center; padding: 10px 0 9px">
+          <span style="width: 60%; height: 1.5px; background: {{b.rule}}"></span>
+          <span style="width: 60%; height: 1.5px; background: {{b.rule}}; margin-top: 3px"></span>
+          <span style="margin-top: 12px; width: {{b.lw}}px; flex: 1; max-height: 104px; background: #f7f1e4; border: 1.2px solid #2a2420; box-sizing: border-box; display: flex; align-items: center; justify-content: center">
+            <span style="writing-mode: vertical-rl; transform: rotate(180deg); font-family: 'Instrument Serif', Georgia, serif; font-size: 15px; color: #2a2420; white-space: nowrap">{{b.name}}</span>
+          </span>
+          <span style="margin-top: 7px; display: flex; flex-direction: column; align-items: center; font-size: 9px; font-weight: 600; line-height: 1.25; color: {{b.ink}}"><span>{{b.yA}}</span><span>{{b.yB}}</span></span>
+          <span style="margin-top: auto; width: 16px; height: 16px; border-radius: 50%; background: {{b.hole}}; border: 1.5px solid #2a2420; box-sizing: border-box"></span>
+        </span>
+      </button>
+    </sc-for>
+
+    <!-- an old portrait leaning on the wall: after Leonardo's Mona Lisa (c. 1503) -->
+    <div style="position: absolute; left: 692px; top: 116px; width: 104px; height: 140px; transform: rotate(-3deg); transform-origin: bottom left">
+      <svg width="104" height="140" viewBox="0 0 104 140" aria-hidden="true" style="display: block">
+        <rect x="0.75" y="0.75" width="102.5" height="138.5" rx="2" fill="#b8892f" stroke="#2a2420" stroke-width="1.5"/>
+        <rect x="5" y="5" width="94" height="130" fill="none" stroke="#e6c25e" stroke-width="2"/>
+        <g fill="#e9c46a" stroke="#7a5a1c" stroke-width="0.7"><circle cx="4.5" cy="4.5" r="2.6"/><circle cx="99.5" cy="4.5" r="2.6"/><circle cx="4.5" cy="135.5" r="2.6"/><circle cx="99.5" cy="135.5" r="2.6"/></g>
+        <rect x="10" y="10" width="84" height="120" fill="#7a5a1c"/>
+        <g transform="translate(12 12)">
+          <rect width="80" height="116" fill="#9aa67a"/>
+          <path d="M0 40 C10 34 18 38 26 32 C36 26 46 34 56 28 C66 24 74 30 80 26 V60 H0 Z" fill="#7f9690"/>
+          <path d="M0 52 C14 46 26 52 40 48 C56 44 66 50 80 46 V116 H0 Z" fill="#6b7444"/>
+          <path d="M64 50 C60 56 68 60 62 68" stroke="#c4a46a" stroke-width="2" fill="none"/>
+          <path d="M22 40 C20 18 30 10 40 10 C50 10 60 18 58 40 L60 70 L48 64 L32 64 L20 70 Z" fill="#3a2a1c"/>
+          <ellipse cx="40" cy="34" rx="12" ry="15" fill="#d8b27a"/>
+          <path d="M46 22 C54 30 54 42 46 48 C49 40 49 30 46 22 Z" fill="#b98f5a"/>
+          <path d="M27 24 C32 16 48 16 53 24" stroke="#2a2420" stroke-width="0.6" opacity="0.4" fill="none"/>
+          <ellipse cx="35" cy="32" rx="2" ry="1.2" fill="#3a2a1c"/><ellipse cx="45" cy="32" rx="2" ry="1.2" fill="#3a2a1c"/>
+          <path d="M40 33 L39 39 L41.5 39" stroke="#9c7748" stroke-width="0.8" fill="none"/>
+          <path d="M36 43 C38 44.5 42 44.5 44 43" stroke="#8a4a36" stroke-width="1" fill="none"/>
+          <path d="M34 48 L46 48 L50 66 L30 66 Z" fill="#d1a86f"/>
+          <path d="M10 116 C12 84 22 66 32 62 C36 66 44 66 48 62 C58 66 68 84 70 116 Z" fill="#3b3326"/>
+          <path d="M30 64 C36 70 44 70 50 64" stroke="#2a2018" stroke-width="1.2" fill="none"/>
+          <path d="M12 116 C14 96 20 86 28 82 L30 104 Z M68 116 C66 96 60 86 52 82 L50 104 Z" fill="#6b5a2e"/>
+          <ellipse cx="34" cy="100" rx="9" ry="5" fill="#d8b27a" transform="rotate(-12 34 100)"/><ellipse cx="44" cy="103" rx="9" ry="5" fill="#d1a86f" transform="rotate(10 44 103)"/>
+        </g>
+      </svg>
+    </div>
+
+    <!-- jar candle -->
+    <button class="tap" type="button" onClick="{{candleClick}}" aria-label="{{candle.aria}}" style="position: absolute; left: 800px; top: 164px; width: 50px; height: 92px">
+      <svg width="50" height="92" viewBox="0 0 50 92" aria-hidden="true" style="display: block; overflow: visible">
+        <sc-if value="{{candle.lit}}" hint-placeholder-val="{{ false }}">
+          <circle cx="25" cy="34" r="26" fill="#ffd28a" opacity="0.35"/>
+          <g class="ignite"><path class="flame" d="M25 22 C31 30 31 37 25 43 C19 37 19 30 25 22 Z" fill="#f4a73c" stroke="#2a2420" stroke-width="1"/><path class="flame" d="M25 31 C27.5 35 27.5 39 25 42 C22.5 39 22.5 35 25 31 Z" fill="#fff3d0"/></g>
+        </sc-if>
+        <sc-if value="{{candle.smoke}}" hint-placeholder-val="{{ false }}"><path class="smoke" d="M25 42 C21 34 29 28 25 20 C21 12 29 6 25 -2" stroke="#9a948c" stroke-width="2" fill="none" stroke-linecap="round"/></sc-if>
+        <path d="M25 50 L25 44" stroke="#2a2420" stroke-width="1.8"/>
+        <path d="M5 46 H45 V86 Q45 91 40 91 H10 Q5 91 5 86 Z" fill="#dfe7e1" stroke="#2a2420" stroke-width="1.5"/>
+        <rect x="9" y="54" width="32" height="33" rx="2" fill="#f4e8d2"/>
+        <rect x="5" y="64" width="40" height="14" fill="#2f4058"/>
+        <path d="M12 71 H38" stroke="#d9a541" stroke-width="1.5"/>
+        <path d="M10 50 V82" stroke="#ffffff" stroke-width="2.5" opacity="0.6"/>
+        <path d="M5 46 H45 V86 Q45 91 40 91 H10 Q5 91 5 86 Z" fill="none" stroke="#2a2420" stroke-width="1.5"/>
+        <rect x="3" y="43" width="44" height="5" rx="1.5" fill="#cfd9d2" stroke="#2a2420" stroke-width="1.2"/>
+      </svg>
+    </button>
+
+    <!-- matchbox: click to strike, then carry the flame to the candle -->
+    <button class="tap" type="button" onClick="{{strike}}" aria-label="{{mb.aria}}" style="position: absolute; left: 852px; top: 228px; width: 46px; height: 30px">
+      <svg width="46" height="30" viewBox="0 0 46 30" aria-hidden="true" style="display: block; overflow: visible">
+        <g style="transform: translateX({{mb.drawer}}px); transition: transform 300ms ease-out">
+          <rect x="3" y="11" width="38" height="15" fill="#efe3c8" stroke="#2a2420" stroke-width="1.2"/>
+          <g fill="#a33a2a" stroke="#2a2420" stroke-width="0.6"><circle cx="8" cy="14.5" r="2"/><circle cx="8" cy="19" r="2"/><circle cx="8" cy="23.5" r="2"/></g>
+          <path d="M10 14.5 H36 M10 19 H36 M10 23.5 H36" stroke="#d8b27a" stroke-width="2.4"/>
+        </g>
+        <rect x="2" y="5" width="42" height="3.5" fill="#6b4a30" stroke="#2a2420" stroke-width="1"/>
+        <rect x="2" y="8" width="42" height="20" fill="#2f4058" stroke="#2a2420" stroke-width="1.5"/>
+        <rect x="2" y="8" width="42" height="5" fill="#c9473b" stroke="#2a2420" stroke-width="1.2"/>
+        <path d="M23 16 C26 19 26 22 23 25 C20 22 20 19 23 16 Z" fill="#d9a541"/>
+      </svg>
+    </button>
+  </div>
+
+  <!-- ============ MIDDLE BOARD · EDUCATION ============ -->
+  <div style="position: absolute; left: 0; top: 0; width: 1000px; height: 1000px; pointer-events: none; filter: {{v.rowShadow}}">
+    <sc-for list="{{edu}}" as="b" hint-placeholder-count="2">
+      <button class="tap" type="button" onMouseEnter="{{b.hover}}" onMouseLeave="{{b.leave}}" onFocus="{{b.hover}}" onBlur="{{b.leave}}" onClick="{{b.open}}" aria-label="{{b.aria}}" style="position: absolute; left: {{b.x}}px; top: {{b.hy}}px; width: {{b.w}}px; height: {{b.hh}}px; z-index: {{b.z}}">
+        <span class="lift" style="position: absolute; left: 0; top: {{b.ht}}px; width: {{b.w}}px; height: {{b.h}}px; transform: translateY({{b.lift}}px) rotate({{b.tilt}}deg); background: {{b.color}}; border: 1.5px solid #2a2420; box-sizing: border-box; box-shadow: inset -7px 0 0 rgba(0,0,0,0.16); display: flex; flex-direction: column; align-items: center; padding: 10px 0 9px">
+          <span style="width: 60%; height: 1.5px; background: {{b.rule}}"></span>
+          <span style="width: 60%; height: 1.5px; background: {{b.rule}}; margin-top: 3px"></span>
+          <span style="margin-top: 12px; width: {{b.lw}}px; flex: 1; max-height: 112px; background: #f7f1e4; border: 1.2px solid #2a2420; box-sizing: border-box; display: flex; align-items: center; justify-content: center">
+            <span style="writing-mode: vertical-rl; transform: rotate(180deg); font-family: 'Instrument Serif', Georgia, serif; font-size: 15px; color: #2a2420; white-space: nowrap">{{b.name}}</span>
+          </span>
+          <span style="margin-top: 7px; display: flex; flex-direction: column; align-items: center; font-size: 9px; font-weight: 600; line-height: 1.25; color: {{b.ink}}"><span>{{b.yA}}</span><span>{{b.yB}}</span></span>
+          <span style="margin-top: auto; width: 16px; height: 16px; border-radius: 50%; background: {{b.hole}}; border: 1.5px solid #2a2420; box-sizing: border-box"></span>
+        </span>
+      </button>
+    </sc-for>
+
+    <!-- two books lying flat, drawn straight on like the project stack; the cube rests on the top one -->
+    <div style="position: absolute; left: 470px; top: 519px; width: 126px; height: 26px; background: #e9dcc4; border: 1.5px solid #2a2420; box-sizing: border-box; box-shadow: inset 0 -5px 0 rgba(0,0,0,0.1); display: flex; align-items: center; justify-content: center; white-space: nowrap; color: #2a2420">
+      <span style="font-family: 'Instrument Serif', Georgia, serif; font-size: 11.5px; line-height: 1">The Pragmatic Programmer</span>
+    </div>
+    <div style="position: absolute; left: 476px; top: 494px; width: 114px; height: 26px; background: #c8714a; border: 1.5px solid #2a2420; box-sizing: border-box; box-shadow: inset 0 -5px 0 rgba(0,0,0,0.12); display: flex; align-items: center; justify-content: center; gap: 6px; white-space: nowrap; color: #fbeee4">
+      <span style="font-family: 'Instrument Serif', Georgia, serif; font-size: 11.5px; line-height: 1">Clean Architecture</span>
+      <span style="font-size: 6px; font-weight: 600; letter-spacing: 0.12em">MARTIN</span>
+    </div>
+    <button class="tap" type="button" onClick="{{openCube}}" onMouseEnter="{{cubeHover}}" onMouseLeave="{{cubeLeave}}" onFocus="{{cubeHover}}" onBlur="{{cubeLeave}}" aria-label="Rubik's cube: pick it up and play" style="position: absolute; left: 492px; top: {{shelfCube.top}}px; width: 80px; height: 78px; perspective: 340px; perspective-origin: 40px 41px">
+      <div style="position: absolute; left: 40px; top: 41px; width: 0; height: 0; transform-style: preserve-3d; transform: translateY({{shelfCube.lift}}px) rotateX({{shelfCube.rx}}deg) rotateY({{shelfCube.ry}}deg) scale3d(0.27, 0.27, 0.27); transition: transform 600ms cubic-bezier(.3,.7,.3,1); --turn: 200ms">
+        <sc-for list="{{cube3d}}" as="cb" hint-placeholder-count="26">
+          <div class="{{cubeUI.anim}}" style="position: absolute; left: -31px; top: -31px; width: 62px; height: 62px; transform-style: preserve-3d; transform: rotateX({{cb.ax}}deg) rotateY({{cb.ay}}deg) rotateZ({{cb.az}}deg) translate3d({{cb.x}}px, {{cb.y}}px, {{cb.z}}px)">
+            <sc-for list="{{cb.faces}}" as="fc" hint-placeholder-count="6"><div style="position: absolute; left: 0; top: 0; width: 62px; height: 62px; box-sizing: border-box; background-color: {{fc.c}}; background-image: linear-gradient(135deg, rgba(255,255,255,0.3) 0%, rgba(255,255,255,0) 46%); border: 5px solid {{fc.edge}}; border-radius: 10px; transform: {{fc.t}}; backface-visibility: hidden"></div></sc-for>
+          </div>
+        </sc-for>
+      </div>
+    </button>
+
+    <!-- echeveria in a charcoal pot -->
+    <button class="tap" type="button" onClick="{{ech.water}}" onMouseEnter="{{ech.hover}}" onMouseLeave="{{plantLeave}}" onFocus="{{ech.hover}}" onBlur="{{plantLeave}}" aria-label="{{ech.aria}}" style="position: absolute; left: 600px; top: 395px; width: 130px; height: 150px">
+      <svg width="130" height="150" viewBox="0 0 130 150" aria-hidden="true" style="display: block; overflow: visible">
+        <g class="{{ech.perk}} {{ech.tip}}">
+          <sc-if value="{{ech.flower}}" hint-placeholder-val="{{ false }}">
+            <path d="M70 98 C73 64 82 38 100 26" stroke="#7d9a6a" stroke-width="2" fill="none"/>
+            <g fill="#e48a6e" stroke="#2a2420" stroke-width="1"><path d="M100 26 c4 0 6 3 5 7 c-3 1 -6 -1 -5 -7z"/><path d="M93 31 c4 0 6 3 5 7 c-3 1 -6 -1 -5 -7z"/><path d="M104 18 c4 0 6 3 5 7 c-3 1 -6 -1 -5 -7z"/></g>
+          </sc-if>
+          <sc-for list="{{ech.back}}" as="lf" hint-placeholder-count="9">
+            <g transform="translate({{lf.x}} {{lf.y}}) rotate({{lf.r}}) scale({{lf.sx}} {{lf.sy}})">
+              <path d="M0 0 C-9 -5 -10 -22 0 -34 C10 -22 9 -5 0 0 Z" fill="{{lf.l}}"/>
+              <path d="M0 0 C-9 -5 -10 -22 0 -34 Z" fill="{{lf.d}}"/>
+              <path d="M-2.6 -29 C-1.2 -31 1.2 -31 2.6 -29 L0 -34 Z" fill="{{lf.tip}}"/>
+              <path d="M0 0 C-9 -5 -10 -22 0 -34 C10 -22 9 -5 0 0 Z" fill="none" stroke="#2a2420" stroke-width="1.1"/>
+            </g>
+          </sc-for>
+          <path d="M30 102 H100 L94 146 Q93 150 89 150 H41 Q37 150 36 146 Z" fill="#3a3734"/>
+          <path d="M84 102 H100 L94 146 Q93 150 89 150 H80 Z" fill="#2c2a28"/>
+          <path d="M30 102 H100 L94 146 Q93 150 89 150 H41 Q37 150 36 146 Z" fill="none" stroke="#2a2420" stroke-width="1.5"/>
+          <rect x="27" y="96" width="76" height="8" rx="1.5" fill="#4a4642" stroke="#2a2420" stroke-width="1.5"/>
+          <sc-for list="{{ech.front}}" as="lf" hint-placeholder-count="6">
+            <g transform="translate({{lf.x}} {{lf.y}}) rotate({{lf.r}}) scale({{lf.sx}} {{lf.sy}})">
+              <path d="M0 0 C-9 -5 -10 -22 0 -34 C10 -22 9 -5 0 0 Z" fill="{{lf.l}}"/>
+              <path d="M0 0 C-9 -5 -10 -22 0 -34 Z" fill="{{lf.d}}"/>
+              <path d="M-2.6 -29 C-1.2 -31 1.2 -31 2.6 -29 L0 -34 Z" fill="{{lf.tip}}"/>
+              <path d="M0 0 C-9 -5 -10 -22 0 -34 C10 -22 9 -5 0 0 Z" fill="none" stroke="#2a2420" stroke-width="1.1"/>
+            </g>
+          </sc-for>
+        </g>
+      </svg>
+    </button>
+
+    <!-- Newton's cradle -->
+    <button class="tap" type="button" onClick="{{swing}}" aria-label="Swing the Newton's cradle" style="position: absolute; left: 728px; top: 445px; width: 96px; height: 100px">
+      <svg class="{{cradleCls}}" width="96" height="100" viewBox="0 0 96 100" aria-hidden="true" style="display: block; overflow: visible">
+        <path d="M12 90 V10 H84 V90" stroke="#2a2420" stroke-width="3" fill="none" stroke-linejoin="round"/>
+        <g class="pl" style="transform-origin: 30px 12px"><line x1="30" y1="12" x2="30" y2="66" stroke="#2a2420" stroke-width="1"/><circle cx="30" cy="70.5" r="4.5" fill="#cfd4d8" stroke="#2a2420" stroke-width="1.1"/><circle cx="28.6" cy="69" r="1.2" fill="#fff"/></g>
+        <g><line x1="39" y1="12" x2="39" y2="66" stroke="#2a2420" stroke-width="1"/><circle cx="39" cy="70.5" r="4.5" fill="#cfd4d8" stroke="#2a2420" stroke-width="1.1"/><circle cx="37.6" cy="69" r="1.2" fill="#fff"/></g>
+        <g><line x1="48" y1="12" x2="48" y2="66" stroke="#2a2420" stroke-width="1"/><circle cx="48" cy="70.5" r="4.5" fill="#cfd4d8" stroke="#2a2420" stroke-width="1.1"/><circle cx="46.6" cy="69" r="1.2" fill="#fff"/></g>
+        <g><line x1="57" y1="12" x2="57" y2="66" stroke="#2a2420" stroke-width="1"/><circle cx="57" cy="70.5" r="4.5" fill="#cfd4d8" stroke="#2a2420" stroke-width="1.1"/><circle cx="55.6" cy="69" r="1.2" fill="#fff"/></g>
+        <g class="pr" style="transform-origin: 66px 12px"><line x1="66" y1="12" x2="66" y2="66" stroke="#2a2420" stroke-width="1"/><circle cx="66" cy="70.5" r="4.5" fill="#cfd4d8" stroke="#2a2420" stroke-width="1.1"/><circle cx="64.6" cy="69" r="1.2" fill="#fff"/></g>
+        <rect x="2" y="89" width="92" height="10" rx="2" fill="#c99257" stroke="#2a2420" stroke-width="1.4"/>
+      </svg>
+    </button>
+
+    <!-- wind-up tin robot -->
+    <button class="tap" type="button" onClick="{{wake}}" aria-label="{{robot.aria}}" style="position: absolute; left: 834px; top: 446px; width: 60px; height: 99px">
+      <svg class="{{robot.cls}}" width="60" height="99" viewBox="0 0 70 116" aria-hidden="true" style="display: block; overflow: visible">
+        <g class="legL"><rect x="18" y="84" width="12" height="20" fill="#2f4058" stroke="#2a2420" stroke-width="1.3"/><rect x="14" y="103" width="20" height="11" rx="2" fill="#2a2420"/></g>
+        <g class="legR"><rect x="40" y="84" width="12" height="20" fill="#2f4058" stroke="#2a2420" stroke-width="1.3"/><rect x="36" y="103" width="20" height="11" rx="2" fill="#2a2420"/></g>
+        <g class="bob">
+          <g class="key"><path d="M60 78 L68 72 L68 84 Z M60 78 L52 72 L52 84 Z" fill="#d9a541" stroke="#2a2420" stroke-width="1"/></g>
+          <line x1="35" y1="12" x2="35" y2="4" stroke="#2a2420" stroke-width="2"/>
+          <circle cx="35" cy="4" r="3.5" fill="{{robot.bulb}}" stroke="#2a2420" stroke-width="1.2"/>
+          <rect x="15" y="12" width="40" height="28" rx="5" fill="#b9c3c9" stroke="#2a2420" stroke-width="1.5"/>
+          <rect x="45" y="13.5" width="9" height="25" rx="3" fill="#9aa6ad"/>
+          <circle cx="27" cy="25" r="5.5" fill="#f7f1e4" stroke="#2a2420" stroke-width="1.2"/><circle cx="43" cy="25" r="5.5" fill="#f7f1e4" stroke="#2a2420" stroke-width="1.2"/>
+          <circle cx="27" cy="25" r="2.4" fill="{{robot.eye}}"/><circle cx="43" cy="25" r="2.4" fill="{{robot.eye}}"/>
+          <path d="M28 34 H42" stroke="#2a2420" stroke-width="2" stroke-linecap="round"/>
+          <rect x="30" y="40" width="10" height="5" fill="#7d878d" stroke="#2a2420" stroke-width="1"/>
+          <rect x="58" y="47" width="8" height="26" rx="3" fill="#b9c3c9" stroke="#2a2420" stroke-width="1.3"/>
+          <rect x="12" y="44" width="46" height="40" rx="5" fill="#c9473b" stroke="#2a2420" stroke-width="1.5"/>
+          <rect x="47" y="45.5" width="10" height="37" rx="3" fill="#a9392f"/>
+          <rect x="19" y="52" width="27" height="18" rx="2" fill="#f2e3c0" stroke="#2a2420" stroke-width="1.2"/>
+          <circle cx="27" cy="61" r="5" fill="#d9a541" stroke="#2a2420" stroke-width="1"/>
+          <line x1="27" y1="61" x2="{{robot.nx}}" y2="{{robot.ny}}" stroke="#2a2420" stroke-width="1.4" stroke-linecap="round"/>
+          <circle cx="38" cy="58" r="2.2" fill="{{robot.l1}}" stroke="#2a2420" stroke-width="0.8"/><circle cx="41" cy="65" r="2.2" fill="{{robot.l2}}" stroke="#2a2420" stroke-width="0.8"/>
+          <g fill="#2a2420"><circle cx="16" cy="48" r="1.1"/><circle cx="54" cy="48" r="1.1"/><circle cx="16" cy="80" r="1.1"/><circle cx="54" cy="80" r="1.1"/></g>
+          <g class="arm"><rect x="4" y="47" width="8" height="26" rx="3" fill="#b9c3c9" stroke="#2a2420" stroke-width="1.3"/><path d="M5 73 L3 80 M11 73 L13 80" stroke="#2a2420" stroke-width="2.2" stroke-linecap="round"/></g>
+        </g>
+      </svg>
+    </button>
+    <sc-if value="{{robot.on}}" hint-placeholder-val="{{ false }}"><div class="pop hand" style="position: absolute; left: 760px; top: 398px; padding: 3px 14px 5px; background: #fbf6ec; border: 1.5px solid #2a2420; border-radius: 16px 16px 16px 3px; font-size: 19px; font-weight: 700; white-space: nowrap">{{robot.says}}</div></sc-if>
+  </div>
+
+  <!-- ============ BOTTOM BOARD · GITHUB ============ -->
+  <div style="position: absolute; left: 0; top: 0; width: 1000px; height: 1000px; pointer-events: none; filter: {{v.rowShadow}}">
+    <!-- the released ones, lying flat; hover floats one up off the stack. A bowl of pebbles on top -->
+    <sc-for list="{{gitFlat}}" as="b" hint-placeholder-count="3">
+      <button class="tap" type="button" onMouseEnter="{{b.hover}}" onMouseLeave="{{b.leave}}" onFocus="{{b.hover}}" onBlur="{{b.leave}}" onClick="{{b.open}}" aria-label="{{b.aria}}" style="position: absolute; left: {{b.x}}px; top: {{b.hy}}px; width: {{b.w}}px; height: {{b.hh}}px; z-index: {{b.z}}">
+        <span class="lift" style="position: absolute; left: 0; top: {{b.ht}}px; width: {{b.w}}px; height: 26px; transform: translateY({{b.lift}}px) rotate({{b.tilt}}deg) scale({{b.sc}}); background: {{b.color}}; border: 1.5px solid #2a2420; box-sizing: border-box; box-shadow: inset 0 -5px 0 rgba(0,0,0,0.12); display: flex; align-items: center; justify-content: space-between; padding: 0 10px">
+          <span style="font-size: 8.5px; font-weight: 600; letter-spacing: 0.06em; color: {{b.ink}}">{{b.lang}}</span>
+          <span style="font-family: 'Instrument Serif', Georgia, serif; font-size: 16px; color: {{b.ink}}">{{b.name}}</span>
+          <span style="width: 9px; height: 9px; border-radius: 50%; background: {{b.dot}}; border: 1.5px solid #2a2420; box-sizing: border-box"></span>
+        </span>
+      </button>
+    </sc-for>
+    <svg width="140" height="40" viewBox="0 0 140 40" aria-hidden="true" style="position: absolute; left: 296px; top: 715px; overflow: visible">
+      <ellipse cx="52" cy="11" rx="14" ry="8" fill="#9a948c" stroke="#2a2420" stroke-width="1.2"/>
+      <ellipse cx="88" cy="11" rx="11" ry="7" fill="#5f5a54" stroke="#2a2420" stroke-width="1.2"/>
+      <ellipse cx="71" cy="8" rx="12" ry="7.5" fill="#d8d0c4" stroke="#2a2420" stroke-width="1.2"/>
+      <path d="M4 12 C12 38 128 38 136 12 Z" fill="#b07a48" stroke="#2a2420" stroke-width="1.5"/>
+      <path d="M22 21 C44 29 96 29 118 21" stroke="#d29a62" stroke-width="1.5" fill="none"/>
+    </svg>
+
+    <!-- everything else on GitHub that is finished or nearly: upright spines, green dot = released, amber = nearly done -->
+    <sc-for list="{{gitUp}}" as="b" hint-placeholder-count="8">
+      <button class="tap" type="button" onMouseEnter="{{b.hover}}" onMouseLeave="{{b.leave}}" onFocus="{{b.hover}}" onBlur="{{b.leave}}" onClick="{{b.open}}" aria-label="{{b.aria}}" style="position: absolute; left: {{b.x}}px; top: {{b.hy}}px; width: 32px; height: {{b.hh}}px; z-index: {{b.z}}">
+        <span class="lift" style="position: absolute; left: 0; top: {{b.ht}}px; width: 32px; height: {{b.h}}px; transform: translateY({{b.lift}}px) rotate({{b.tilt}}deg); background: {{b.color}}; border: 1.5px solid #2a2420; box-sizing: border-box; box-shadow: inset -6px 0 0 rgba(0,0,0,0.16); display: flex; flex-direction: column; align-items: center; padding: 8px 0 7px">
+          <span style="width: 9px; height: 9px; border-radius: 50%; background: {{b.dot}}; border: 1.5px solid #2a2420; box-sizing: border-box"></span>
+          <span style="margin-top: 8px; width: 22px; flex: 1; max-height: 112px; background: #f7f1e4; border: 1.2px solid #2a2420; box-sizing: border-box; display: flex; align-items: center; justify-content: center">
+            <span style="writing-mode: vertical-rl; transform: rotate(180deg); font-family: 'Instrument Serif', Georgia, serif; font-size: 13px; color: #2a2420; white-space: nowrap">{{b.name}}</span>
+          </span>
+          <span style="margin-top: 6px; font-size: 8px; font-weight: 600; letter-spacing: 0.04em; color: {{b.ink}}">{{b.lang}}</span>
+          <span style="margin-top: auto; width: 13px; height: 13px; border-radius: 50%; background: {{b.hole}}; border: 1.5px solid #2a2420; box-sizing: border-box"></span>
+        </span>
+      </button>
+    </sc-for>
+
+    <!-- succulents, each its own plant: golden barrel cactus, zebra haworthia, aloe -->
+    <svg width="146" height="124" viewBox="0 0 146 124" aria-hidden="true" style="position: absolute; left: 752px; top: 700px; overflow: visible; pointer-events: none">
+      <g class="{{tri.c.cls}}">
+        <ellipse cx="27" cy="{{tri.c.cy}}" rx="{{tri.c.rx}}" ry="{{tri.c.ry}}" fill="{{tri.c.cl}}" stroke="#2a2420" stroke-width="1.4"/>
+        <ellipse cx="27" cy="{{tri.c.cy}}" rx="{{tri.c.rx2}}" ry="{{tri.c.ry}}" fill="none" stroke="{{tri.c.cd}}" stroke-width="1.4"/>
+        <ellipse cx="27" cy="{{tri.c.cy}}" rx="{{tri.c.rx3}}" ry="{{tri.c.ry}}" fill="none" stroke="{{tri.c.cd}}" stroke-width="1.4"/>
+        <sc-for list="{{tri.c.spines}}" as="sp" hint-placeholder-count="7"><circle cx="{{sp.x}}" cy="{{sp.y}}" r="1.4" fill="#f3e7c4" stroke="#2a2420" stroke-width="0.5"/></sc-for>
+        <sc-if value="{{tri.c.flower}}" hint-placeholder-val="{{ false }}">
+          <g transform="translate(27 {{tri.c.fy}})" fill="#e48fa0" stroke="#2a2420" stroke-width="0.8"><circle cx="-4" cy="-2" r="3"/><circle cx="4" cy="-2" r="3"/><circle cx="0" cy="-5" r="3"/><circle cx="0" cy="-1" r="2" fill="#e9c74a"/></g>
+        </sc-if>
+        <path d="M5 92 H49 L45 121 Q44 124 41 124 H13 Q10 124 9 121 Z" fill="#c8714a" stroke="#2a2420" stroke-width="1.4"/>
+        <rect x="2" y="84" width="50" height="9" rx="1.5" fill="#d9825a" stroke="#2a2420" stroke-width="1.4"/>
+      </g>
+      <g class="{{tri.h.cls}}">
+        <sc-for list="{{tri.h.leaves}}" as="lf" hint-placeholder-count="7">
+          <g transform="translate(76 82) rotate({{lf.r}}) scale({{lf.sx}} {{lf.s}})">
+            <path d="M0 0 C-5 -4 -4 -30 0 -44 C4 -30 5 -4 0 0 Z" fill="{{lf.l}}" stroke="#2a2420" stroke-width="1.1"/>
+            <path d="M-2.5 -10 H2.5 M-2.2 -18 H2.2 M-1.8 -26 H1.8 M-1.2 -34 H1.2" stroke="{{lf.stripe}}" stroke-width="1.4"/>
+          </g>
+        </sc-for>
+        <path d="M57 84 H95 L92 121 Q91 124 88 124 H64 Q61 124 60 121 Z" fill="#f3eee4" stroke="#2a2420" stroke-width="1.4"/>
+        <rect x="54" y="77" width="44" height="8" rx="1.5" fill="#e6dfd2" stroke="#2a2420" stroke-width="1.4"/>
+        <path d="M62 100 H90" stroke="#2f4058" stroke-width="2"/>
+      </g>
+      <g class="{{tri.a.cls}}">
+        <sc-for list="{{tri.a.leaves}}" as="lf" hint-placeholder-count="6">
+          <g transform="translate(122 98) rotate({{lf.r}}) scale({{lf.sx}} {{lf.s}})">
+            <path d="M0 0 C-4 -6 -3 -26 2 -40 C3 -26 4 -6 0 0 Z" fill="{{lf.l}}" stroke="#2a2420" stroke-width="1.1"/>
+            <path d="M0 0 C-4 -6 -3 -26 2 -40 Z" fill="{{lf.d}}"/>
+          </g>
+        </sc-for>
+        <path d="M105 100 H139 L136 121 Q135 124 132 124 H112 Q109 124 108 121 Z" fill="#c8714a" stroke="#2a2420" stroke-width="1.4"/>
+        <rect x="102" y="94" width="40" height="7" rx="1.5" fill="#d9825a" stroke="#2a2420" stroke-width="1.4"/>
+      </g>
+    </svg>
+    <button class="tap" type="button" onClick="{{tri.c.water}}" onMouseEnter="{{tri.c.hover}}" onMouseLeave="{{plantLeave}}" onFocus="{{tri.c.hover}}" onBlur="{{plantLeave}}" aria-label="{{tri.c.aria}}" style="position: absolute; left: 752px; top: 726px; width: 54px; height: 98px"></button>
+    <button class="tap" type="button" onClick="{{tri.h.water}}" onMouseEnter="{{tri.h.hover}}" onMouseLeave="{{plantLeave}}" onFocus="{{tri.h.hover}}" onBlur="{{plantLeave}}" aria-label="{{tri.h.aria}}" style="position: absolute; left: 806px; top: 718px; width: 48px; height: 106px"></button>
+    <button class="tap" type="button" onClick="{{tri.a.water}}" onMouseEnter="{{tri.a.hover}}" onMouseLeave="{{plantLeave}}" onFocus="{{tri.a.hover}}" onBlur="{{plantLeave}}" aria-label="{{tri.a.aria}}" style="position: absolute; left: 854px; top: 740px; width: 46px; height: 84px"></button>
+  </div>
+
+  <!-- dust that settles while nobody visits -->
+  <svg width="1000" height="1000" viewBox="0 0 1000 1000" aria-hidden="true" style="position: absolute; left: 0; top: 0; pointer-events: none; opacity: {{dust.op}}; transition: opacity 600ms">
+    <polygon points="266,810 884,810 900,830 250,830" fill="#cfc8bc" opacity="0.5"/>
+    <rect x="250" y="542" width="650" height="3" fill="#d8d2c6"/>
+    <path d="{{dust.specks}}" fill="#b7afa2"/>
+    <g fill="#cdc6ba" stroke="#8d857a" stroke-width="0.8"><ellipse cx="262" cy="823" rx="10" ry="5"/><ellipse cx="888" cy="826" rx="8" ry="4"/><ellipse cx="460" cy="543" rx="7" ry="3"/></g>
+  </svg>
+
+  <!-- the hanging pothos: a ceiling hook, three threads, a full crown in the pot, vines trailing beside the shelf. Click to water -->
+  <svg class="{{pothos.tipSvg}}" width="1000" height="1000" viewBox="0 0 1000 1000" aria-hidden="true" style="position: absolute; left: 0; top: 0; pointer-events: none; overflow: visible; filter: {{v.rowShadow}}">
+    <g class="hang">
+      <rect x="156" y="0" width="28" height="5" rx="1.5" fill="#2a2420"/>
+      <rect x="166.5" y="4" width="7" height="3" rx="1" fill="#3e3630"/>
+      <path d="M164 28.5 L124 232 M164 28.5 L170 229 M164 28.5 L216 232" stroke="#6b5a46" stroke-width="1.5" fill="none"/>
+      <circle cx="164" cy="24" r="4.5" fill="none" stroke="#2a2420" stroke-width="2"/>
+      <path d="M170 6 V16 C170 25 158 25 158 17 V14.5" stroke="#2a2420" stroke-width="2.6" fill="none" stroke-linecap="round"/>
+      <circle cx="164" cy="40" r="3.4" fill="#d9a541" stroke="#2a2420" stroke-width="1"/>
+      <g transform="translate(105 160)">
+        <g class="{{pothos.perk}}">
+        <sc-for list="{{pothos.back}}" as="lf" hint-placeholder-count="10">
+          <path d="{{lf.stem}}" stroke="{{lf.stemC}}" stroke-width="1.6" fill="none"/>
+          <g transform="translate({{lf.x}} {{lf.y}}) rotate({{lf.r}}) scale({{lf.s}})">
+            <path d="M0 0 C-6 -4 -15 0 -14 9 C-13 18 -5 26 0 32 C5 26 13 18 14 9 C15 0 6 -4 0 0 Z" fill="{{lf.l}}"/>
+            <path d="M0 0 C-6 -4 -15 0 -14 9 C-13 18 -5 26 0 32 Z" fill="{{lf.d}}"/>
+            <path d="M0 3 L0 28" stroke="{{lf.vein}}" stroke-width="1" fill="none"/>
+            <path d="M0 0 C-6 -4 -15 0 -14 9 C-13 18 -5 26 0 32 C5 26 13 18 14 9 C15 0 6 -4 0 0 Z" fill="none" stroke="#2a2420" stroke-width="1.2"/>
+          </g>
+        </sc-for>
+        <path d="M22 80 H106 L99 127 Q98 131 94 131 H34 Q30 131 29 127 Z" fill="#c8714a"/>
+        <path d="M88 80 H106 L99 127 Q98 131 94 131 H84 Z" fill="#a9573a"/>
+        <path d="M31 104 q6 -5 12 0 t12 0 t12 0 t12 0 t12 0 t12 0" stroke="#f1d2bd" stroke-width="2" fill="none"/>
+        <path d="M22 80 H106 L99 127 Q98 131 94 131 H34 Q30 131 29 127 Z" fill="none" stroke="#2a2420" stroke-width="1.5"/>
+        <rect x="18" y="70" width="92" height="11" rx="1.5" fill="#d9825a" stroke="#2a2420" stroke-width="1.5"/>
+        <sc-for list="{{pothos.front}}" as="lf" hint-placeholder-count="4">
+          <g transform="translate({{lf.x}} {{lf.y}}) rotate({{lf.r}}) scale({{lf.s}})">
+            <path d="M0 0 C-6 -4 -15 0 -14 9 C-13 18 -5 26 0 32 C5 26 13 18 14 9 C15 0 6 -4 0 0 Z" fill="{{lf.l}}"/>
+            <path d="M0 0 C-6 -4 -15 0 -14 9 C-13 18 -5 26 0 32 Z" fill="{{lf.d}}"/>
+            <path d="M0 3 L0 28" stroke="{{lf.vein}}" stroke-width="1" fill="none"/>
+            <path d="M0 0 C-6 -4 -15 0 -14 9 C-13 18 -5 26 0 32 C5 26 13 18 14 9 C15 0 6 -4 0 0 Z" fill="none" stroke="#2a2420" stroke-width="1.2"/>
+          </g>
+        </sc-for>
+        </g>
+      </g>
+    <sc-for list="{{vines.paths}}" as="vn" hint-placeholder-count="3">
+        <path d="{{vn.d}}" stroke="{{vines.stem}}" stroke-width="2.4" fill="none" stroke-linecap="round"/>
+      </sc-for>
+      <sc-for list="{{vines.leaves}}" as="lf" hint-placeholder-count="24">
+        <line x1="{{lf.px}}" y1="{{lf.py}}" x2="{{lf.x}}" y2="{{lf.y}}" stroke="{{lf.stemC}}" stroke-width="1.6"/>
+        <g transform="translate({{lf.x}} {{lf.y}}) rotate({{lf.r}}) scale({{lf.s}})">
+          <path d="M0 0 C-6 -4 -15 0 -14 9 C-13 18 -5 26 0 32 C5 26 13 18 14 9 C15 0 6 -4 0 0 Z" fill="{{lf.l}}"/>
+          <path d="M0 0 C-6 -4 -15 0 -14 9 C-13 18 -5 26 0 32 Z" fill="{{lf.d}}"/>
+          <path d="M0 3 L0 28" stroke="{{lf.vein}}" stroke-width="1" fill="none"/>
+          <path d="M0 0 C-6 -4 -15 0 -14 9 C-13 18 -5 26 0 32 C5 26 13 18 14 9 C15 0 6 -4 0 0 Z" fill="none" stroke="#2a2420" stroke-width="1.2"/>
+        </g>
+      </sc-for>
+    </g>
+  </svg>
+  <svg width="1000" height="1000" viewBox="0 0 1000 1000" aria-hidden="true" style="position: absolute; left: 0; top: 0; pointer-events: none">
+    <sc-for list="{{fallen}}" as="fl" hint-placeholder-count="2">
+      <g transform="translate({{fl.x}} {{fl.y}}) scale({{fl.s}} {{fl.sy}}) rotate({{fl.r}})">
+        <path d="{{fl.d}}" fill="{{fl.c}}" stroke="#2a2420" stroke-width="1.4"/>
+      </g>
+    </sc-for>
+  </svg>
+  <button class="tap" type="button" onClick="{{pothos.water}}" onMouseEnter="{{pothos.hover}}" onMouseLeave="{{plantLeave}}" onFocus="{{pothos.hover}}" onBlur="{{plantLeave}}" aria-label="{{pothos.aria}}" style="position: absolute; left: 105px; top: 172px; width: 132px; height: 122px"></button>
+  </div>
+
+  <!-- standing lamp, right: shade at the middle board's height; pull the cord -->
+  <svg width="1000" height="1000" viewBox="0 0 1000 1000" aria-hidden="true" style="position: absolute; left: 0; top: 0; pointer-events: none">
+    <rect x="911" y="528" width="7" height="472" fill="#2a2420"/>
+    <rect x="903" y="526" width="23" height="6" rx="2" fill="#2a2420"/>
+    <sc-if value="{{lamp.on}}" hint-placeholder-val="{{ false }}"><ellipse cx="914.5" cy="529" rx="44" ry="6" fill="#fff1cc"/></sc-if>
+    <path d="M868 528 L961 528 L943 452 L886 452 Z" fill="{{lamp.shade}}" stroke="#2a2420" stroke-width="2" stroke-linejoin="round"/>
+    <path d="M874 514 L955 514" stroke="#2a2420" stroke-width="1" opacity="0.3"/>
+    <rect x="908" y="444" width="13" height="8" rx="2" fill="#2a2420"/>
+    <g class="{{lamp.tug}}"><line x1="948" y1="528" x2="948" y2="580" stroke="#2a2420" stroke-width="1.4"/><circle cx="948" cy="584" r="5" fill="#d9a541" stroke="#2a2420" stroke-width="1.3"/></g>
+  </svg>
+
+  <!-- the room's light: the sun's panes come from the east window in the morning, the west window in the afternoon -->
+  <svg width="1400" height="1000" viewBox="-200 0 1400 1000" aria-hidden="true" style="position: absolute; left: -200px; top: 0; pointer-events: none; mix-blend-mode: multiply">
+    <rect x="-200" width="1400" height="1000" fill="{{v.shadeTint}}" opacity="{{v.shadeAmount}}"/>
+  </svg>
+  <svg width="1400" height="1000" viewBox="-200 0 1400 1000" aria-hidden="true" style="position: absolute; left: -200px; top: 0; pointer-events: none; mix-blend-mode: screen">
+    <defs>
+      <filter id="paneSoft" x="-10%" y="-10%" width="120%" height="120%"><feGaussianBlur stdDeviation="4"/></filter>
+      <clipPath id="panes"><sc-for list="{{panes}}" as="pn" hint-placeholder-count="4"><polygon points="{{pn.pts}}"/></sc-for></clipPath>
+      <radialGradient id="lampPool" cx="915" cy="530" r="700" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#ffc677" stop-opacity="0.6"/><stop offset="0.45" stop-color="#d98b45" stop-opacity="0.2"/><stop offset="1" stop-color="#d98b45" stop-opacity="0"/></radialGradient>
+<radialGradient id="candleGlow" cx="750" cy="196" r="340" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#ffcf86" stop-opacity="0.75"/><stop offset="0.3" stop-color="#ffb35c" stop-opacity="0.3"/><stop offset="0.7" stop-color="#e08a3e" stop-opacity="0.1"/><stop offset="1" stop-color="#e08a3e" stop-opacity="0"/></radialGradient>
+    </defs>
+    <g opacity="{{v.sun}}" filter="url(#paneSoft)">
+      <sc-for list="{{panes}}" as="pn" hint-placeholder-count="4"><polygon points="{{pn.pts}}" fill="{{v.sunColor}}" opacity="0.45"/></sc-for>
+    </g>
+    <g clip-path="url(#panes)" opacity="{{v.sun}}">
+      <rect x="175" y="256" width="650" height="2" fill="#fff6dc" opacity="0.8"/><rect x="175" y="542" width="650" height="3" fill="#fff6dc" opacity="0.9"/>
+      <rect x="175" y="810" width="650" height="20" fill="#fff3d4" opacity="0.4"/><rect x="175" y="829" width="650" height="2" fill="#fff8e4" opacity="0.9"/>
+      <rect x="175" y="256" width="650" height="40" fill="#fff0cc" opacity="0.16"/><rect x="175" y="545" width="650" height="40" fill="#fff0cc" opacity="0.16"/><rect x="175" y="830" width="650" height="40" fill="#fff0cc" opacity="0.16"/>
+    </g>
+    <rect x="-200" width="1400" height="1000" fill="url(#lampPool)" opacity="{{v.lamp}}"/>
+    <rect class="{{v.candleCls}}" x="-200" width="1400" height="1000" fill="url(#candleGlow)" opacity="{{v.candle}}" style="transition: opacity 600ms"/>
+  </svg>
+
+  <!-- ============ THE TWO WINDOWS: west on the left (sunset), east on the right (sunrise) ============ -->
+  <svg width="1400" height="1000" viewBox="-200 0 1400 1000" aria-hidden="true" style="position: absolute; left: -200px; top: 0; pointer-events: none">
+    <defs>
+      <linearGradient id="frost" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#ffffff" stop-opacity="0.75"/><stop offset="1" stop-color="#ffffff" stop-opacity="0"/></linearGradient>
+    </defs>
+    <sc-for list="{{windows}}" as="w" hint-placeholder-count="2">
+      <defs>
+        <linearGradient id="{{w.skyId}}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="{{w.top}}"/><stop offset="1" stop-color="{{w.bot}}"/></linearGradient>
+        <clipPath id="{{w.clipId}}"><rect x="0" y="0" width="144" height="604"/></clipPath>
+      </defs>
+      <rect x="{{w.fx}}" y="100" width="168" height="628" fill="{{v.frame}}" stroke="#2a2420" stroke-width="2"/>
+      <g transform="translate({{w.gx}} 112)">
+        <g clip-path="url(#{{w.clipId}})">
+          <rect width="144" height="604" fill="url(#{{w.skyId}})"/>
+          <sc-if value="{{w.stars}}" hint-placeholder-val="{{ false }}"><path class="twinkle" d="{{w.starD}}" fill="#fff8e0"/></sc-if>
+          <sc-if value="{{w.moon}}" hint-placeholder-val="{{ false }}"><circle cx="96" cy="120" r="13" fill="#f4ecd2"/><circle cx="102" cy="115" r="12" fill="{{w.top}}"/></sc-if>
+          <sc-if value="{{w.sun}}" hint-placeholder-val="{{ false }}"><circle cx="{{w.sx}}" cy="{{w.sy}}" r="{{w.sr2}}" fill="{{w.sc}}" opacity="0.28"/><circle cx="{{w.sx}}" cy="{{w.sy}}" r="{{w.sr}}" fill="{{w.sc}}"/></sc-if>
+          <g class="drift" opacity="{{w.cloudOp}}" fill="{{w.cloudC}}">
+            <ellipse cx="34" cy="150" rx="30" ry="11"/><ellipse cx="54" cy="142" rx="22" ry="12"/><ellipse cx="74" cy="152" rx="22" ry="9"/>
+            <ellipse cx="104" cy="262" rx="26" ry="10"/><ellipse cx="122" cy="254" rx="18" ry="10"/>
+            <sc-if value="{{w.heavy}}" hint-placeholder-val="{{ false }}"><ellipse cx="72" cy="70" rx="70" ry="26"/><ellipse cx="20" cy="210" rx="44" ry="16"/><ellipse cx="120" cy="190" rx="40" ry="14"/></sc-if>
+          </g>
+          <path d="M0 548 C24 528 52 536 78 518 C100 506 122 516 144 506 V604 H0 Z" fill="{{w.hillFar}}"/>
+          <path d="M0 584 C40 562 92 578 144 558 V604 H0 Z" fill="{{w.hillNear}}"/>
+          <!-- east window: two houses down the lane -->
+          <sc-if value="{{w.houses}}" hint-placeholder-val="{{ false }}">
+            <path d="M18 604 V540 H68 V604 Z" fill="{{w.houseA}}" stroke="#2a2420" stroke-width="1.2"/>
+            <path d="M10 542 L43 510 L76 542 Z" fill="{{w.roof}}" stroke="#2a2420" stroke-width="1.2"/>
+            <rect x="54" y="514" width="8" height="18" fill="{{w.roof}}" stroke="#2a2420" stroke-width="1"/>
+            <rect x="28" y="556" width="12" height="12" fill="{{w.lit}}" stroke="#2a2420" stroke-width="1"/><rect x="48" y="556" width="12" height="12" fill="{{w.lit}}" stroke="#2a2420" stroke-width="1"/>
+            <path d="M90 604 V560 H140 V604 Z" fill="{{w.houseB}}" stroke="#2a2420" stroke-width="1.2"/>
+            <path d="M84 562 L115 534 L146 562 Z" fill="{{w.roof}}" stroke="#2a2420" stroke-width="1.2"/>
+            <rect x="108" y="576" width="12" height="14" fill="{{w.lit}}" stroke="#2a2420" stroke-width="1"/>
+            <sc-if value="{{w.snowy}}" hint-placeholder-val="{{ false }}"><path d="M10 542 L43 510 L76 542 L70 542 L43 517 L16 542 Z M84 562 L115 534 L146 562 L140 562 L115 541 L90 562 Z" fill="#ffffff" stroke="#2a2420" stroke-width="0.8"/></sc-if>
+          </sc-if>
+          <!-- west window: the tree, which follows the seasons -->
+          <sc-if value="{{w.tree}}" hint-placeholder-val="{{ false }}">
+            <g class="treeTop">
+              <path d="M2 604 C10 520 20 444 26 392 C30 356 34 330 44 304 L56 306 C48 334 44 362 42 396 C38 452 34 528 32 604 Z" fill="{{w.trunk}}" stroke="#2a2420" stroke-width="1.2"/>
+              <path d="{{w.limbsD}}" stroke="{{w.trunk}}" stroke-width="5" fill="none" stroke-linecap="round"/>
+              <path d="{{w.twigsD}}" stroke="{{w.trunk}}" stroke-width="1.8" fill="none" stroke-linecap="round"/>
+              <sc-for list="{{w.masses}}" as="ms" hint-placeholder-count="9"><path d="{{ms.d}}" fill="{{ms.c}}" stroke="{{ms.k}}" stroke-width="1.1"/></sc-for>
+              <path d="{{w.overLimbsD}}" stroke="{{w.trunk}}" stroke-width="3.5" fill="none" stroke-linecap="round"/>
+              <path d="{{w.flecksD}}" fill="{{w.fleckC}}"/>
+              <sc-if value="{{w.blossom}}" hint-placeholder-val="{{ false }}"><path d="{{w.blossomD}}" fill="#f2b6c4" stroke="#2a2420" stroke-width="0.5"/></sc-if>
+              <sc-if value="{{w.snowy}}" hint-placeholder-val="{{ false }}"><path d="{{w.snowD2}}" stroke="#ffffff" stroke-width="2.4" fill="none" stroke-linecap="round"/></sc-if>
+            </g>
+            <sc-for list="{{w.falling}}" as="fl" hint-placeholder-count="6">
+              <g transform="translate({{fl.x}} {{fl.y}})"><path class="leafFall" d="M0 0 C-4 -3 -8 0 -7 5 C-6 9 -2 12 0 14 C2 12 6 9 7 5 C8 0 4 -3 0 0 Z" fill="{{fl.c}}" stroke="#2a2420" stroke-width="0.8" style="animation-delay: {{fl.delay}}s; animation-duration: {{fl.dur}}s"/></g>
+            </sc-for>
+          </sc-if>
+          <sc-if value="{{w.rain}}" hint-placeholder-val="{{ false }}">
+            <g class="rainfall"><path d="{{w.rainD}}" stroke="#dbe6ef" stroke-width="1.3" stroke-linecap="round" fill="none" opacity="0.75"/></g>
+            <path d="{{w.dropD}}" fill="#e6eef4" opacity="0.6" stroke="#9fb0bd" stroke-width="0.6"/>
+          </sc-if>
+          <sc-if value="{{w.snow}}" hint-placeholder-val="{{ false }}"><g class="sway"><g class="snowfall"><path d="{{w.snowD}}" fill="#ffffff" stroke="#b9c4cc" stroke-width="0.4"/></g></g></sc-if>
+          <sc-if value="{{w.frost}}" hint-placeholder-val="{{ false }}"><rect y="520" width="144" height="84" fill="url(#frost)"/></sc-if>
+          <path d="M84 0 L106 0 L42 604 L20 604 Z" fill="#ffffff" opacity="0.08"/>
+        </g>
+        <rect width="144" height="604" fill="none" stroke="#2a2420" stroke-width="1.5"/>
+      </g>
+      <path d="{{w.mullD}}" stroke="#2a2420" stroke-width="9"/>
+      <path d="{{w.mullD}}" stroke="{{v.frame}}" stroke-width="6"/>
+      <rect x="{{w.sillX}}" y="726" width="192" height="16" fill="{{v.frame}}" stroke="#2a2420" stroke-width="2"/>
+      <rect x="{{w.sillX}}" y="742" width="192" height="6" fill="#2a2420" opacity="0.12"/>
+    </sc-for>
+  </svg>
+
+  <!-- a gust of air through the room, now and then -->
+  <sc-if value="{{wind.on}}" hint-placeholder-val="{{ false }}">
+    <svg width="1400" height="1000" viewBox="-200 0 1400 1000" aria-hidden="true" style="position: absolute; left: -200px; top: 0; pointer-events: none">
+      <g transform="{{wind.flip}}" stroke="#ffffff" stroke-width="2.2" fill="none" stroke-linecap="round" opacity="0.85">
+        <path class="windLine" d="M-40 230 C160 200 300 260 480 236 C620 218 700 180 760 204 C800 222 784 254 756 246"/>
+        <path class="windLine" style="animation-delay: 0.5s" d="M-40 420 C200 400 380 450 560 424 C700 404 820 380 900 400 C950 414 940 442 910 436"/>
+        <path class="windLine" style="animation-delay: 0.9s" d="M-40 650 C140 630 320 676 520 650 C640 636 740 610 820 628"/>
+        <path class="windLine" style="animation-delay: 1.3s; stroke: #9aa8b4" d="M-40 330 C180 320 300 350 460 332"/>
+      </g>
+    </svg>
+    <sc-for list="{{wind.leaves}}" as="bl" hint-placeholder-count="3">
+      <svg width="16" height="16" viewBox="-8 -2 16 16" aria-hidden="true" style="position: absolute; left: {{bl.x}}px; top: {{bl.y}}px; pointer-events: none; overflow: visible"><path class="{{bl.cls}}" d="M0 0 C-4 -3 -8 0 -7 5 C-6 9 -2 12 0 14 C2 12 6 9 7 5 C8 0 4 -3 0 0 Z" fill="{{bl.c}}" stroke="#2a2420" stroke-width="0.8" style="animation-delay: {{bl.d}}s"/></svg>
+    </sc-for>
+  </sc-if>
+
+  <!-- the lamp switch: the shade and its cord -->
+  <button class="tap" type="button" onClick="{{toggleLamp}}" aria-pressed="{{lamp.pressed}}" aria-label="{{lamp.aria}}" style="position: absolute; left: 860px; top: 440px; width: 112px; height: 152px"></button>
+
+  <!-- things in front of the light, in shelf coordinates -->
+  <div style="position: absolute; left: -75px; top: 0; width: 1000px; height: 1000px; pointer-events: none">
+    <!-- cobwebs, grown while nobody visited -->
+    <svg width="1400" height="1000" viewBox="-125 0 1400 1000" aria-hidden="true" style="position: absolute; left: -125px; top: 0; pointer-events: none; overflow: visible">
+      <sc-for list="{{webs}}" as="wb" hint-placeholder-count="2">
+        <path d="{{wb.d}}" stroke="#ffffff" stroke-width="1.6" fill="none" opacity="0.55"/>
+        <path d="{{wb.d}}" stroke="#6b6258" stroke-width="0.8" fill="none" opacity="0.75"/>
+      </sc-for>
+      <sc-if value="{{spider.show}}" hint-placeholder-val="{{ false }}">
+        <g class="dangle">
+          <line x1="715" y1="298" x2="715" y2="352" stroke="#6b6258" stroke-width="0.8"/>
+          <g transform="translate(715 358)" stroke="#2a2420" stroke-width="1.2" fill="none"><path d="M-3 -2 L-10 -8 L-13 -3 M-3 0 L-11 -2 L-14 3 M-3 2 L-10 5 L-12 10 M3 -2 L10 -8 L13 -3 M3 0 L11 -2 L14 3 M3 2 L10 5 L12 10"/><circle r="4.5" fill="#2a2420"/><circle cx="0" cy="-5" r="3" fill="#2a2420"/><circle cx="-1" cy="-6" r="0.8" fill="#fff" stroke="none"/><circle cx="1.2" cy="-6" r="0.8" fill="#fff" stroke="none"/></g>
+        </g>
+      </sc-if>
+      <sc-for list="{{poofs}}" as="pf" hint-placeholder-count="1">
+        <g transform="translate({{pf.x}} {{pf.y}})"><g class="poof" fill="#efe9de" stroke="#8d857a" stroke-width="0.8"><circle cx="-8" cy="0" r="8"/><circle cx="6" cy="-5" r="9"/><circle cx="4" cy="7" r="7"/></g></g>
+      </sc-for>
+    </svg>
+    <sc-for list="{{webs}}" as="wb" hint-placeholder-count="2">
+      <button class="tap" type="button" onClick="{{wb.clear}}" aria-label="Clear the cobweb" style="position: absolute; left: {{wb.bx}}px; top: {{wb.by}}px; width: 64px; height: 64px"></button>
+    </sc-for>
+
+    <!-- watering can: lives on the east window's sill. Pick it up, hold to pour over a plant -->
+    <sc-if value="{{can.held}}" hint-placeholder-val="{{ false }}">
+      <div onPointerDown="{{pourStart}}" onPointerUp="{{pourStop}}" style="position: absolute; left: -125px; top: 0; width: 1400px; height: 1000px; pointer-events: auto; touch-action: none"></div>
+      <div class="hand" style="position: absolute; left: 420px; top: 8px; padding: 3px 14px; background: #fbf6ec; box-shadow: 0 5px 12px rgba(40,25,10,0.28); transform: rotate(-1.5deg); font-size: 20px; font-weight: 700; white-space: nowrap; pointer-events: none">{{can.hint}}</div>
+    </sc-if>
+    <button class="tap can" type="button" onClick="{{canClick}}" aria-label="{{can.aria}}" style="position: absolute; left: 0; top: 0; width: 105px; height: 84px; transform: translate({{can.x}}px, {{can.y}}px) rotate({{can.r}}deg); transition: {{can.tr}}; pointer-events: {{can.pe}}">
+      <svg width="105" height="84" viewBox="0 0 70 56" aria-hidden="true" style="display: block; overflow: visible">
+        <path d="M21 40 L5 13 L1 16 L16 46 Z" fill="#7f9a86" stroke="#2a2420" stroke-width="1.3" stroke-linejoin="round"/>
+        <ellipse cx="3" cy="14" rx="3.2" ry="5.5" transform="rotate(-30 3 14)" fill="#d9a541" stroke="#2a2420" stroke-width="1.2"/>
+        <path d="M30 22 C30 6 54 6 54 22" stroke="#2a2420" stroke-width="4" fill="none"/>
+        <path d="M58 26 C70 28 70 46 59 48" stroke="#2a2420" stroke-width="4" fill="none"/>
+        <path d="M20 22 H60 L61 52 Q61 55 58 55 H23 Q20 55 20 52 Z" fill="#9bb5a0"/>
+        <path d="M50 23 H60 L61 52 Q61 55 58 55 H50 Z" fill="#7f9a86"/>
+        <path d="M20 22 H60 L61 52 Q61 55 58 55 H23 Q20 55 20 52 Z" fill="none" stroke="#2a2420" stroke-width="1.5"/>
+        <rect x="18" y="19" width="44" height="5" rx="1.5" fill="#b8cbbc" stroke="#2a2420" stroke-width="1.2"/>
+        <path d="M27 35 H44" stroke="#efe6d6" stroke-width="2"/>
+      </svg>
+    </button>
+    <!-- a plant that got too much: it tells you so, and tips the extra out -->
+    <sc-if value="{{spill.show}}" hint-placeholder-val="{{ false }}">
+      <svg width="1000" height="1000" viewBox="0 0 1000 1000" aria-hidden="true" style="position: absolute; left: 0; top: 0; pointer-events: none; overflow: visible">
+        <path class="spillStream" d="{{spill.d}}" stroke="#7ab3d6" stroke-width="4" fill="none" stroke-linecap="round"/>
+        <ellipse class="puddle" cx="{{spill.px}}" cy="{{spill.py}}" rx="{{spill.prx}}" ry="3.5" fill="#9cc8e3" stroke="#2a2420" stroke-width="0.6"/>
+        <g fill="#7ab3d6" stroke="#2a2420" stroke-width="0.6"><sc-for list="{{spill.drips}}" as="dp" hint-placeholder-count="3"><circle class="dripLong" cx="{{dp.x}}" cy="{{dp.y}}" r="2.6" style="animation-delay: {{dp.d}}s"/></sc-for></g>
+      </svg>
+    </sc-if>
+    <sc-if value="{{scold.show}}" hint-placeholder-val="{{ false }}">
+      <div class="pop hand" role="status" style="position: absolute; left: {{scold.x}}px; top: {{scold.y}}px; padding: 4px 14px 6px; background: #fbf6ec; border: 1.5px solid #2a2420; border-radius: 16px 16px 16px 3px; font-size: 21px; font-weight: 700; white-space: nowrap; pointer-events: none; box-shadow: 0 5px 12px rgba(40,25,10,0.28)">{{scold.line}}</div>
+    </sc-if>
+    <sc-if value="{{can.pouring}}" hint-placeholder-val="{{ false }}">
+      <svg width="20" height="60" viewBox="-10 0 20 60" aria-hidden="true" style="position: absolute; left: {{can.dropX}}px; top: {{can.dropY}}px; pointer-events: none; overflow: visible">
+        <g fill="#7ab3d6" stroke="#2a2420" stroke-width="0.7"><circle class="drip" cx="-4" cy="2" r="2.4"/><circle class="drip" cx="1" cy="0" r="2.4" style="animation-delay: 0.23s"/><circle class="drip" cx="5" cy="3" r="2.4" style="animation-delay: 0.46s"/><circle class="drip" cx="-1" cy="4" r="2" style="animation-delay: 0.12s"/></g>
+      </svg>
+    </sc-if>
+
+    <!-- the struck match, held at the pointer -->
+    <sc-if value="{{match.show}}" hint-placeholder-val="{{ false }}">
+      <div style="position: absolute; left: {{match.x}}px; top: {{match.y}}px; width: 30px; height: 74px; pointer-events: none; transform: rotate(-16deg); transform-origin: 15px 20px">
+        <svg width="30" height="74" viewBox="0 0 30 74" aria-hidden="true" style="display: block; overflow: visible">
+          <sc-if value="{{match.striking}}" hint-placeholder-val="{{ false }}"><g fill="#f4c23c"><circle class="s1" cx="15" cy="20" r="1.6"/><circle class="s2" cx="15" cy="20" r="1.4"/><circle class="s3" cx="15" cy="20" r="1.6"/><circle class="s4" cx="15" cy="20" r="1.3"/></g></sc-if>
+          <g transform="translate(15 17) scale({{match.fl}}) translate(-15 -17)">
+            <circle cx="15" cy="10" r="15" fill="#ffcf86" opacity="0.35"/>
+            <g class="ignite"><path class="flame" d="M15 0 C21 7 21 13 15 18 C9 13 9 7 15 0 Z" fill="#f4a73c" stroke="#2a2420" stroke-width="1"/><path class="flame" d="M15 7 C17.5 10.5 17.5 14 15 16.5 C12.5 14 12.5 10.5 15 7 Z" fill="#fff3d0"/></g>
+          </g>
+          <rect x="13.5" y="23" width="3" height="48" fill="#e6c48e" stroke="#2a2420" stroke-width="0.8"/>
+          <rect x="13.5" y="23" width="3" height="{{match.char}}" fill="#3a2a20"/>
+          <ellipse cx="15" cy="20" rx="3.6" ry="4.6" fill="#a33a2a" stroke="#2a2420" stroke-width="1"/>
+        </svg>
+      </div>
+    </sc-if>
+    <sc-if value="{{smoke.show}}" hint-placeholder-val="{{ false }}">
+      <svg width="20" height="40" viewBox="0 0 20 40" aria-hidden="true" style="position: absolute; left: {{smoke.x}}px; top: {{smoke.y}}px; pointer-events: none; overflow: visible"><path class="smoke" d="M10 40 C6 32 14 26 10 18 C6 10 14 6 10 0" stroke="#9a948c" stroke-width="2" fill="none" stroke-linecap="round"/></svg>
+    </sc-if>
+
+    <!-- the feather duster, held at the pointer -->
+    <sc-if value="{{duster.show}}" hint-placeholder-val="{{ false }}">
+      <div style="position: absolute; left: {{duster.x}}px; top: {{duster.y}}px; width: 70px; height: 110px; pointer-events: none; transform: rotate(-24deg); transform-origin: 35px 28px">
+        <svg width="70" height="110" viewBox="0 0 70 110" aria-hidden="true" style="display: block; overflow: visible">
+          <rect x="31" y="46" width="8" height="62" rx="3" fill="#b07a48" stroke="#2a2420" stroke-width="1.4"/>
+          <rect x="29" y="44" width="12" height="8" rx="2" fill="#d9a541" stroke="#2a2420" stroke-width="1.2"/>
+          <g stroke="#2a2420" stroke-width="1.2"><ellipse cx="22" cy="24" rx="12" ry="20" fill="#c8714a" transform="rotate(-24 22 24)"/><ellipse cx="48" cy="24" rx="12" ry="20" fill="#2f4058" transform="rotate(24 48 24)"/><ellipse cx="35" cy="20" rx="12" ry="22" fill="#d9a541"/><ellipse cx="35" cy="34" rx="16" ry="10" fill="#e9dcc4"/></g>
+        </svg>
+      </div>
+      <div class="hand" style="position: absolute; left: 470px; top: 8px; padding: 3px 14px; background: #fbf6ec; box-shadow: 0 5px 12px rgba(40,25,10,0.28); transform: rotate(-1.5deg); font-size: 21px; font-weight: 700; white-space: nowrap">{{duster.left}}</div>
+    </sc-if>
+
+    <!-- little paper slips -->
+    <sc-if value="{{tag.show}}" hint-placeholder-val="{{ false }}">
+      <div class="pop" style="position: absolute; left: {{tag.x}}px; top: {{tag.y}}px; padding: 6px 14px 7px; background: #fbf6ec; box-shadow: 0 5px 12px rgba(40,25,10,0.28); transform: rotate(-1.5deg); pointer-events: none; display: flex; flex-direction: column; white-space: nowrap; color: #2a2420">
+        <span class="hand" style="font-size: 21px; font-weight: 700; line-height: 1.05">{{tag.title}}</span>
+        <span class="typed" style="font-size: 10.5px; color: #6a5d4f">{{tag.sub}}</span>
+      </div>
+    </sc-if>
+    <sc-if value="{{candle.hint}}" hint-placeholder-val="{{ false }}"><div class="pop hand" style="position: absolute; left: 730px; top: 124px; padding: 4px 12px; background: #fbf6ec; box-shadow: 0 5px 12px rgba(40,25,10,0.28); transform: rotate(-2deg); font-size: 20px; font-weight: 700; white-space: nowrap; pointer-events: none">strike a match first →</div></sc-if>
+
+    <!-- the spider's speech bubble for someone who has been away -->
+    <sc-if value="{{pop.hello}}" hint-placeholder-val="{{ false }}">
+      <div class="boing" role="dialog" aria-label="Thanks for visiting" style="position: absolute; left: 345px; top: 250px; width: 380px; height: 240px; pointer-events: auto">
+        <svg width="380" height="240" viewBox="0 0 380 240" aria-hidden="true" style="position: absolute; left: 0; top: 0; overflow: visible">
+          <path d="{{pop.bubble}}" fill="rgba(42,36,32,0.2)" transform="translate(6 9)"/>
+          <path d="{{pop.bubble}}" fill="#fbf6ec" stroke="#2a2420" stroke-width="2" stroke-linejoin="round"/>
+          <line x1="318" y1="-70" x2="318" y2="4" stroke="#6b6258" stroke-width="1"/>
+          <g class="dangle"><g transform="translate(318 10)" stroke="#2a2420" stroke-width="1.4" fill="none"><path d="M-4 -2 L-12 -10 L-16 -4 M-4 0 L-13 -2 L-17 4 M-4 2 L-12 6 L-14 12 M4 -2 L12 -10 L16 -4 M4 0 L13 -2 L17 4 M4 2 L12 6 L14 12"/><circle r="6" fill="#2a2420"/><circle cx="0" cy="-7" r="4" fill="#2a2420"/><circle cx="-1.5" cy="-8" r="1.2" fill="#fff" stroke="none"/><circle cx="1.5" cy="-8" r="1.2" fill="#fff" stroke="none"/></g></g>
+        </svg>
+        <div style="position: absolute; left: 34px; right: 34px; top: 28px; display: flex; flex-direction: column; gap: 6px; color: #2a2420">
+          <div class="hand" style="font-size: 42px; font-weight: 700; line-height: 1">Thanks for visiting!</div>
+          <div class="typed" style="font-size: 13px; line-height: 1.5">{{pop.body}}</div>
+          <div style="display: flex; gap: 26px; align-items: center; margin-top: 8px">
+            <button type="button" class="scribble" onClick="{{grabDuster}}">grab the duster</button>
+            <button type="button" class="scribble" onClick="{{laterPop}}" style="font-size: 20px; opacity: 0.7">later</button>
+          </div>
+        </div>
+      </div>
+    </sc-if>
+    <sc-if value="{{pop.thanks}}" hint-placeholder-val="{{ false }}">
+      <div class="boing" role="status" style="position: absolute; left: 420px; top: 300px; width: 270px; height: 170px; pointer-events: none">
+        <svg width="270" height="170" viewBox="0 0 380 240" preserveAspectRatio="none" aria-hidden="true" style="position: absolute; left: 0; top: 0">
+          <path d="{{pop.bubble}}" fill="rgba(42,36,32,0.2)" transform="translate(6 9)"/>
+          <path d="{{pop.bubble}}" fill="#fbf6ec" stroke="#2a2420" stroke-width="2.6" stroke-linejoin="round"/>
+        </svg>
+        <div style="position: absolute; left: 24px; right: 24px; top: 24px; display: flex; flex-direction: column; gap: 4px; color: #2a2420">
+          <div class="hand" style="font-size: 44px; font-weight: 700; line-height: 1">Spotless!</div>
+          <div class="typed" style="font-size: 12px; line-height: 1.45">Thanks for the help. Come back soon.</div>
+        </div>
+      </div>
+    </sc-if>
+  </div>
+
+  <!-- a cork board for visitors' notes: click to read them all and pin your own -->
+  <button class="tap" type="button" onClick="{{notesOpen}}" aria-label="{{board.aria}}" style="position: absolute; left: 14px; top: 706px; width: 152px; height: 214px">
+    <svg width="152" height="214" viewBox="0 0 152 214" aria-hidden="true" style="display: block; overflow: visible">
+      <line x1="76" y1="-14" x2="40" y2="6" stroke="#2a2420" stroke-width="1.2"/><line x1="76" y1="-14" x2="112" y2="6" stroke="#2a2420" stroke-width="1.2"/><circle cx="76" cy="-14" r="2.6" fill="#2a2420"/>
+      <rect x="-3" y="5" width="152" height="214" fill="#2a2420" opacity="0.15"/>
+      <rect x="1" y="1" width="150" height="210" rx="3" fill="#8a5a32" stroke="#2a2420" stroke-width="1.5"/>
+      <rect x="9" y="9" width="134" height="194" fill="#c79a62" stroke="#2a2420" stroke-width="1"/>
+      <path d="{{board.cork}}" fill="#a97b45"/>
+      <g transform="translate(24 16) rotate(-3)"><rect width="104" height="22" fill="#fbf6ec" stroke="#2a2420" stroke-width="1"/><text x="52" y="15.5" text-anchor="middle" font-family="Caveat, cursive" font-size="15" font-weight="700" fill="#2a2420">Leave me a note!</text></g>
+      <sc-for list="{{board.mini}}" as="nt" hint-placeholder-count="6">
+        <g transform="translate({{nt.x}} {{nt.y}}) rotate({{nt.r}})"><g class="note"><rect x="-19" y="0" width="38" height="36" fill="{{nt.c}}" stroke="#2a2420" stroke-width="1"/><path d="M-12 12 H11 M-12 19 H8 M-12 26 H10" stroke="#2a2420" stroke-width="1" opacity="0.45"/><circle cx="0" cy="3" r="2.6" fill="#c9473b" stroke="#2a2420" stroke-width="0.8"/></g></g>
+      </sc-for>
+    </svg>
+  </button>
+  <div style="position: absolute; left: 36px; bottom: 24px; font-size: 11px; letter-spacing: 0.04em; color: {{v.note}}; white-space: nowrap">{{v.clock}}</div>
+
+  <!-- the contact card: a kraft luggage tag that drops off the thread -->
+  <sc-if value="{{contact.open}}" hint-placeholder-val="{{ false }}">
+    <div class="unroll" role="dialog" aria-label="Contact Gokul" style="position: absolute; left: 196px; top: 204px; width: 320px; filter: drop-shadow(0 16px 18px rgba(40,25,10,0.32))">
+      <div style="position: relative; padding: 34px 26px 24px; box-sizing: border-box; background-color: #d6b582; background-image: radial-gradient(rgba(110,72,28,0.1) 1px, transparent 1.3px); background-size: 6px 6px; clip-path: polygon(0 24px, 24px 0, calc(100% - 24px) 0, 100% 24px, 100% 100%, 0 100%); display: flex; flex-direction: column; gap: 8px">
+        <span style="position: absolute; left: 154px; top: 12px; width: 12px; height: 12px; border-radius: 50%; background: #efe3cc; box-shadow: inset 0 0 0 3px #b8935a"></span>
+        <button type="button" class="typed" onClick="{{closeContact}}" aria-label="Put the tag away" style="position: absolute; right: 14px; top: 16px; appearance: none; border: 0; background: transparent; cursor: pointer; font-size: 16px; color: #4a3a22; width: 32px; height: 32px">×</button>
+        <div class="hand" style="font-size: 36px; font-weight: 700; line-height: 1; color: #2a2420; margin-bottom: 4px">write to me</div>
+        <sc-for list="{{contact.rows}}" as="cr" hint-placeholder-count="5">
+          <div class="typed" style="display: flex; align-items: center; gap: 10px; min-height: 24px; border-bottom: 1px dashed rgba(74,58,34,0.35); padding-bottom: 4px">
+            <span style="width: 70px; flex: none; font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; color: #6b5536">{{cr.label}}</span>
+            <a href="{{cr.href}}" target="_blank" rel="noopener" style="font-size: 13.5px; color: #2a2420; text-decoration: none">{{cr.value}}</a>
+            <sc-if value="{{cr.canCopy}}" hint-placeholder-val="{{ false }}">
+              <button type="button" onClick="{{cr.copy}}" aria-label="{{cr.copyAria}}" title="{{cr.copyAria}}" style="margin-left: auto; appearance: none; border: 0; background: transparent; cursor: pointer; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; color: #4a3a22">
+                <svg width="15" height="15" viewBox="0 0 15 15" aria-hidden="true"><path d="{{cr.icon}}" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </button>
+            </sc-if>
+          </div>
+        </sc-for>
+        <div style="margin-top: 14px; display: flex; justify-content: flex-start">
+          <a class="stamp" href="/_blob/43da7d3578c29d1ed2ce3e345e33799a" download="Gokul_MV_Resume.pdf" target="_blank" rel="noopener">Download résumé</a>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+
+  <!-- the opened file: a manila folder that comes out and opens on its cover -->
+  <sc-if value="{{doc.show}}" hint-placeholder-val="{{ false }}">
+    <div class="{{doc.fadeCls}}" onClick="{{closeDoc}}" style="position: absolute; left: -200px; top: 0; width: 1400px; height: 1000px; background: radial-gradient(ellipse at 50% 52%, rgba(24,17,10,0.3), rgba(24,17,10,0.72))"></div>
+    <div role="dialog" aria-label="{{doc.name}}" class="{{doc.inCls}}" style="position: absolute; left: 20px; top: 160px; width: 960px; height: 680px; perspective: 2000px">
+      <div class="typed" style="position: absolute; left: 500px; top: -30px; width: 220px; height: 34px; background: #d4b273; border: 1px solid #8a6a3a; border-bottom: 0; border-radius: 9px 9px 0 0; box-sizing: border-box; padding: 8px 16px; font-size: 12px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: #4a3a22; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{doc.name}}</div>
+      <div style="position: absolute; left: 480px; top: 0; width: 480px; height: 680px; background: #d9bb7e; border: 1px solid #8a6a3a; border-radius: 0 7px 7px 0; box-sizing: border-box; box-shadow: 0 34px 70px rgba(0,0,0,0.4)">
+        <div class="typed" style="position: absolute; left: 24px; top: 24px; right: 28px; bottom: 26px; background-color: #fffdf7; background-image: linear-gradient(90deg, transparent 30px, rgba(201,71,59,0.32) 30px, rgba(201,71,59,0.32) 31px, transparent 31px); box-shadow: 0 1px 0 #e8e1d2, 0 3px 0 #fffdf7, 0 4px 0 #e1d9c8, 0 10px 18px rgba(60,40,10,0.2); transform: rotate(0.5deg); padding: 34px 30px 26px 46px; box-sizing: border-box; overflow-y: auto; color: #2a2420">
+          <div style="font-size: 12px; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase; padding-bottom: 7px; border-bottom: 1px solid #2a2420; margin-bottom: 16px">{{doc.listTitle}}</div>
+          <sc-for list="{{doc.points}}" as="pt" hint-placeholder-count="4">
+            <div style="display: flex; gap: 10px; font-size: 12.5px; line-height: 1.5; margin-bottom: 11px"><span style="flex: none">—</span><span>{{pt.text}}</span></div>
+          </sc-for>
+          <sc-if value="{{doc.hasStack}}" hint-placeholder-val="{{ false }}">
+            <div style="margin-top: 18px; font-size: 11.5px; line-height: 1.65; color: #4f4438"><b style="letter-spacing: 0.14em">BUILT WITH</b> {{doc.stackLine}}</div>
+          </sc-if>
+          <div style="margin-top: 20px; display: flex; gap: 22px; align-items: center; flex-wrap: wrap">
+            <sc-if value="{{doc.hasLink}}" hint-placeholder-val="{{ false }}"><a class="hand" href="{{doc.link}}" target="_blank" rel="noopener" style="font-size: 23px; font-weight: 700; color: #2f4058; text-decoration: none">→ {{doc.linkText}}</a></sc-if>
+            <sc-if value="{{doc.isCV}}" hint-placeholder-val="{{ false }}"><a class="stamp" href="/_blob/43da7d3578c29d1ed2ce3e345e33799a" download="Gokul_MV_Resume.pdf" target="_blank" rel="noopener">Download résumé</a></sc-if>
+          </div>
+        </div>
+        <svg width="26" height="60" viewBox="0 0 26 60" aria-hidden="true" style="position: absolute; left: 70px; top: 6px"><path d="M8 54 V10 a5 5 0 0 1 10 0 V48 a3 3 0 0 1 -6 0 V16" fill="none" stroke="#8d96a0" stroke-width="2.4" stroke-linecap="round"/></svg>
+      </div>
+      <div class="cover" style="position: absolute; left: 0; top: 0; width: 480px; height: 680px; transform-origin: 100% 50%; transform-style: preserve-3d">
+        <div style="position: absolute; left: 0; top: 0; width: 480px; height: 680px; background: #e4c68c; border: 1px solid #8a6a3a; border-radius: 7px 0 0 7px; box-sizing: border-box; backface-visibility: hidden; padding: 40px 40px 34px; display: flex; flex-direction: column; gap: 12px; color: #2a2420">
+          <div style="align-self: flex-start; display: flex; align-items: stretch; background: #fffdf7; border: 1px solid #b89a62; box-shadow: 0 1px 2px rgba(0,0,0,0.15); transform: rotate(-1.2deg)"><span style="width: 10px; background: {{doc.color}}"></span><span class="typed" style="padding: 5px 12px; font-size: 11px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase">{{doc.kind}}</span></div>
+          <div style="font-family: 'Instrument Serif', Georgia, serif; font-size: 50px; line-height: 1; margin-top: 8px">{{doc.name}}</div>
+          <div class="typed" style="font-size: 14px; font-weight: 700; line-height: 1.4">{{doc.role}}</div>
+          <div class="typed" style="font-size: 12.5px; color: #5a4a32">{{doc.dates}}</div>
+          <div style="border-top: 1.5px dashed rgba(74,58,34,0.5); margin: 6px 0 2px"></div>
+          <div class="typed" style="font-size: 13.5px; line-height: 1.6">{{doc.summary}}</div>
+          <sc-if value="{{doc.hasStats}}" hint-placeholder-val="{{ false }}">
+            <div style="margin-top: auto; align-self: flex-start; width: 320px; background: #ffe88a; padding: 16px 20px 14px; box-sizing: border-box; transform: rotate(-1.6deg); box-shadow: 0 9px 16px rgba(60,40,10,0.2); display: flex; flex-direction: column; gap: 4px">
+              <sc-for list="{{doc.stats}}" as="st" hint-placeholder-count="3">
+                <div class="hand" style="display: flex; gap: 12px; align-items: baseline"><span style="font-size: 27px; font-weight: 700; min-width: 112px; white-space: nowrap">{{st.n}}</span><span style="font-size: 18px; line-height: 1.05">{{st.l}}</span></div>
+              </sc-for>
+            </div>
+          </sc-if>
+        </div>
+        <div style="position: absolute; left: 0; top: 0; width: 480px; height: 680px; background: #dfbf82; border: 1px solid #8a6a3a; border-radius: 0 7px 7px 0; box-sizing: border-box; transform: rotateY(180deg); backface-visibility: hidden; display: flex; align-items: center; justify-content: center">
+          <div class="typed" style="padding: 10px 22px; background: #fffdf7; border: 1px solid #b89a62; font-size: 16px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase">{{doc.name}}</div>
+        </div>
+      </div>
+      <button type="button" class="scribble" onClick="{{closeDoc}}" style="position: absolute; right: 0; top: -54px; color: #fbf6ec">put it back</button>
+    </div>
+  </sc-if>
+
+  <!-- the visitors' board, taken down to read: pin a note from the pad -->
+  <sc-if value="{{board.open}}" hint-placeholder-val="{{ false }}">
+    <div class="fadeIn" onClick="{{notesClose}}" style="position: absolute; left: -200px; top: 0; width: 1400px; height: 1000px; background: radial-gradient(ellipse at 50% 50%, rgba(24,17,10,0.3), rgba(24,17,10,0.72))"></div>
+    <div role="dialog" aria-label="Notes from visitors" class="folderIn" style="position: absolute; left: 60px; top: 170px; width: 880px; height: 620px; background: #8a5a32; border: 1.5px solid #2a2420; border-radius: 4px; box-sizing: border-box; padding: 16px; box-shadow: 0 34px 70px rgba(0,0,0,0.45)">
+      <div style="position: relative; width: 100%; height: 100%; background-color: #c79a62; background-image: radial-gradient(#a97b45 1.2px, transparent 1.4px), radial-gradient(#d9ad74 1px, transparent 1.2px); background-size: 9px 9px, 13px 13px; background-position: 0 0, 4px 6px; border: 1px solid #2a2420; overflow: hidden">
+        <div class="hand" style="position: absolute; left: 22px; top: 16px; padding: 4px 16px; background: #fbf6ec; border: 1px solid rgba(42,36,32,0.6); transform: rotate(-2deg); font-size: 30px; font-weight: 700; box-shadow: 0 3px 6px rgba(0,0,0,0.15)">Notes from visitors</div>
+        <sc-for list="{{board.notes}}" as="nt" hint-placeholder-count="6">
+          <div class="note" style="position: absolute; left: {{nt.x}}px; top: {{nt.y}}px; width: 136px; min-height: 120px; padding: 18px 12px 10px; box-sizing: border-box; background: {{nt.c}}; box-shadow: 0 6px 10px rgba(42,36,32,0.25); transform: rotate({{nt.r}}deg); display: flex; flex-direction: column; gap: 6px">
+            <span style="position: absolute; left: 61px; top: -5px; width: 13px; height: 13px; border-radius: 50%; background: radial-gradient(circle at 35% 35%, #e97b6c, #b3372f); box-shadow: 0 2px 2px rgba(0,0,0,0.3)"></span>
+            <span class="hand" style="font-size: 19px; line-height: 1.1; color: #2a2420; word-break: break-word">{{nt.text}}</span>
+            <span class="hand" style="margin-top: auto; font-size: 15px; color: #4f4438">— {{nt.name}}</span>
+            <sc-if value="{{nt.mine}}" hint-placeholder-val="{{ false }}"><button type="button" onClick="{{nt.remove}}" aria-label="Take your note down" title="Take it down" style="position: absolute; right: 2px; top: 2px; appearance: none; border: 0; background: transparent; width: 26px; height: 26px; cursor: pointer; color: #4f4438; font-size: 15px">×</button></sc-if>
+          </div>
+        </sc-for>
+        <!-- the pad: write on the top sheet, pick a colour, pin it -->
+        <div style="position: absolute; left: 628px; top: 352px; width: 200px; height: 200px">
+          <div style="position: absolute; left: 6px; top: 6px; width: 190px; height: 190px; background: {{board.draftColor}}; filter: brightness(0.9); box-shadow: 0 4px 6px rgba(0,0,0,0.2)"></div>
+          <div style="position: absolute; left: 3px; top: 3px; width: 190px; height: 190px; background: {{board.draftColor}}; filter: brightness(0.95)"></div>
+          <div style="position: absolute; left: 0; top: 0; width: 190px; height: 190px; background: {{board.draftColor}}; box-shadow: 0 1px 2px rgba(0,0,0,0.15); display: flex; flex-direction: column; padding: 12px 14px 10px; box-sizing: border-box">
+            <textarea class="hand" value="{{board.draft}}" onInput="{{onDraft}}" maxlength="140" placeholder="write something…" aria-label="Your note" style="flex: 1; resize: none; border: 0; outline: none; background: transparent; font-size: 21px; line-height: 1.1; color: #2a2420; padding: 0"></textarea>
+            <input class="hand" value="{{board.draftName}}" onInput="{{onDraftName}}" maxlength="24" placeholder="— your name" aria-label="Your name" style="border: 0; border-top: 1px dashed rgba(42,36,32,0.35); outline: none; background: transparent; font-size: 17px; color: #4f4438; padding: 4px 0 0">
+          </div>
+        </div>
+        <div style="position: absolute; left: 560px; top: 360px; display: flex; flex-direction: column; gap: 10px">
+          <sc-for list="{{board.colors}}" as="co" hint-placeholder-count="4"><button type="button" onClick="{{co.pick}}" aria-label="{{co.aria}}" aria-pressed="{{co.pressed}}" style="appearance: none; width: 34px; height: 34px; cursor: pointer; border: 0; background: {{co.c}}; box-shadow: {{co.shadow}}; transform: {{co.lift}}; transition: transform 160ms"></button></sc-for>
+        </div>
+        <button type="button" class="scribble" onClick="{{pinNote}}" style="position: absolute; left: 690px; top: 556px; color: #2a2420; display: flex; align-items: center; gap: 6px">
+          <svg width="18" height="22" viewBox="0 0 18 22" aria-hidden="true"><circle cx="9" cy="7" r="6.5" fill="#c9473b" stroke="#2a2420" stroke-width="1"/><circle cx="7" cy="5" r="2" fill="#f2a397"/><path d="M9 13 V21" stroke="#2a2420" stroke-width="1.6" stroke-linecap="round"/></svg>pin it
+        </button>
+        <div class="typed" style="position: absolute; left: 22px; bottom: 12px; font-size: 11px; color: #4a3220">{{board.count}}</div>
+      </div>
+      <button type="button" class="scribble" onClick="{{notesClose}}" style="position: absolute; right: 0; top: -54px; color: #fbf6ec">hang it back</button>
+    </div>
+  </sc-if>
+
+  <!-- the Rubik's cube, taken off the shelf: drag a row to turn it -->
+  <sc-if value="{{cubeUI.open}}" hint-placeholder-val="{{ false }}">
+    <div class="fadeIn" style="position: absolute; left: -200px; top: 0; width: 1400px; height: 1000px; background: radial-gradient(circle at 50% 46%, rgba(255,236,200,0.1) 0, rgba(18,12,7,0.82) 250px, rgba(10,7,4,0.93) 560px)"></div>
+    <div role="dialog" aria-label="Rubik's cube" tabindex="0" onKeyDown="{{cubeKey}}" style="position: absolute; left: 160px; top: 90px; width: 680px; height: 820px; outline: none; color: #fbf6ec; text-shadow: 0 2px 8px rgba(0,0,0,0.85)">
+      <div class="typed" style="position: absolute; left: 0; right: 0; top: 0; text-align: center; font-size: 13px; letter-spacing: 0.16em; text-transform: uppercase; opacity: 0.85">{{cubeUI.moveCount}} moves · {{cubeUI.time}}</div>
+      <div class="hand" style="position: absolute; left: 0; right: 0; top: 26px; text-align: center; font-size: 26px">{{cubeUI.status}}</div>
+      <div onPointerDown="{{orbitDown}}" style="position: absolute; left: 0; top: 90px; width: 680px; height: 560px; perspective: 1100px; cursor: grab; touch-action: none; --turn: {{cubeUI.ms}}ms">
+        <div style="position: absolute; left: 340px; top: 280px; width: 0; height: 0; transform-style: preserve-3d; transform: rotateX({{cubeUI.rx}}deg) rotateY({{cubeUI.ry}}deg)">
+          <sc-for list="{{cube3d}}" as="cb" hint-placeholder-count="26">
+            <div class="{{cubeUI.anim}}" style="position: absolute; left: -31px; top: -31px; width: 62px; height: 62px; transform-style: preserve-3d; transform: rotateX({{cb.ax}}deg) rotateY({{cb.ay}}deg) rotateZ({{cb.az}}deg) translate3d({{cb.x}}px, {{cb.y}}px, {{cb.z}}px)">
+              <sc-for list="{{cb.faces}}" as="fc" hint-placeholder-count="6"><div onPointerDown="{{fc.down}}" style="position: absolute; left: 0; top: 0; width: 62px; height: 62px; box-sizing: border-box; background-color: {{fc.c}}; background-image: linear-gradient(135deg, rgba(255,255,255,0.3) 0%, rgba(255,255,255,0) 46%); border: 4px solid {{fc.edge}}; border-radius: 9px; transform: {{fc.t}}; backface-visibility: hidden; cursor: {{fc.cursor}}"></div></sc-for>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+      <div class="hand" style="position: absolute; left: 0; right: 0; top: 660px; text-align: center; font-size: 19px; opacity: 0.75">drag a row to turn it · drag around the cube to look at it</div>
+      <div style="position: absolute; left: 0; right: 0; top: 708px; display: flex; justify-content: center; gap: 44px">
+        <button type="button" class="scribble" onClick="{{scramble}}" style="color: #ffd88a; font-size: 30px">shuffle</button>
+        <button type="button" class="scribble" onClick="{{resetCube}}" style="color: #fbf6ec">reset</button>
+        <button type="button" class="scribble" onClick="{{closeCube}}" style="color: #fbf6ec">put it back</button>
+      </div>
+    </div>
+  </sc-if>
+
+  <!-- solved: congratulations, crackers and confetti right across the screen -->
+  <sc-if value="{{party.on}}" hint-placeholder-val="{{ false }}">
+    <div style="position: absolute; left: -200px; top: 0; width: 1400px; height: 1000px; pointer-events: none; overflow: hidden">
+      <sc-for list="{{party.confetti}}" as="cf" hint-placeholder-count="20">
+        <div class="confetti" style="position: absolute; left: {{cf.x}}px; top: -24px; width: {{cf.w}}px; height: {{cf.h}}px; background: {{cf.c}}; animation-delay: {{cf.d}}s; animation-duration: {{cf.t}}s; --sway: {{cf.s}}px"></div>
+      </sc-for>
+      <sc-for list="{{party.sparks}}" as="sp" hint-placeholder-count="20">
+        <span class="spark" style="position: absolute; left: {{sp.x}}px; top: {{sp.y}}px; width: 7px; height: 7px; border-radius: 50%; background: {{sp.c}}; box-shadow: 0 0 6px {{sp.c}}; --dx: {{sp.dx}}px; --dy: {{sp.dy}}px; animation-delay: {{sp.d}}s"></span>
+      </sc-for>
+      <div class="boing" role="status" style="position: absolute; left: 420px; top: 400px; width: 560px; pointer-events: auto; filter: drop-shadow(0 18px 22px rgba(0,0,0,0.35))">
+        <div style="padding: 22px 60px 20px; background: #fbf6ec; clip-path: polygon(0 0, 100% 0, 95% 50%, 100% 100%, 0 100%, 5% 50%); display: flex; flex-direction: column; align-items: center; gap: 4px; text-align: center; color: #2a2420">
+          <div class="hand" style="font-size: 62px; font-weight: 700; line-height: 1">Congratulations!</div>
+          <div class="typed" style="font-size: 14px; letter-spacing: 0.06em">{{party.line}}</div>
+          <button type="button" class="scribble" onClick="{{scramble}}" style="margin-top: 6px; color: #2a2420">again?</button>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"boards":{"editor":"enum","options":["black","oak"],"default":"black"},"mood":{"editor":"enum","options":["live","sunrise","morning","golden","sunset","night"],"default":"live"},"season":{"editor":"enum","options":["auto","spring","summer","autumn","winter"],"default":"auto"},"weather":{"editor":"enum","options":["auto","clear","cloudy","rain","snow"],"default":"auto"},"plants":{"editor":"enum","options":["live","thriving","thirsty","wilting","dead"],"default":"live"},"absence":{"editor":"enum","options":["auto","fresh","days","weeks","months"],"default":"auto"},"wind":{"editor":"enum","options":["auto","breezy","calm"],"default":"auto"},"$preview":{"width":1400,"height":1000}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.tm = {};
+    const now = Date.now();
+    // Plants keep their own clock: the time each was last watered and how much it has grown, kept in this browser.
+    const plants = { pothos: { w: now - 2 * 3600000, g: 6 }, echeveria: { w: now - 2 * 3600000, g: 5 }, cactus: { w: now - 2 * 3600000, g: 5 }, haworthia: { w: now - 2 * 3600000, g: 5 }, aloe: { w: now - 2 * 3600000, g: 5 } };
+    let saved = null;
+    try { saved = JSON.parse(window.localStorage.getItem('gmv-shelf-plants-v1') || 'null'); } catch (e) { saved = null; }
+    if (saved && typeof saved === 'object') {
+      // the three succulents used to share one record; each starts from it
+      if (saved.trio && !saved.cactus) ['cactus', 'haworthia', 'aloe'].forEach((k) => { saved[k] = saved.trio; });
+      Object.keys(plants).forEach((k) => {
+        const p = saved[k];
+        if (p && typeof p.w === 'number' && p.w <= now) plants[k] = { w: p.w, g: Math.max(1, Math.min(10, Math.round(p.g) || 1)) };
+      });
+    }
+    this.state = {
+      now, plants, forced: null, hover: null, open: null, lamp: null, tug: false,
+      fire: 'idle', burnStart: 0, mx: 872, my: 212, candle: 'off', smoke: null, candleHint: false,
+      can: 'home', canFor: null, plantHover: null,
+      moves: [], solving: false, solved: false, twisting: false,
+      robotOn: false, robotSays: 0, carOn: false, cradleOn: false, tick: 0,
+      dx: 600, dy: 400, poofs: [],
+      carX: 300, carLight: false, pull: 0, contactOpen: false, copied: false,
+      cubeOpen: false, turn: null, snap: false, rx: -26, ry: -38, playing: false, scrambling: false, startAt: 0, moveCount: 0, party: false, partyMoves: 0, partyMs: 0,
+      canMode: 'home', pouring: false, soak: {}, canX: 1115, canY: 643, perkId: null, scold: null, spill: null,
+      notes: this.loadNotes(), notesOpen: false, draft: '', draftName: '', draftColor: 0, gust: false,
+      ...this.visit(props, now, true),
+    };
+    this.queue = [];
+    // Face turns: [axis, layer, quarter turns of the base rotation]. Base rotations follow R, U and F.
+    this.MOVES = { R: [0, 1, 1], "R'": [0, 1, 3], L: [0, -1, 3], "L'": [0, -1, 1], U: [1, 1, 1], "U'": [1, 1, 3], D: [1, -1, 3], "D'": [1, -1, 1], F: [2, 1, 1], "F'": [2, 1, 3], B: [2, -1, 3], "B'": [2, -1, 1] };
+  }
+  loadNotes() {
+    try {
+      const raw = JSON.parse(window.localStorage.getItem('gmv-shelf-notes-v1') || '[]');
+      if (!Array.isArray(raw)) return [];
+      return raw.filter((n) => n && typeof n.text === 'string' && n.text.trim()).slice(0, 60).map((n) => ({ id: String(n.id || `n${Math.random()}`), text: n.text.slice(0, 140), name: typeof n.name === 'string' ? n.name.slice(0, 24) : '', c: Math.max(0, Math.min(3, n.c | 0)), at: typeof n.at === 'number' ? n.at : 0 }));
+    } catch (e) { return []; }
+  }
+  saveNotes(notes) {
+    try { window.localStorage.setItem('gmv-shelf-notes-v1', JSON.stringify(notes)); } catch (e) { /* storage unavailable: the note stays for this visit */ }
+  }
+  // Page → shelf coordinates: the room sits 200px in, the shelf 75px further left within it.
+  toShelf(e) {
+    const t = e && e.currentTarget;
+    const root = t && t.closest ? t.closest('[data-room]') : null;
+    if (!root) return null;
+    const r = root.getBoundingClientRect();
+    const sc = r.width / 1400 || 1;
+    return { x: (e.clientX - r.left) / sc - 125, y: (e.clientY - r.top) / sc, sc };
+  }
+  stickersFor(moves) {
+    const FACES = [[[0, 1, 0], '#f4f1ea'], [[0, -1, 0], '#f1cf3b'], [[0, 0, 1], '#3f9a5a'], [[0, 0, -1], '#2f6fb8'], [[1, 0, 0], '#c9473b'], [[-1, 0, 0], '#e58a2e']];
+    const BASE = [(q) => [q[0], q[2], -q[1]], (q) => [-q[2], q[1], q[0]], (q) => [q[1], -q[0], q[2]]];
+    let st = [];
+    FACES.forEach(([n, c]) => {
+      const ax = n.findIndex((q) => q !== 0);
+      const others = [0, 1, 2].filter((i) => i !== ax);
+      for (let a = -1; a <= 1; a += 1) for (let b = -1; b <= 1; b += 1) { const p = [0, 0, 0]; p[ax] = n[ax]; p[others[0]] = a; p[others[1]] = b; st.push({ p, n: n.slice(), c }); }
+    });
+    moves.forEach((m) => {
+      const mv = this.MOVES[m] || (typeof m === 'string' && /^\d,-?\d,[13]$/.test(m) ? m.split(',').map(Number) : null);
+      if (!mv) return;
+      const [ax, layer, t] = mv;
+      for (let i = 0; i < t; i += 1) st = st.map((q) => (q.p[ax] === layer ? { p: BASE[ax](q.p), n: BASE[ax](q.n), c: q.c } : q));
+    });
+    return st;
+  }
+  isSolved(moves) {
+    const by = {};
+    return this.stickersFor(moves).every((q) => { const k = q.n.join(','); if (!by[k]) by[k] = q.c; return by[k] === q.c; });
+  }
+  // One face turn: the layer swings round (CSS transition), then the model catches up and the swing resets without a transition.
+  startTurn(m) {
+    if (this.turning) { this.queue.push(m); return; }
+    this.turning = m;
+    this.setState({ turn: m });
+    this.later('turn', (this.state.scrambling ? 90 : 200) + 20, () => {
+      const mv = this.turning;
+      this.turning = null;
+      this.setState((st) => ({ moves: [...st.moves, mv], turn: null, snap: true, moveCount: st.playing && !st.scrambling ? st.moveCount + 1 : st.moveCount }));
+      this.later('snap', 34, () => {
+        this.setState({ snap: false });
+        const next = this.queue.shift();
+        if (next) this.startTurn(next); else this.afterTurn();
+      });
+    });
+  }
+  afterTurn() {
+    const st = this.state;
+    if (st.scrambling) {
+      this.setState({ scrambling: false, playing: true, startAt: Date.now(), moveCount: 0 });
+      this.every('cubeclock', 1000, () => this.setState({ tick: this.state.tick + 1 }));
+      return;
+    }
+    if (st.playing && this.isSolved(st.moves)) {
+      this.stop('cubeclock');
+      this.setState({ playing: false, party: true, partyMoves: st.moveCount, partyMs: Date.now() - st.startAt });
+      this.later('party', 9000, () => this.setState({ party: false }));
+    }
+  }
+  // Press a sticker and drag: the row or column under it turns the way you dragged.
+  stickerDown(e, p, n) {
+    if (e && e.stopPropagation) e.stopPropagation();
+    if (this.state.scrambling) return;
+    this.swipe = { x: e.clientX, y: e.clientY, p, n, done: false };
+  }
+  swipeTurn(sw, dx, dy) {
+    const rx = (this.state.rx * Math.PI) / 180, ry = (this.state.ry * Math.PI) / 180;
+    // a direction in the cube's own axes → where it points on screen (CSS axes: y down), ignoring perspective
+    const toScreen = (v) => { const x = v[0], y = -v[1], z = v[2]; const x1 = x * Math.cos(ry) + z * Math.sin(ry), z1 = -x * Math.sin(ry) + z * Math.cos(ry); return [x1, y * Math.cos(rx) - z1 * Math.sin(rx)]; };
+    const ax = sw.n.findIndex((c) => c !== 0);
+    let best = null;
+    [0, 1, 2].filter((i) => i !== ax).forEach((i) => { const t = [0, 0, 0]; t[i] = 1; const sc = toScreen(t); const len = Math.hypot(sc[0], sc[1]) || 1; const dot = (sc[0] * dx + sc[1] * dy) / len; if (!best || Math.abs(dot) > Math.abs(best.dot)) best = { t, dot }; });
+    const want = best.t.map((c) => c * (best.dot < 0 ? -1 : 1));
+    // turning +90° about u carries the face normal n onto u × n, so u = n × want
+    const n = sw.n, u = [n[1] * want[2] - n[2] * want[1], n[2] * want[0] - n[0] * want[2], n[0] * want[1] - n[1] * want[0]];
+    const k = u.findIndex((c) => c !== 0);
+    // the base turns are −90° about +axis, so +90° about +axis is three of them and +90° about −axis is one
+    return `${k},${sw.p[k]},${u[k] > 0 ? 3 : 1}`;
+  }
+  scramble() {
+    if (this.turning || this.state.scrambling) return;
+    const opts = ['U', 'D', 'L', 'R', 'F', 'B'];
+    const seq = [];
+    let last = '';
+    for (let i = 0; i < 22; i += 1) { let f = opts[Math.floor(Math.random() * 6)]; while (f === last) f = opts[Math.floor(Math.random() * 6)]; last = f; seq.push(f + (Math.random() < 0.5 ? "'" : '')); }
+    this.stop('cubeclock');
+    this.setState({ scrambling: true, party: false, playing: false, moveCount: 0 });
+    this.queue = seq.slice(1);
+    this.startTurn(seq[0]);
+  }
+  health(p, now) { const hrs = (now - p.w) / 3600000; return hrs < 12 ? 1 : Math.max(0, Math.min(1, 1 - (hrs - 12) / 60)); }
+  plantData() {
+    const PRE = { thriving: 2, thirsty: 36, wilting: 56, dead: 80 };
+    const st = this.state, pre = this.props.plants ?? 'live';
+    if (PRE[pre] === undefined) return { forced: null, data: st.plants };
+    const ago = st.now - PRE[pre] * 3600000;
+    return { forced: pre, data: st.forced && st.forced.preset === pre ? st.forced.data : { pothos: { w: ago, g: 7 }, echeveria: { w: ago, g: 6 }, cactus: { w: ago, g: 6 }, haworthia: { w: ago, g: 6 }, aloe: { w: ago, g: 6 } } };
+  }
+  applyWater(id) {
+    const now = Date.now();
+    const { forced, data } = this.plantData();
+    const p = data[id];
+    const next = { ...data, [id]: { w: now, g: this.health(p, now) < 0.08 ? 1 : Math.min(10, p.g + 1) } };
+    if (forced) this.setState({ now, forced: { preset: forced, data: next } });
+    else {
+      try { window.localStorage.setItem('gmv-shelf-plants-v1', JSON.stringify(next)); } catch (e) { /* storage unavailable: the plant still drinks for this visit */ }
+      this.setState({ now, plants: next });
+    }
+    this.setState({ perkId: id });
+    this.later('perk', 1900, () => this.setState({ perkId: null }));
+  }
+  // Watered in the last 20 minutes: it doesn't want any more.
+  recentlyWatered(id) { return Date.now() - this.plantData().data[id].w < 20 * 60000; }
+  scold(id) {
+    const LINES = { pothos: ["Hey! I'm drowning up here!", 'Enough! My roots are swimming!'], echeveria: ["I'm a succulent! No wet feet!", 'Too much! I store my own water!'], cactus: ["I'm a cactus! I'm from the desert!", 'Too much! Cacti hate wet feet!'], haworthia: ["Easy! I rot if I'm soggy!", "That's plenty, thank you!"], aloe: ['Aloe likes dry soil! Stop!', "Too much! I'm full!"] };
+    const list = LINES[id];
+    this.scoldN = (this.scoldN || 0) + 1;
+    this.setState({ scold: { id, line: list[this.scoldN % list.length] }, spill: id });
+    this.later('spill', 2200, () => this.setState({ spill: null }));
+    this.later('scold', 3000, () => this.setState({ scold: null }));
+  }
+  // The pot each spout has to be over to count: the hanging pothos, the echeveria, and each of the three succulents.
+  plantUnder(x, y) {
+    const Z = { pothos: [112, 228, 120, 262], echeveria: [618, 712, 380, 500], cactus: [752, 806, 640, 800], haworthia: [806, 854, 620, 800], aloe: [854, 905, 640, 800] };
+    return Object.keys(Z).find((id) => { const [x0, x1, y0, y1] = Z[id]; return x >= x0 && x <= x1 && y >= y0 && y <= y1; }) || null;
+  }
+  pickUpCan() {
+    this.wateredThisPour = {};
+    this.setState({ canMode: 'held', pouring: false, soak: {}, canX: 1115, canY: 620 });
+    this.every('pour', 100, () => this.pourTick());
+    this.later('canIdle', 15000, () => this.returnCan());
+  }
+  pourTick() {
+    const st = this.state;
+    if (st.canMode !== 'held' || !st.pouring) return;
+    const id = this.plantUnder(st.canX + 3, st.canY + 54);
+    if (!id) return;
+    const soak = { ...st.soak, [id]: (st.soak[id] || 0) + 0.08 };
+    const drank = this.wateredThisPour[id];
+    // a thirsty plant drinks a full can's worth and then can't take more; a freshly watered one overflows almost at once
+    const limit = !drank && this.recentlyWatered(id) ? 0.35 : 1.9;
+    if (!drank && soak[id] >= 1 && !this.recentlyWatered(id)) { this.wateredThisPour[id] = true; this.applyWater(id); }
+    if (soak[id] >= limit) { this.scold(id); this.returnCan(); return; }
+    this.setState({ soak });
+  }
+  returnCan() {
+    this.stop('pour'); this.stop('canIdle');
+    if (this.state.canMode !== 'held') return;
+    this.setState({ canMode: 'returning', pouring: false });
+    this.later('canHome', 700, () => this.setState({ canMode: 'home' }));
+  }
+  coast(v) {
+    this.carV = v;
+    this.every('coast', 16, () => {
+      let x = this.state.carX + this.carV;
+      this.carV *= 0.94;
+      if (x < 254) { x = 254; this.carV = -this.carV * 0.45; }
+      if (x > 412) { x = 412; this.carV = -this.carV * 0.45; }
+      if (Math.abs(this.carV) < 0.12) { this.stop('coast'); this.setState({ carX: x, carLight: false }); return; }
+      this.setState({ carX: x, carLight: true });
+    });
+  }
+  gust() {
+    const mode = this.props.wind ?? 'auto';
+    if (mode === 'calm') return;
+    this.setState({ gust: true });
+    this.later('gustEnd', 4800, () => {
+      this.setState({ gust: false });
+      this.later('gustWait', mode === 'breezy' ? 9000 : 25000 + Math.random() * 45000, () => this.gust());
+    });
+  }
+  // How long since this browser last visited: dust after 3 days, cobwebs after two weeks, all of them after two months.
+  visit(props, now, save) {
+    const ABS = { fresh: 0, days: 5, weeks: 21, months: 90 };
+    const pre = (props && props.absence) || 'auto';
+    let days = 0, carry = [];
+    if (ABS[pre] !== undefined) days = ABS[pre];
+    else {
+      try {
+        const rec = JSON.parse(window.localStorage.getItem('gmv-shelf-visit-v1') || 'null');
+        if (rec && typeof rec.last === 'number' && rec.last <= now) {
+          days = (now - rec.last) / 86400000;
+          if (Array.isArray(rec.webs)) carry = rec.webs.filter((x) => typeof x === 'string');
+        }
+      } catch (e) { days = 0; }
+    }
+    const ALL = ['w1', 'w2', 'w3', 'w4', 'w5', 'w6'];
+    const lvl = days >= 60 ? ALL : days >= 14 ? ['w1', 'w2', 'w3', 'w4'] : days >= 3 ? ['w1', 'w3'] : [];
+    const webs = ALL.filter((id) => lvl.includes(id) || carry.includes(id));
+    if (save && pre === 'auto') {
+      try { window.localStorage.setItem('gmv-shelf-visit-v1', JSON.stringify({ last: now, webs })); } catch (e) { /* storage unavailable */ }
+    }
+    return { webs, websStart: webs.length, absentDays: days, dust: days >= 3 ? Math.min(1, 0.35 + days / 90) : webs.length ? 0.4 : 0, pop: webs.length >= 2 ? 'hello' : 'none', dusting: false };
+  }
+  componentDidMount() {
+    // Esc puts things back: the can, the cube, an open file, the board, the tag.
+    this.onKey = (e) => {
+      if (e.key !== 'Escape') return;
+      const st = this.state;
+      if (st.canMode === 'held') this.returnCan();
+      else if (st.cubeOpen) this.setState({ cubeOpen: false, party: false });
+      else if (st.open) { this.setState({ docClosing: true }); this.later('docClose', 260, () => this.setState({ open: null, docClosing: false })); }
+      else if (st.notesOpen) this.setState({ notesOpen: false });
+      else if (st.contactOpen) this.setState({ contactOpen: false });
+    };
+    try { window.addEventListener('keydown', this.onKey); } catch (e) { /* no window: nothing to listen to */ }
+    this.every('clock', 60000, () => this.setState({ now: Date.now() }));
+    this.later('gustWait', 6000, () => this.gust());
+  }
+  componentDidUpdate(prev) {
+    if (prev && prev.absence !== this.props.absence) this.setState(this.visit(this.props, Date.now(), false));
+  }
+  componentWillUnmount() {
+    try { window.removeEventListener('keydown', this.onKey); } catch (e) { /* nothing to remove */ }
+    Object.keys(this.tm).forEach((k) => { clearTimeout(this.tm[k]); clearInterval(this.tm[k]); });
+  }
+  later(name, ms, fn) { clearTimeout(this.tm[name]); this.tm[name] = setTimeout(fn, ms); }
+  every(name, ms, fn) { clearInterval(this.tm[name]); this.tm[name] = setInterval(fn, ms); }
+  stop(name) { clearTimeout(this.tm[name]); clearInterval(this.tm[name]); }
+  dropMatch() {
+    this.stop('burn');
+    const st = this.state;
+    this.setState({ fire: 'idle', smoke: { x: Math.round(st.mx - 10), y: Math.round(st.my - 52) } });
+    this.later('smoke', 1400, () => this.setState({ smoke: null }));
+  }
+  clearWeb(id, x, y) {
+    const st = this.state;
+    if (!st.webs.includes(id)) return;
+    const webs = st.webs.filter((w) => w !== id);
+    const poofs = [...st.poofs, { id: `${id}-${Date.now()}`, x, y }];
+    const done = webs.length === 0;
+    this.setState({ webs, poofs, ...(done ? { dusting: false, dust: 0, pop: st.websStart ? 'thanks' : 'none' } : {}) });
+    this.later(`poof-${id}`, 650, () => this.setState({ poofs: this.state.poofs.filter((p) => !p.id.startsWith(`${id}-`)) }));
+    if ((this.props.absence ?? 'auto') === 'auto') {
+      try { window.localStorage.setItem('gmv-shelf-visit-v1', JSON.stringify({ last: Date.now(), webs })); } catch (e) { /* storage unavailable */ }
+    }
+    if (done && st.websStart) this.later('thanks', 2600, () => this.setState({ pop: 'none' }));
+  }
+  renderVals() {
+    const s = this.state;
+    const oak = (this.props.boards ?? 'black') === 'oak';
+    const clamp01 = (x) => Math.max(0, Math.min(1, x));
+    const hex = (c) => [1, 3, 5].map((i) => parseInt(c.slice(i, i + 2), 16));
+    const mix = (a, b, t) => { const A = hex(a), B = hex(b); return `#${A.map((n, i) => Math.round(n + (B[i] - n) * t).toString(16).padStart(2, '0')).join('')}`; };
+    const rng = (n) => { const x = Math.sin(n * 91.345 + 7.1) * 10000; return x - Math.floor(x); };
+
+    // ---------- time, season, weather ----------
+    const mood = this.props.mood ?? 'live';
+    const d0 = new Date(s.now);
+    const MOODS = { sunrise: 6.4, morning: 8.5, golden: 17.2, sunset: 18.6, night: 22 };
+    const H = MOODS[mood] ?? d0.getHours() + d0.getMinutes() / 60;
+    const month = d0.getMonth();
+    const seasonP = this.props.season ?? 'auto';
+    const season = seasonP !== 'auto' ? seasonP : [11, 0, 1].includes(month) ? 'winter' : month <= 4 ? 'spring' : month <= 7 ? 'summer' : 'autumn';
+    const weatherP = this.props.weather ?? 'auto';
+    let weather = 'clear';
+    if (weatherP !== 'auto') weather = weatherP;
+    else {
+      // The same weather for everyone in a six-hour block, with odds that follow the season.
+      const seed = (d0.getFullYear() * 372 + month * 31 + d0.getDate()) * 4 + Math.floor(d0.getHours() / 6);
+      const r = rng(seed);
+      const odds = { winter: [['snow', 0.35], ['rain', 0.1], ['cloudy', 0.2]], spring: [['rain', 0.2], ['cloudy', 0.2]], summer: [['rain', 0.4], ['cloudy', 0.2]], autumn: [['rain', 0.25], ['cloudy', 0.25]] }[season];
+      let acc = 0;
+      for (const [w, p] of odds) { acc += p; if (r < acc) { weather = w; break; } }
+    }
+    const overcast = weather !== 'clear';
+    const day = H >= 6 && H < 19;
+    const warm = day && (H < 7.5 || H >= 16.5);
+    const east = H < 12.5;
+    const k = day ? clamp01(east ? (H - 6) / 6.5 : (19 - H) / 6.5) : 0;
+    const lampOn = s.lamp ?? !day;
+    const sunny = day && !overcast;
+
+    // Four panes of sun on the wall. East window (right) until noon, west window (left) after: same geometry, mirrored.
+    const PW = 150, PHt = 300 - 40 * k, gp = 22, shear = 250 - 150 * k, rise = -28;
+    const ox = 440 + 260 * k, oy = 40 + 300 * k;
+    const panes = [];
+    for (let r = 0; r < 2; r += 1) {
+      for (let c = 0; c < 2; c += 1) {
+        const x = ox + c * (PW + gp) - r * (shear + (gp * shear) / PHt);
+        const y = oy + r * (PHt + gp) + c * rise;
+        const ry = rise * (PW / (PW + gp));
+        const pts = [[x, y], [x + PW, y + ry], [x + PW - shear, y + ry + PHt], [x - shear, y + PHt]];
+        panes.push({ pts: pts.map((p) => `${(east ? p[0] : 1000 - p[0]).toFixed(1)},${p[1].toFixed(1)}`).join(' ') });
+      }
+    }
+    const sxv = !day ? (lampOn ? -7 : 0) : overcast ? 0 : (east ? -1 : 1) * (5 + 12 * (1 - k));
+    const syv = !day ? 6 : overcast ? 4 : 6 + 5 * k;
+    const sa = !day ? (lampOn ? 0.32 : 0.2) : overcast ? 0.18 : 0.3;
+    const hh = String(Math.floor(H)).padStart(2, '0'), mm = String(mood === 'live' ? d0.getMinutes() : Math.round((H % 1) * 60)).padStart(2, '0');
+    const WX = { clear: day ? 'clear' : 'clear sky', cloudy: 'cloudy', rain: 'rain', snow: 'snow' };
+    const v = {
+      rootClass: `${s.fire === 'held' || s.dusting || s.canMode === 'held' ? 'holding' : ''}${s.gust ? ' gusty' : ''}`,
+      wallL: !day ? '#d6c6ab' : overcast ? '#e4dfd6' : warm ? '#ecd8b8' : '#eee5d4',
+      wallR: !day ? '#e2d0b2' : overcast ? '#ebe6dd' : warm ? '#f3e2c6' : '#f4ecdf',
+      letter: '#2a2420', note: !day ? '#efe2cc' : '#6a5d4f',
+      frame: !day ? (lampOn ? '#b8a68c' : '#8d8170') : '#f6efe2',
+      boardTop: oak ? 'linear-gradient(180deg, #e6c896 0%, #d6b07a 100%)' : '#34302c',
+      boardFace: oak ? 'linear-gradient(180deg, #cc9f66 0%, #bb8c54 55%, #a57843 100%)' : '#1f1c19',
+      boardUnder: oak ? 'linear-gradient(180deg, #8f6639 0%, #a37a48 100%)' : '#0f0d0c',
+      edge: oak ? '#e2c08e' : '#433d37',
+      boardShadow: day ? (overcast ? 0.16 : 0.24) : 0.4, bsx: (sxv * 0.6 - 75).toFixed(1),
+      rowShadow: `drop-shadow(${sxv.toFixed(1)}px ${syv.toFixed(1)}px ${overcast ? 6 : 3}px rgba(45,30,15,${sa}))`,
+      sun: sunny ? (k < 0.12 ? 0.75 : 1) : 0, sunColor: warm ? '#ffc27a' : '#fff4dc',
+      shadeTint: !day ? (lampOn ? '#2a1d12' : '#14100c') : overcast ? '#5e646a' : warm ? '#6b4a2a' : '#6e6250',
+      shadeAmount: !day ? (lampOn ? 0.42 : s.candle === 'lit' ? 0.5 : 0.6) : overcast ? 0.2 : warm ? 0.2 : 0.12,
+      lamp: lampOn ? 1 : 0, candle: s.candle === 'lit' ? (day ? 0.55 : 1) : 0, candleCls: s.candle === 'lit' ? 'candleLight' : '',
+      clock: `${hh}:${mm} · ${season} · ${WX[weather]} · ${!day ? (lampOn ? 'night, lamp on' : 'night') : overcast ? 'soft light' : H < 7.5 ? 'sunrise, east window' : east ? 'morning sun, east window' : warm ? 'sunset light, west window' : 'afternoon sun, west window'}`,
+    };
+
+    // ---------- the two windows ----------
+    const dl = clamp01((H - 5) / 1.5) * clamp01((20 - H) / 1.8);
+    const glowE = clamp01(1 - Math.abs(H - 6.4) / 1.5), glowW = clamp01(1 - Math.abs(H - 18.6) / 1.5);
+    const winter = season === 'winter';
+    let rainD = '', snowD = '', starD = '', dropD = '';
+    for (let t = -1; t < 6; t += 1) for (let i = 0; i < 14; i += 1) rainD += `M${(rng(i * 3 + 1) * 150).toFixed(1)} ${(t * 120 + rng(i * 7 + 2) * 120).toFixed(1)} l-4 18 `;
+    for (let t = -1; t < 5; t += 1) for (let i = 0; i < 16; i += 1) { const x = rng(i * 5 + 3) * 150, y = t * 150 + rng(i * 11 + 4) * 150, r = 1.4 + rng(i * 13 + 5) * 1.8; snowD += `M${(x - r).toFixed(1)} ${y.toFixed(1)} a${r.toFixed(1)} ${r.toFixed(1)} 0 1 0 ${(2 * r).toFixed(1)} 0 a${r.toFixed(1)} ${r.toFixed(1)} 0 1 0 ${(-2 * r).toFixed(1)} 0 `; }
+    for (let i = 0; i < 26; i += 1) { const x = rng(i * 17 + 9) * 144, y = rng(i * 19 + 3) * 380, r = 0.6 + rng(i * 23 + 1) * 0.9; starD += `M${(x - r).toFixed(1)} ${y.toFixed(1)} a${r.toFixed(1)} ${r.toFixed(1)} 0 1 0 ${(2 * r).toFixed(1)} 0 a${r.toFixed(1)} ${r.toFixed(1)} 0 1 0 ${(-2 * r).toFixed(1)} 0 `; }
+    for (let i = 0; i < 18; i += 1) { const x = 6 + rng(i * 29 + 2) * 132, y = 10 + rng(i * 31 + 6) * 580, r = 1.6 + rng(i * 37 + 4) * 2; dropD += `M${(x - r).toFixed(1)} ${y.toFixed(1)} a${r.toFixed(1)} ${(r * 1.2).toFixed(1)} 0 1 0 ${(2 * r).toFixed(1)} 0 a${r.toFixed(1)} ${(r * 1.2).toFixed(1)} 0 1 0 ${(-2 * r).toFixed(1)} 0 `; }
+    const dark = 1 - dl;
+    const outside = (c) => mix(c, '#141a2a', dark * 0.72);
+    // A clump of leaves: a scalloped blob, each lobe a curve bulging outwards.
+    const blob = (cx, cy, r, sd, lobes) => {
+      const pts = [];
+      for (let i = 0; i < lobes; i += 1) { const a = (i / lobes) * Math.PI * 2 + rng(sd + i) * 0.3; const rr = r * (0.78 + rng(sd * 3 + i) * 0.22); pts.push([cx + Math.cos(a) * rr, cy + Math.sin(a) * rr * 0.86]); }
+      let d = `M${pts[0][0].toFixed(1)} ${pts[0][1].toFixed(1)} `;
+      for (let i = 0; i < lobes; i += 1) {
+        const p = pts[i], q = pts[(i + 1) % lobes];
+        const ma = Math.atan2((p[1] + q[1]) / 2 - cy, (p[0] + q[0]) / 2 - cx);
+        d += `Q${(cx + Math.cos(ma) * r * 1.18).toFixed(1)} ${(cy + Math.sin(ma) * r * 1.18 * 0.86).toFixed(1)} ${q[0].toFixed(1)} ${q[1].toFixed(1)} `;
+      }
+      return `${d}Z`;
+    };
+    const MASSES = [[92, 236, 62, 0], [44, 206, 48, 0], [120, 150, 40, 0], [74, 184, 44, 1], [112, 292, 40, 1], [34, 298, 36, 1], [96, 118, 32, 1], [62, 168, 26, 2], [102, 246, 22, 2], [42, 262, 20, 2], [90, 104, 18, 2]];
+    const TREEPAL = { spring: ['#6f9d4f', '#8cbc6a', '#b5d68f'], summer: ['#3f6f33', '#5f8f45', '#7fae5e'], autumn: ['#a8452a', '#d9822b', '#e9b04a'], winter: null }[season];
+    const masses = TREEPAL ? MASSES.filter((m, i) => season !== 'autumn' || ![4, 5, 9].includes(i)).map((m, i) => ({ d: blob(m[0], m[1], m[2], i * 7 + 3, m[2] > 30 ? 10 : 7), c: outside(TREEPAL[m[3]]), k: m[3] === 2 ? 'none' : '#2a2420' })) : [];
+    let flecksD = '', blossomD = '';
+    if (TREEPAL) MASSES.forEach(([x, y, r], i) => {
+      for (let j = 0; j < 5; j += 1) { const a = rng(i * 13 + j) * 6.28, dd = r * 0.75 * rng(i * 17 + j); const fx = x + Math.cos(a) * dd, fy = y + Math.sin(a) * dd * 0.86; flecksD += `M${fx.toFixed(1)} ${fy.toFixed(1)} q2.5 -3.5 5 0 q-2.5 3.5 -5 0 Z `; }
+      for (let j = 0; j < 3; j += 1) { const a = rng(i * 7 + j) * 6.28, dd = r * 0.6 * rng(i * 11 + j); const bx = x + Math.cos(a) * dd, by = y + Math.sin(a) * dd; blossomD += `M${(bx - 2.6).toFixed(1)} ${by.toFixed(1)} a2.6 2.6 0 1 0 5.2 0 a2.6 2.6 0 1 0 -5.2 0 `; }
+    });
+    const TREE = {
+      limbsD: 'M38 420 C62 398 88 388 124 372 M40 362 C28 334 16 314 0 304 M46 316 C70 288 98 266 136 256 M52 304 C58 262 70 222 94 192 M94 192 C104 176 118 166 140 160 M30 470 C14 456 6 440 -4 432',
+      twigsD: 'M124 372 l14 -10 M124 372 l12 6 M136 256 l8 -12 M136 256 l10 4 M140 160 l6 -10 M94 192 l-10 -14 M0 304 l-6 -8 M70 290 l-6 -14 M100 268 l4 -16 M60 240 l-12 -8 M112 386 l6 -14 M84 214 l-12 -6',
+      overLimbsD: season === 'autumn' ? 'M46 316 C70 288 98 266 120 260 M52 304 C58 270 66 240 80 214' : '',
+      snowD2: 'M38 417 C62 395 88 385 124 369 M46 313 C70 285 98 263 136 253 M52 301 C58 259 70 219 94 189 M94 189 C104 173 118 163 140 157 M40 359 C28 331 16 311 0 301',
+    };
+    const skyOf = (glow, isE) => {
+      let top = mix('#101831', '#86b6e2', dl), bot = mix('#24365e', '#d6eaf6', dl);
+      top = mix(top, '#6c6aa3', glow * 0.7);
+      bot = mix(bot, isE ? '#f6b27a' : '#f28a4c', glow);
+      // The window facing away from the sun still takes the twilight: a dusky blue over a pink horizon.
+      const opp = isE ? glowW : glowE;
+      top = mix(top, '#5a6596', opp * 0.45);
+      bot = mix(bot, '#d3a9b4', opp * 0.55);
+      if (overcast) { top = mix(top, dl > 0.3 ? '#8f99a3' : '#1d222b', 0.75); bot = mix(bot, dl > 0.3 ? '#c3c8cc' : '#2e3440', 0.75); }
+      return { top, bot };
+    };
+    const makeWin = (isE) => {
+      const sky = skyOf(isE ? glowE : glowW, isE);
+      let e = null;
+      if (!overcast && isE && H > 5.6 && H < 11) e = clamp01((H - 5.9) / 5);
+      if (!overcast && !isE && H > 13 && H < 19.3) e = clamp01((19 - H) / 6);
+      const fx = isE ? 1016 : -184, gx = fx + 12;
+      const hillFar = winter ? mix('#e8edf1', '#36435c', dark * 0.8) : outside(mix('#a9bfa0', sky.bot, 0.3));
+      const hillNear = winter ? mix('#f4f6f8', '#2a3550', dark * 0.8) : outside('#7d9a72');
+      return {
+        skyId: isE ? 'skyE' : 'skyW', clipId: isE ? 'glassE' : 'glassW', fx, gx, sillX: fx - 12,
+        mullD: `M${gx + 72} 112 V716 M${gx} 313 H${gx + 144} M${gx} 514 H${gx + 144}`,
+        top: sky.top, bot: sky.bot, hillFar, hillNear,
+        stars: !overcast && dl < 0.25, starD,
+        moon: !overcast && dl < 0.2 && (isE ? H >= 18 : H < 6),
+        sun: e !== null, sx: e === null ? 0 : (isE ? 60 + e * 30 : 84 - e * 30).toFixed(1), sy: e === null ? 0 : (540 - e * 470).toFixed(1), sr: e === null ? 0 : (19 - e * 5).toFixed(1), sr2: e === null ? 0 : (34 - e * 8).toFixed(1), sc: e === null ? '#ffffff' : mix('#ff8a45', '#fff3c8', e),
+        cloudOp: overcast ? 0.95 : dl > 0.3 ? 0.7 : 0, cloudC: overcast ? (dl > 0.3 ? '#aab1b8' : '#3a404c') : '#ffffff', heavy: overcast,
+        houses: isE, tree: !isE, snowy: winter,
+        houseA: outside('#c98f86'), houseB: outside('#e9dcc4'), roof: outside('#5b4a42'), lit: dl < 0.5 ? '#ffd27a' : '#b9d0e0',
+        trunk: outside('#5a4434'),
+        masses: !isE ? masses : [], ...TREE, flecksD: TREEPAL ? flecksD : '', fleckC: TREEPAL ? outside(season === 'autumn' ? '#f0c35a' : TREEPAL[2]) : 'none',
+        blossom: !isE && season === 'spring', blossomD,
+        falling: !isE && season === 'autumn' ? [[30, 210], [76, 250], [112, 190], [52, 300], [98, 330], [130, 260]].map(([x, y], i) => ({ x, y, c: outside(['#d9822b', '#c0532a', '#e3a33b'][i % 3]), delay: (i * 1.6).toFixed(1), dur: (8 + (i % 3) * 1.5).toFixed(1) })) : [],
+        rain: weather === 'rain', rainD, dropD, snow: weather === 'snow', snowD, frost: winter,
+      };
+    };
+    const windows = [makeWin(false), makeWin(true)];
+
+    // ---------- files ----------
+    // ---------- files: every job, the degree, the skills, the résumé, and the GitHub projects ----------
+    const FILES = {
+      tw: {
+        x: 500, y: 42, w: 50, h: 214, color: '#c8714a', rule: '#f1d2bd', ink: '#fbeee4', hole: '#8f4429', yA: '2023', yB: 'now', name: 'Thoughtworks',
+        kind: 'Work · current', role: 'Senior Consultant (Senior Software Engineer)', dates: 'Dec 2023 – present · Hyderabad · team of 14',
+        summary: 'Senior engineer on an e-commerce customer-service platform. When the platform opened from agent-only to direct customer access, traffic went up ten times; the job was to keep it fast, recoverable, and shipping every day.',
+        stats: [['10×', 'traffic: 3K → 30K API calls an hour'], ['200 ms', 'p90 held through it (p50 150 ms)'], ['6 h → 3–4 h', 'full disaster recovery'], ['40% → 15%', 'bugs from AI-written code']],
+        points: [
+          'Design and build Spring Boot microservices with Domain-Driven Design and Hexagonal Architecture, producing and consuming millions of events across teams over Kafka and SQS.',
+          'Held p50 at 150 ms and p90 at 200 ms through a 10× traffic increase (3K → 30K API calls an hour) as the platform moved from agent-mediated to direct customer access.',
+          'Rebuilt disaster recovery as automated Terraform provisioning plus a scripted bootstrap, cutting full-application recovery from a 6-hour SLA to 3–4 hours.',
+          'Ship to production daily with trunk-based delivery, feature toggles and GitHub Actions, gated by Trivy and OWASP Dependency-Check; remediate the cloud and container findings Wiz flags.',
+          'Led feature delivery for relationship agents (Vue.js, Spring Boot, MongoDB), improving after-sales complaint resolution.',
+          'Built and maintain a multi-agent debugging workflow that triages production errors from AWS CloudWatch logs and traces each failure to its likely root cause for engineers to verify.',
+          'Wrote GitHub Copilot skills for code review and Jira-to-spec generation: the share of bugs from AI-written code fell from 40% to 15%, and AI spend per developer from $80 to $50 a month.',
+          'Mentor engineers on AI-augmented development: Claude Code and Copilot workflows, prompt design, and when to reject AI-generated code.',
+        ],
+        stack: ['Java 17/21', 'Spring Boot', 'Kafka', 'AWS SQS', 'AWS (EC2, S3, Lambda, CloudWatch)', 'Terraform', 'GitHub Actions', 'Vue.js', 'MongoDB', 'Wiz', 'Trivy', 'Claude Code', 'GitHub Copilot'],
+      },
+      ot: {
+        x: 554, y: 52, w: 46, h: 204, color: '#2f4058', rule: '#9fb0c6', ink: '#e8eef5', hole: '#1b2638', yA: '2021', yB: '2023', name: 'OpenText',
+        kind: 'Work', role: 'Software Engineer · OT2 multi-tenant SaaS platform', dates: 'Jul 2021 – Dec 2023 · Hyderabad · team of 8–12',
+        summary: 'The OT2 multi-tenant SaaS suite: OT2Central, Admin Center and Entitlement Tenant Services. I owned OT2Central end to end, as product owner, full-stack developer and QA, from roadmap and requirements to release.',
+        stats: [['50K+', 'API calls a minute'], ['100–120 ms', 'latency under that load'], ['600M+', 'customer records'], ['0', 'downtime moving Azure → GCP']],
+        points: [
+          'Sustained 50K+ API calls a minute at 100–120 ms over 600M+ customer records by tuning PostgreSQL queries and access patterns; operated to a 2-hour incident-response SLA with New Relic.',
+          'Architected OT2Central, a 0-to-1 replacement for Admin Center with graphical modelling of applications, tenants, subscriptions and per-application user views.',
+          'Built Admin Center, multi-tenant self-service for the tenant, subscription and user lifecycle: RBAC, role definitions, groups and service credentials.',
+          'Developed Entitlement Tenant Services, the Protobuf/gRPC backend authority for entitlements, subscriptions and access control behind both products.',
+          'Delivered an Azure → GCP platform migration with zero downtime as part of the migration team.',
+          'Upgraded Angular 9 → 17 across five major versions with no breaking changes, backed by automation that cut regression-testing effort.',
+          "Shipped operability tooling: a failed-events view with error history, batch-job controls with play, pause, stop and timeline editing, and an in-app API console that took Postman out of the team's daily workflow.",
+        ],
+        stack: ['Java', 'Spring Boot', 'PostgreSQL', 'gRPC', 'Protocol Buffers', 'Angular 9 → 17', 'GCP', 'Azure', 'New Relic', 'RBAC'],
+      },
+      cg: {
+        x: 604, y: 60, w: 44, h: 196, color: '#8fa58a', rule: '#e3ecdf', ink: '#2a2420', hole: '#5f7559', yA: '2019', yB: '2021', name: 'Cognizant',
+        kind: 'Work · first job', role: 'Programmer Analyst · IVS Portal', dates: 'Feb 2019 – Jul 2021 · Hyderabad',
+        summary: 'IVS Portal, a Siemens Teamcenter engineering-workflow platform for a North American automotive manufacturer. Java services that replaced the manual engineering workflows.',
+        stats: [['Java 8', 'Spring Boot, Spring MVC, Hibernate'], ['Oracle', 'the system of record'], ['S3', 'file upload and download APIs']],
+        points: [
+          'Built backend services in Java 8, Spring Boot, Spring MVC and Hibernate/HQL over Oracle, replacing manual engineering workflows.',
+          'Developed REST APIs for file upload and download on Amazon S3, and Spring Integration flows for communication between systems.',
+          'Delivered microservice components with JUnit coverage against SLA-bound release commitments.',
+        ],
+        stack: ['Java 8', 'Spring Boot', 'Spring MVC', 'Hibernate/HQL', 'Oracle', 'Amazon S3', 'Spring Integration', 'JUnit'],
+      },
+      ai: {
+        x: 652, y: 70, w: 34, h: 186, color: '#d9a541', rule: '#f6e3b4', ink: '#2a2420', hole: '#9c7426', yA: 'AI', yB: 'now', name: 'AI at work',
+        kind: 'Work · how I build', role: 'AI-augmented engineering, at Thoughtworks and on my own', dates: 'Thoughtworks, Dec 2023 – present · plus open-source tools on the GitHub shelf',
+        summary: 'I use AI to ship faster without shipping worse, and I teach the team where the line is. At work that means agents that triage production errors and skills that keep AI-written code reviewable; on my own time it means tools that measure and harden AI agents.',
+        stats: [['40% → 15%', 'bugs from AI-written code'], ['$80 → $50', 'AI spend per developer a month'], ['3', 'open-source AI tools: Rig, kryptonite, Nexus Forge']],
+        points: [
+          'A multi-agent debugging workflow that triages production errors from AWS CloudWatch logs and traces each failure to its likely root cause, for an engineer to verify and fix.',
+          'GitHub Copilot skills for code review and Jira-to-spec generation that standardise AI-generated code across the team.',
+          'Open-source skills adapted to load only the context a task needs, which cut AI spend by 38%.',
+          'Mentoring engineers on Claude Code and Copilot workflows, prompt design, and judging when to reject AI-generated output.',
+          'On the GitHub shelf: Rig measures what a change to an agent really does; kryptonite and Nexus Forge are Claude Code skills that attack an app on purpose and then harden it.',
+        ],
+        stack: ['Claude Code', 'GitHub Copilot', 'LangChain4j', 'MCP', 'RAG pipelines', 'AWS CloudWatch'],
+      },
+      ed: {
+        x: 290, y: 333, w: 50, h: 212, color: '#d9a541', rule: '#f6e3b4', ink: '#2a2420', hole: '#9c7426', yA: 'ECE', yB: '2018', name: 'B.Tech · JNTU',
+        kind: 'Education', role: 'B.Tech, Electronics and Communications Engineering', dates: 'Jawaharlal Nehru Technological University (JNTU), Anantapur · 2018',
+        summary: 'A degree in electronics and communications engineering. I moved into software straight after, joining Cognizant as a programmer analyst in February 2019.',
+        listTitle: 'Details',
+        points: ['Bachelor of Technology (B.Tech), Electronics and Communications Engineering, 2018.', 'Jawaharlal Nehru Technological University (JNTU), Anantapur.'],
+      },
+      ag: {
+        x: 344, y: 353, w: 40, h: 192, color: '#c98f86', rule: '#f3d9d4', ink: '#2a2420', hole: '#8e5a52', yA: '2025', yB: 'cert', name: 'Agile & Scrum',
+        kind: 'Certification', role: 'Agile and Scrum Product Management', dates: 'HP LIFE · 2025',
+        summary: 'It backs up the product-owner side of my work: at OpenText I owned OT2Central end to end, as product owner, developer and QA.',
+        listTitle: 'Details',
+        points: ['Agile and Scrum Product Management, HP LIFE, 2025.', 'Put to use owning OT2Central from roadmap and requirements through delivery and release.'],
+      },
+      sk: {
+        x: 388, y: 345, w: 34, h: 200, color: '#e9dcc4', rule: '#b8a98e', ink: '#2a2420', hole: '#b8a98e', yA: 'Java', yB: '& co', name: 'Skills',
+        kind: 'Skills', role: 'What I build with, every day and when it is needed', dates: 'Seven years in production, front end to infrastructure',
+        summary: 'Every day: Java 17/21, Spring Boot, Kafka, PostgreSQL, AWS, Terraform and GitHub Actions. I have shipped with plenty more, front end included.',
+        stats: [['7+', 'years in production'], ['3', 'companies'], ['11', 'projects on the GitHub shelf']],
+        listTitle: 'By area',
+        points: [
+          'Languages: Java, SQL (PostgreSQL, MySQL, Oracle, MongoDB), TypeScript, JavaScript, HTML/CSS.',
+          'Backend: Spring Boot, Spring (Core, Data, MVC, Security), Hibernate/JPA, JUnit.',
+          'Frontend: Angular (led the 9 → 17 upgrades), React, Vue.js, Single SPA micro frontends, Jasmine.',
+          'APIs and messaging: REST, gRPC, Protocol Buffers, OAuth 2.0, Apache Kafka, AWS SQS/SNS, DynamoDB.',
+          'Cloud and DevOps: AWS (EC2, S3, Lambda, CloudWatch), GCP, Terraform, Docker, Kubernetes, GitHub Actions, Jenkins.',
+          'Architecture: microservices, event-driven systems, DDD, hexagonal architecture, multi-tenant systems, RBAC, HLD and LLD.',
+          'AI and LLMs: Claude Code, GitHub Copilot, LangChain4j, MCP, RAG pipelines.',
+          'Observability and security: Splunk, Datadog, New Relic, Grafana, CloudWatch, Wiz, Trivy, OWASP Dependency-Check, SonarQube.',
+        ],
+      },
+      cv: {
+        x: 426, y: 363, w: 30, h: 182, color: '#8fa58a', rule: '#e3ecdf', ink: '#2a2420', hole: '#5f7559', yA: 'PDF', yB: '↓', name: 'Résumé',
+        kind: 'Résumé', role: 'Gokul MV · AI full stack engineer', dates: 'Hyderabad, India · reddy.gokul@gmail.com · +91 80194 43788',
+        summary: 'Senior software engineer with 7+ years building and operating Java platforms in production: multi-tenant systems sustaining 50K+ API calls a minute at 100–120 ms over 600M+ records, and event-driven microservices on AWS processing millions of Kafka events. End-to-end ownership, from ambiguous requirements through architecture, delivery and production support.',
+        listTitle: 'In short', isCV: true, link: 'https://www.linkedin.com/in/gokulmv', linkText: 'LinkedIn ↗',
+        points: ['Thoughtworks · Senior Consultant · Dec 2023 – present', 'OpenText · Software Engineer · Jul 2021 – Dec 2023', 'Cognizant · Programmer Analyst · Feb 2019 – Jul 2021', 'JNTU Anantapur · B.Tech, ECE · 2018'],
+      },
+    };
+    // GitHub: public repositories with a README that are released or nearly done. Released = a release, a registry package or a live site.
+    const GH = (repo) => `https://github.com/${repo}`;
+    const PROJ = {
+      ch: {
+        flat: true, x: 262, y: 798, w: 204, color: '#d9a541', ink: '#2a2420', lang: 'C#', name: 'ClipHive', rel: true, repo: 'levitasOrg/cliphive',
+        role: 'Encrypted clipboard history manager for Windows', dates: 'C# · WPF · MIT · release v1.3.2',
+        summary: 'A privacy-first clipboard history for Windows, built natively in WPF/C#, with zero telemetry and no runtime dependencies in its standalone build.',
+        stats: [['v1.3.2', 'latest release'], ['AES-256-GCM', 'encryption at rest'], ['0', 'network calls']],
+        listTitle: 'What it does',
+        points: ['Ctrl + Shift + V opens your history; one click pastes an item back.', 'Live search across text and the OCR-extracted text of copied images, offline through Windows.Media.Ocr.', 'Encrypted at rest with AES-256-GCM, with keys protected by DPAPI and bound to your Windows account.', 'Pins, auto-clear, duplicate detection, and smart actions for links, file paths and colour codes.', 'A standalone single EXE with the runtime bundled, or a small installer.'],
+        stack: ['C#', '.NET 8', 'WPF', 'AES-256-GCM', 'Windows DPAPI', 'Windows.Media.Ocr'],
+      },
+      oo: {
+        flat: true, x: 266, y: 772, w: 198, color: '#2f4058', ink: '#efe6d6', lang: 'SWIFT', name: 'Over&Out', rel: true, repo: 'GokulMV/hush',
+        role: 'macOS menu-bar app: never wonder "am I muted?" again', dates: 'Swift · GPL-3.0 · v1.3.3 on Homebrew',
+        summary: 'It notices when you step away, pick up your phone or a call starts, and mutes, hides and pauses things for you. When you are back, it puts everything the way it was.',
+        stats: [['v1.3.3', 'on Homebrew'], ['On-device', 'camera detection']],
+        listTitle: 'What it does',
+        points: ['Walk away mid-meeting: it mutes the mic, turns Zoom video off and pauses media; sit back down and it all comes back.', 'Putting your phone to your ear counts as stepping away; a call starting pauses whatever you were watching.', 'An iPhone call ringing on the Mac pauses media and lowers the volume.', 'Global shortcuts to hard-mute every microphone, toggle the camera, or hit panic mode.', 'Checks GitHub Releases daily and updates itself, through Homebrew when installed that way.'],
+        stack: ['Swift', 'Apple Vision', 'Core ML', 'Core Audio', 'Accessibility API', 'Homebrew'],
+      },
+      lv: {
+        flat: true, x: 270, y: 746, w: 192, color: '#efe6d6', ink: '#2a2420', lang: 'JAVA', name: 'Levitas', rel: true, repo: 'levitasOrg/levitas-validators',
+        role: 'Zero-dependency Java validators for Indian identifiers', dates: 'Java 17 · Apache 2.0 · io.github.levitasorg:levitas-validators',
+        summary: 'Built for every backend team tired of copy-pasting regex: real validation with checksums, entity types and masking, fully offline.',
+        stats: [['v0.1.0', 'on Maven Central'], ['0', 'dependencies'], ['6', 'identifier types']],
+        listTitle: 'What it does',
+        points: ['GSTIN: format, checksum, state extraction, PAN extraction and entity type.', 'PAN entity types, HSN codes (4, 6 and 8 digit), IFSC with bank lookup, UPI VPA, and Aadhaar with Verhoeff checksums.', 'DPDP-compliant masking for log-safe PII in production systems.', 'An automated release pipeline to Maven Central with GitHub Actions.'],
+        stack: ['Java 17', 'Maven', 'GitHub Actions', 'Maven Central'],
+      },
+      dth: {
+        h: 196, color: '#2f4058', ink: '#efe6d6', hole: '#1b2638', lang: 'GO', name: 'DocTheRepo', rel: false, repo: 'GokulMV/DocTheRepo',
+        role: 'Self-hosted living documentation and error intelligence for every repository', dates: 'Go · PostgreSQL + pgvector · MIT',
+        summary: 'DocTheRepo Hub watches your repositories. On every push it updates the documentation where the code changed, answers questions about your systems with citations, and explains the errors your tools report. One Go binary, PostgreSQL, and your own model keys.',
+        stats: [['1', 'Go binary + PostgreSQL'], ['9', 'kinds of LLM provider supported']],
+        listTitle: 'What it does',
+        points: ['Writes and updates per-repository docs: an overview, the architecture, a guide per module, and the flows, API, events, data model, tests and CI.', 'Ask: hybrid retrieval (vectors, full text and a knowledge graph) over code, docs, Confluence and Jira, scoped to what each person may read.', 'Explains alerts and errors from Sentry, Datadog, PagerDuty, Grafana, CloudWatch, Wiz, Splunk and queue lag.', 'Connect with GitHub in one click; provider keys are sealed in the browser with X25519 + ML-KEM-768.', 'Hard spend limits are checked before every paid model call.'],
+        stack: ['Go', 'PostgreSQL', 'pgvector', 'TypeScript', 'React', 'Docker', 'Helm'],
+      },
+      rig: {
+        h: 184, color: '#c8714a', ink: '#fbeee4', hole: '#8f4429', lang: 'PY', name: 'Rig', rel: true, repo: 'GokulMV/rig',
+        role: 'A garage for AI agent architectures', dates: 'Python · TypeScript · MIT · rig-it.dev',
+        summary: 'Your architecture is the car: swap any part in or out (a skill, a step, a model, a loop, a hook, an MCP server, a CLAUDE.md rule), rerun the same tasks with and without the change, and see what it really changed, with a confidence interval.',
+        stats: [['95%', 'confidence interval on every result'], ['20', 'built-in benches']],
+        listTitle: 'What it does',
+        points: ["Rig a Repo: maps your code's architecture, suggests what would help, writes test scenarios and measures them.", 'Rig a Workflow: build or pick one (15 business processes, 25 agentic patterns, or your own on a canvas) and measure it.', 'A Rig score weighs lift, cost, whether the agent followed the change, whether it holds up on held-out tasks, and reliability.', 'Every trial runs in its own Docker sandbox; keys stay in memory and are never written to disk.'],
+        stack: ['Python', 'TypeScript', 'React', 'Docker', 'uv'],
+      },
+      tu: {
+        h: 200, color: '#d9a541', ink: '#2a2420', hole: '#9c7426', lang: 'JS', name: 'TeamUp', rel: false, repo: 'GokulMV/teamUp',
+        role: 'Browser party games for up to 30 players', dates: 'Node.js · Three.js',
+        summary: 'Party games for one room, solo or in teams of 2–5. No installs for players: share a 4-letter room code and everyone joins from a phone or laptop.',
+        stats: [['30', 'players a room'], ['5', 'game modes']],
+        listTitle: 'What it does',
+        points: ['Pictionary, Telephone, a 3D Kart Battle, Ball & Chain, and Control Room.', 'Server-authoritative: the server owns the game state, and the Pictionary word only reaches the drawer and those who have guessed it.', 'Karts and rope physics simulate at 30 Hz on the server and stream at 15 Hz; other karts are interpolated and your own is predicted.', 'Drop out or refresh and you are put back in your seat with the current game state.'],
+        stack: ['Node.js', 'JavaScript', 'Three.js'],
+      },
+      pf: {
+        h: 178, color: '#8fa58a', ink: '#2a2420', hole: '#5f7559', lang: 'PY', name: 'PromptForge', rel: true, repo: 'levitasOrg/promptforge',
+        role: 'Vague prompts in, structured and token-efficient prompts out, from the terminal', dates: 'Python CLI · pipx install promptforge-cli',
+        summary: 'Vague prompts cost twice: bad output you retry, and bloated context you keep adding. PromptForge asks the right questions up front, then writes a prompt precise and lean enough for an agent to get right first time.',
+        stats: [['1', 'API call per prompt'], ['pipx', 'install promptforge-cli']],
+        listTitle: 'What it does',
+        points: ['Analyses a vague prompt and asks you targeted clarifying questions.', 'Synthesises the final prompt: clear, structured, and fewer tokens.', 'An interactive REPL, repo intelligence, and analytics on the tokens it saves.', 'Works with OpenAI, Anthropic and other providers, set up once with a wizard.'],
+        stack: ['Python', 'CLI'],
+      },
+      ov: {
+        h: 190, color: '#5b6f8a', ink: '#efe6d6', hole: '#36455a', lang: 'KT', name: 'OneVault', rel: false, repo: 'levitasOrg/oneVault',
+        role: 'Local-first Android password manager', dates: 'Kotlin · Android',
+        summary: 'Your vault is stored only on your device, encrypted at rest, and never leaves the phone unless you export or back it up. There is no account and no server.',
+        stats: [['210k', 'PBKDF2 iterations'], ['ML-KEM-768', 'post-quantum layer']],
+        listTitle: 'What it does',
+        points: ['An SQLCipher database whose passphrase lives in the Android Keystore, plus per-item AES-256-GCM keyed from your master password.', 'A post-quantum KEM layer (ML-KEM-768 via BouncyCastle) on v3 payloads.', 'Android autofill ranked by the requesting domain, and an optional floating quick-access bubble.', 'Screenshot-protected, auto-locking and root-aware; no analytics, no telemetry.', 'A written threat model: what it protects against, and what it deliberately does not.'],
+        stack: ['Kotlin', 'Android', 'SQLCipher', 'BouncyCastle'],
+      },
+      kr: {
+        h: 172, color: '#9bb5a0', ink: '#2a2420', hole: '#6f8a75', lang: 'SKILL', name: 'kryptonite', rel: false, repo: 'levitasOrg/kryptonite',
+        role: 'A Claude Code skill that breaks a working app on purpose, then hardens it', dates: 'Claude Code skill · Python · MIT',
+        summary: 'Most skills help you build. kryptonite is the other half: point it at an app that already works and it attacks it, then fixes what it finds without regressing a single feature.',
+        stats: [['8', 'phases'], ['3', 'fix-and-re-attack rounds at most']],
+        listTitle: 'What it does',
+        points: ['Records what the app does right today as a regression baseline before attacking anything.', 'Parallel attacker subagents, one per module; every finding is reproduced adversarially and ranked P0–P3.', 'Each fix is a minimal diff with two tests: the hole is closed and the feature still works.', 'Nothing changes until you approve each fix; it ends with a GO / NO-GO readiness report.'],
+        stack: ['Claude Code skill', 'Python'],
+      },
+      nf: {
+        h: 186, color: '#c98f86', ink: '#2a2420', hole: '#8e5a52', lang: 'SKILL', name: 'Nexus Forge', rel: false, repo: 'GokulMV/nexus-forge',
+        role: 'Adversarial, multi-timeline security testing for systems you own', dates: 'Claude Code skill · Python · MIT · strictly defensive',
+        summary: 'One request branches into a timeline per attacker × vector × response; the ones where an attack succeeds are nexus events. You get a map of where your code holds, where it breaks, and a fix for every weak spot.',
+        listTitle: 'What it does',
+        points: ['Generates attack scenarios from your own code, ranks them, and runs as many as your budget allows.', 'Models adaptive AI attackers that read error messages and route around controls.', 'Estimates roughly how long each break would take a real attacker.', 'Proposes an antibody (a fix) for each weak spot and re-challenges it with mutations to prove it holds.'],
+        stack: ['Claude Code skill', 'Python'],
+      },
+      mc: {
+        h: 194, color: '#e9dcc4', ink: '#2a2420', hole: '#b8a98e', lang: 'JS', name: 'Moonlit Cove', rel: false, repo: 'GokulMV/moonlit-cove',
+        role: 'An earlier portfolio: a beach camp under your real night sky', dates: 'three.js · hand-written shaders · Node',
+        summary: 'A beach camp to explore under a live night sky, drawn in the browser with three.js and hand-written shaders. The résumé was part of the camp.',
+        listTitle: 'What it does',
+        points: ['Your own stars and the Milky Way, where they really are for you, with shooting stars from the showers that are on.', 'Make a wish on a shooting star or let a sky lantern go; it is pinned to a shared board for everyone to read.', 'Fruit trees that flower, ripen and drop, round after round; a sketchboard and a radio by the fire.', 'A small Node server serves the page and keeps the wish board and drawings.'],
+        stack: ['three.js', 'GLSL', 'Node.js'],
+      },
+    };
+    ['dth', 'rig', 'tu', 'pf', 'ov', 'kr', 'nf', 'mc'].forEach((id, i) => { PROJ[id].x = 472 + i * 34; PROJ[id].y = 824 - PROJ[id].h; });
+    Object.keys(PROJ).forEach((id) => {
+      const p = PROJ[id];
+      FILES[id] = { ...p, dot: p.rel ? '#5fbf5a' : '#e9a93a', kind: p.rel ? 'GitHub · released' : 'GitHub · nearly done', link: GH(p.repo), linkText: `github.com/${p.repo} ↗` };
+    });
+    const file = (id) => {
+      const f = FILES[id];
+      const up = s.hover === id || s.open === id;
+      return {
+        ...f, lift: up ? (f.flat ? -9 : -28) : 0, tilt: up ? (f.flat ? -1.5 : -2) : 0, sc: f.flat && up ? 1.04 : 1, lw: Math.max(18, (f.w || 32) - 16),
+        // The button is a still hit area covering the file and the space it lifts into; only the file inside moves.
+        hy: f.y - (f.flat ? 12 : 34), hh: (f.flat ? 26 : f.h) + (f.flat ? 12 : 34), ht: f.flat ? 12 : 34, z: up ? 5 : 1,
+        aria: `${f.name}, ${f.yA ? `${f.yA}–${f.yB}` : f.lang}: open`,
+        hover: () => this.setState({ hover: id }),
+        leave: () => this.setState({ hover: null }),
+        open: () => this.setState({ open: id, docClosing: false }),
+      };
+    };
+
+    // ---------- plants: health falls in real time when nobody waters them; the season shows on their leaves ----------
+    const PRE = { thriving: 2, thirsty: 36, wilting: 56, dead: 80 };
+    const preset = this.props.plants ?? 'live';
+    const presetData = (now) => { const w = now - PRE[preset] * 3600000; return { pothos: { w, g: 7 }, echeveria: { w, g: 6 }, cactus: { w, g: 6 }, haworthia: { w, g: 6 }, aloe: { w, g: 6 } }; };
+    const forcedMode = PRE[preset] !== undefined;
+    const P = forcedMode ? (s.forced && s.forced.preset === preset ? s.forced.data : presetData(s.now)) : s.plants;
+    const healthOf = (p, now) => { const hrs = (now - p.w) / 3600000; return hrs < 12 ? 1 : Math.max(0, Math.min(1, 1 - (hrs - 12) / 60)); };
+    const stageOf = (h) => (h >= 0.75 ? 'thriving' : h >= 0.4 ? 'thirsty' : h >= 0.08 ? 'wilting' : 'dead');
+    const ago = (p) => { const m = Math.max(0, Math.round((s.now - p.w) / 60000)); return m < 2 ? 'just now' : m < 60 ? `${m} min ago` : m < 2880 ? `${Math.round(m / 60)} h ago` : `${Math.round(m / 1440)} days ago`; };
+    const tone = (h, live, dry, dead) => (h < 0.08 ? dead : mix(live, dry, Math.pow(1 - h, 1.3)));
+    const seasonTint = (c, i) => (season === 'autumn' ? (i % 3 === 2 ? mix(c, '#d9952f', 0.78) : i % 5 === 4 ? mix(c, '#b5652e', 0.62) : c) : season === 'winter' ? mix(c, '#8f9c84', 0.22) : season === 'spring' && i % 4 === 1 ? mix(c, '#b9dc8a', 0.45) : c);
+    const NAMES = { pothos: 'Pothos', echeveria: 'Echeveria', cactus: 'Golden barrel cactus', haworthia: 'Zebra haworthia', aloe: 'Aloe' };
+    const TAGPOS = { pothos: [40, 300], echeveria: [600, 360], cactus: [676, 676], haworthia: [726, 660], aloe: [760, 690] };
+
+    const water = (id) => {
+      if (this.state.can !== 'home' || this.state.canMode !== 'home') return;
+      this.setState({ can: 'fly', canFor: id, plantHover: null });
+      this.later('can1', 640, () => {
+        if (this.recentlyWatered(id)) { this.setState({ can: 'pour' }); this.later('overflow', 500, () => this.scold(id)); return; }
+        this.setState({ can: 'pour' });
+        this.applyWater(id);
+      });
+      this.later('can2', 1950, () => this.setState({ can: 'back' }));
+      this.later('can3', 2700, () => this.setState({ can: 'home', canFor: null }));
+    };
+    const plantMeta = (id) => {
+      const h = healthOf(P[id], s.now);
+      const st = stageOf(h);
+      return {
+        h, g: P[id].g, dead: h < 0.08, stage: st,
+        perk: (s.can === 'pour' && s.canFor === id && !s.scold) || s.perkId === id ? 'perk' : '',
+        tip: s.spill === id && id !== 'pothos' ? 'wobble' : '', tipSvg: s.spill === id && id === 'pothos' ? 'tipHang' : '',
+        aria: `${NAMES[id]}: ${st}, watered ${ago(P[id])}. ${st === 'dead' ? 'Water to replant' : 'Water it'}`,
+        water: () => water(id),
+        hover: () => this.setState({ plantHover: id }),
+      };
+    };
+
+    const pm = plantMeta('pothos');
+    const pH = pm.h, pDead = pm.dead;
+    const leafL = tone(pH, '#7aa95a', '#cdb35e', '#a07c52'), leafL2 = tone(pH, '#93bd6c', '#d6c070', '#a88458'), leafD = tone(pH, '#4f7f3c', '#a88a3e', '#7c5a3a');
+    const stemC = tone(pH, '#56803d', '#a38b48', '#7b5d3e'), vein = pDead ? '#c9b08a' : '#e4edc9';
+    const dAmt = (1 - pH) * 34 + (pDead ? 30 : 0);
+    const shrink = 0.82 + 0.18 * pH;
+    const droop = (r) => (r > 0 ? r - dAmt : r + dAmt);
+    const crownB = [[64, 58, 178, 1.15], [50, 62, 150, 1.1], [78, 62, -150, 1.1], [40, 70, 128, 1], [90, 70, -128, 1], [56, 50, 165, 0.95], [74, 50, -165, 0.95], [30, 74, 100, 0.95], [100, 74, -100, 0.95], [64, 44, 180, 0.9]];
+    const crownF = [[26, 76, 62, 0.9], [102, 76, -62, 0.9], [50, 80, 24, 0.8], [80, 80, -24, 0.8]];
+    const nB = pDead ? 3 : Math.round(10 * (0.45 + 0.55 * pH));
+    const nF = pDead ? 1 : Math.round(4 * (0.3 + 0.7 * pH));
+    const crownLeaf = (q, i) => ({ x: q[0], y: q[1], r: droop(q[2]).toFixed(1), s: (q[3] * shrink).toFixed(2), l: seasonTint(i % 3 === 1 ? leafL2 : leafL, i), d: seasonTint(leafD, i), vein, stemC, stem: `M64 78 Q${((64 + q[0]) / 2).toFixed(1)} ${(Math.min(q[1], 78) - 6).toFixed(1)} ${q[0]} ${q[1]}` });
+    const pothos = { ...pm, back: crownB.slice(0, nB).map(crownLeaf), front: crownF.slice(0, nF).map((q, i) => crownLeaf(q, i + 10)) };
+
+    const bez = (q, u) => { const m = 1 - u; return [0, 1].map((i) => m * m * m * q[0][i] + 3 * m * m * u * q[1][i] + 3 * m * u * u * q[2][i] + u * u * u * q[3][i]); };
+    const lerp = (a, b, u) => [a[0] + (b[0] - a[0]) * u, a[1] + (b[1] - a[1]) * u];
+    const split = (q, u) => { const p01 = lerp(q[0], q[1], u), p12 = lerp(q[1], q[2], u), p23 = lerp(q[2], q[3], u), p012 = lerp(p01, p12, u), p123 = lerp(p12, p23, u); return [q[0], p01, p012, lerp(p012, p123, u)]; };
+    const f1 = (p) => `${p[0].toFixed(1)} ${p[1].toFixed(1)}`;
+    const vineDefs = [
+      [[128, 238], [96, 300], [110, 420], [118, 560]],
+      [[214, 240], [240, 320], [224, 460], [232, 640]],
+      [[150, 244], [138, 330], [160, 430], [150, 500]],
+    ];
+    const uMax = pDead ? 0.5 : Math.min(1, 0.3 + 0.07 * pm.g);
+    const vleaf = (vd, vi, kk, u, sMul) => {
+      const p = bez(vd, u), a = bez(vd, Math.max(0, u - 0.01)), b = bez(vd, Math.min(1, u + 0.01));
+      let tx = b[0] - a[0], ty = b[1] - a[1];
+      const tl = Math.hypot(tx, ty) || 1;
+      tx /= tl; ty /= tl;
+      const side = kk % 2 === 0 ? 1 : -1;
+      const nx = -ty * side, ny = tx * side;
+      const bx = p[0] + nx * 9, by = p[1] + ny * 9;
+      let dx = tx * 0.5 + nx * 0.85, dy = ty * 0.5 + ny * 0.85 + 0.35 + (1 - pH) * 0.8;
+      const dln = Math.hypot(dx, dy) || 1;
+      dx /= dln; dy /= dln;
+      const sc = (1 + 0.32 * (1 - Math.abs(u - 0.45)) - (vi === 2 ? 0.1 : 0)) * shrink * sMul;
+      const ix = kk + vi * 4;
+      return { px: p[0].toFixed(1), py: p[1].toFixed(1), x: bx.toFixed(1), y: by.toFixed(1), r: ((Math.atan2(-dx, dy) * 180) / Math.PI).toFixed(1), s: sc.toFixed(2), l: seasonTint((kk + vi) % 3 === 0 ? leafL2 : leafL, ix), d: seasonTint(leafD, ix), vein, stemC };
+    };
+    const vineLeaves = [];
+    vineDefs.forEach((vd, vi) => {
+      for (let kk = 0; kk < 9; kk += 1) {
+        const u = 0.1 + kk * 0.1;
+        if (u > uMax - 0.03) break;
+        const skip = pDead ? !(kk === 1 || kk === 4) : (pH < 0.75 && (kk + vi) % 4 === 3) || (pH < 0.4 && (kk + vi) % 2 === 1);
+        if (!skip) vineLeaves.push(vleaf(vd, vi, kk, u, 1));
+      }
+      if (!pDead) vineLeaves.push(vleaf(vd, vi, 9, uMax, 0.55));
+    });
+    const vines = { stem: stemC, leaves: vineLeaves, paths: vineDefs.map((vd) => { const q = split(vd, uMax); return { d: `M${f1(q[0])} C${f1(q[1])} ${f1(q[2])} ${f1(q[3])}` }; }) };
+
+    const em = plantMeta('echeveria');
+    const eH = em.h, eDead = em.dead;
+    const eL = tone(eH, '#9cc0ab', '#cdb67e', '#94744f'), eD = tone(eH, '#6f9a86', '#a68e56', '#76583b');
+    const eTip = season === 'autumn' && !eDead ? '#c2453a' : tone(eH, '#d98f86', '#c98a5a', '#6e5034');
+    const GS = 0.85 + em.g * 0.045, spread = 1 + 0.4 * (1 - eH) + (eDead ? 0.25 : 0), sxk = 0.55 + 0.45 * eH;
+    const rings = [
+      { a: [-36, -12, 12, 36], s: 0.9, y: 100, min: 1, front: false },
+      { a: [-62, -30, 0, 30, 62], s: 1.05, y: 102, min: 2, front: false },
+      { a: [-18, 18], s: 0.78, y: 106, min: 3, front: true },
+      { a: [-86, -52, 52, 86], s: 1, y: 104, min: 4, front: true },
+    ];
+    const eBack = [], eFront = [];
+    rings.forEach((rd) => {
+      if (em.g < rd.min || (eDead && rd.front)) return;
+      rd.a.forEach((a) => {
+        const outer = Math.abs(a) > 80 && season === 'autumn';
+        (rd.front ? eFront : eBack).push({ x: (65 + a * 0.12).toFixed(1), y: rd.y, r: (a * spread).toFixed(1), sx: (rd.s * GS * sxk).toFixed(2), sy: (rd.s * GS * (eDead ? 0.7 : 0.9 + 0.1 * eH)).toFixed(2), l: outer ? mix(eL, '#b5652e', 0.45) : eL, d: outer ? mix(eD, '#8a4a26', 0.45) : eD, tip: eTip });
+      });
+    });
+    const ech = { ...em, back: eBack, front: eFront, flower: eH >= 0.75 && em.g >= 5 && season !== 'winter' };
+
+    // The three succulents, each its own plant: size follows its growth; colour, slump and shrivel follow its health.
+    const succ = (id) => { const m = plantMeta(id); return { ...m, G: 0.85 + m.g * 0.04, spread: 1 + 0.45 * (1 - m.h) + (m.dead ? 0.3 : 0), squash: 0.7 + 0.3 * m.h, cls: `${m.perk} ${m.tip}` }; };
+    const cm = succ('cactus'), hm = succ('haworthia'), am = succ('aloe');
+    const cry = 17 * cm.G * (0.72 + 0.28 * cm.h), crx = 19 * cm.G * (cm.dead ? 0.85 : 1), ccy = 88 - cry * 0.85;
+    const tri = {
+      c: {
+        ...cm, cy: ccy.toFixed(1), rx: crx.toFixed(1), ry: cry.toFixed(1), rx2: (crx * 0.55).toFixed(1), rx3: (crx * 0.14).toFixed(1),
+        cl: tone(cm.h, '#6e9b52', '#b9a35c', '#8a6a48'), cd: tone(cm.h, '#4f7c3c', '#8f7c40', '#6a4e34'),
+        spines: [-160, -135, -110, -90, -70, -45, -20].map((deg) => ({ x: (27 + crx * 0.9 * Math.cos((deg * Math.PI) / 180)).toFixed(1), y: (ccy + cry * 0.9 * Math.sin((deg * Math.PI) / 180)).toFixed(1) })),
+        flower: cm.h >= 0.75 && cm.g >= 4 && (season === 'spring' || season === 'summer'), fy: (ccy - cry + 1).toFixed(1),
+      },
+      h: { ...hm, leaves: [-42, -26, -10, 0, 10, 26, 42].map((a) => ({ r: (a * hm.spread).toFixed(1), s: (hm.G * (a === 0 ? 1.08 : 1 - Math.abs(a) / 200)).toFixed(2), sx: (hm.G * hm.squash).toFixed(2), l: tone(hm.h, '#4f8a5c', '#a8964e', '#7d5f40'), stripe: hm.dead ? '#b39a78' : '#eef3e6' })) },
+      a: { ...am, leaves: [-56, -32, -12, 10, 30, 54].map((a) => ({ r: (a * am.spread).toFixed(1), s: (am.G * 0.95).toFixed(2), sx: (am.G * am.squash).toFixed(2), l: tone(am.h, '#7fa76a', '#c0ad66', '#8d6d4a'), d: tone(am.h, '#5e8a4c', '#9c8846', '#6e5034') })) },
+    };
+
+    const heart = 'M0 0 C-6 -4 -15 0 -14 9 C-13 18 -5 26 0 32 C5 26 13 18 14 9 C15 0 6 -4 0 0 Z';
+    const fleshy = 'M0 0 C-9 -5 -10 -22 0 -34 C10 -22 9 -5 0 0 Z';
+    const fallen = [];
+    if (pH < 0.4) fallen.push({ x: 258, y: 541, s: 0.55, sy: 0.3, r: -92, d: heart, c: '#b08a55' }, { x: 278, y: 543, s: 0.5, sy: 0.28, r: 86, d: heart, c: '#a07c52' });
+    if (eH < 0.4) fallen.push({ x: 606, y: 543, s: 0.6, sy: 0.32, r: 94, d: fleshy, c: eL });
+    if (season === 'autumn') fallen.push({ x: 462, y: 543, s: 0.5, sy: 0.28, r: -80, d: heart, c: '#d9952f' }, { x: 300, y: 828, s: 0.55, sy: 0.32, r: 70, d: heart, c: '#c0532a' }, { x: 420, y: 829, s: 0.5, sy: 0.3, r: -110, d: heart, c: '#e3a33b' });
+
+    // ---------- watering can: home on the east window's sill ----------
+    const CAN = { home: [1115, 643], pothos: [173, 111], echeveria: [677, 343], cactus: [776, 666], haworthia: [825, 651], aloe: [871, 674] };
+    const atPlant = s.can === 'fly' || s.can === 'pour';
+    const held = s.canMode === 'held';
+    const cp = held ? [s.canX, s.canY] : atPlant ? CAN[s.canFor] : CAN.home;
+    const thirstiest = ['pothos', 'echeveria', 'cactus', 'haworthia', 'aloe'].map((id) => [id, healthOf(P[id], s.now)]).sort((a, b) => a[1] - b[1])[0][0];
+    const overPlant = held ? this.plantUnder(s.canX + 3, s.canY + 54) : null;
+    const can = {
+      x: Math.round(cp[0]), y: Math.round(cp[1]), r: held ? (s.pouring ? -38 : -10) : s.can === 'pour' ? -38 : atPlant ? -8 : 0,
+      pouring: (s.can === 'pour' && !s.scold) || (held && s.pouring), dropX: Math.round(cp[0] - 6), dropY: Math.round(cp[1] + 56),
+      held, pe: held ? 'none' : 'auto', tr: held ? 'transform 70ms linear' : 'transform 620ms cubic-bezier(.3,.7,.3,1)',
+      hint: s.pouring && overPlant ? `pouring on the ${NAMES[overPlant].toLowerCase()}…` : 'hold to pour over a plant · click the windowsill or press Esc to put it back', aria: held ? 'Watering can (held)' : 'Pick up the watering can' };
+
+    const tagId = s.can === 'home' && s.canMode === 'home' && !s.dusting && !s.scold ? s.plantHover : null;
+    const tag = tagId ? (() => { const meta = plantMeta(tagId); return { show: true, x: TAGPOS[tagId][0], y: TAGPOS[tagId][1], title: `${NAMES[tagId]} · ${meta.stage}`, sub: meta.dead ? `Watered ${ago(P[tagId])}. Water to replant.` : `Watered ${ago(P[tagId])} · click to water` }; })() : { show: false, x: 0, y: 0, title: '', sub: '' };
+
+    // ---------- cobwebs and dust ----------
+    const webPath = (cx, cy, a0, a1, R) => {
+      const n = 6;
+      const pts = [];
+      let d = '';
+      for (let i = 0; i <= n; i += 1) {
+        const a = ((a0 + ((a1 - a0) * i) / n) * Math.PI) / 180;
+        pts.push([Math.cos(a), Math.sin(a)]);
+        d += `M${cx} ${cy} L${(cx + Math.cos(a) * R).toFixed(1)} ${(cy + Math.sin(a) * R).toFixed(1)} `;
+      }
+      [0.28, 0.5, 0.72, 0.94].forEach((f) => {
+        const r = R * f;
+        for (let i = 0; i < n; i += 1) {
+          const p = pts[i], q = pts[i + 1];
+          const x1 = cx + p[0] * r, y1 = cy + p[1] * r, x2 = cx + q[0] * r, y2 = cy + q[1] * r;
+          const qx = cx + ((x1 + x2) / 2 - cx) * 0.82, qy = cy + ((y1 + y2) / 2 - cy) * 0.82;
+          d += `M${x1.toFixed(1)} ${y1.toFixed(1)} Q${qx.toFixed(1)} ${qy.toFixed(1)} ${x2.toFixed(1)} ${y2.toFixed(1)} `;
+        }
+      });
+      return d;
+    };
+    const WEBS = {
+      w1: [253, 307, 0, 95, 70], w2: [897, 307, 85, 180, 60], w3: [1103, 112, 0, 90, 70],
+      w4: [47, 112, 90, 180, 60], w5: [993, 530, 0, 90, 36], w6: [897, 588, 90, 180, 55],
+    };
+    const webCentre = (id) => { const [cx, cy, a0, a1, R] = WEBS[id]; const a = (((a0 + a1) / 2) * Math.PI) / 180; return [cx + Math.cos(a) * R * 0.5, cy + Math.sin(a) * R * 0.5]; };
+    const webs = s.webs.map((id) => {
+      const [cx, cy, a0, a1, R] = WEBS[id];
+      const [mxw, myw] = webCentre(id);
+      return { d: webPath(cx, cy, a0, a1, R), bx: Math.round(mxw - 32), by: Math.round(myw - 32), clear: () => this.clearWeb(id, Math.round(mxw), Math.round(myw)) };
+    });
+    let specks = '';
+    for (let i = 0; i < 70; i += 1) { const onBottom = i < 46; const x = 254 + rng(i * 41 + 7) * 640, y = onBottom ? 811 + rng(i * 43 + 1) * 17 : 539 + rng(i * 47 + 3) * 5, r = 0.6 + rng(i * 53 + 2) * 1.1; specks += `M${(x - r).toFixed(1)} ${y.toFixed(1)} a${r.toFixed(1)} ${r.toFixed(1)} 0 1 0 ${(2 * r).toFixed(1)} 0 a${r.toFixed(1)} ${r.toFixed(1)} 0 1 0 ${(-2 * r).toFixed(1)} 0 `; }
+    const dustNow = s.websStart ? s.dust * (0.25 + (0.75 * s.webs.length) / s.websStart) : s.dust;
+    const away = s.absentDays < 14 ? `${Math.max(3, Math.round(s.absentDays))} days` : s.absentDays < 60 ? `${Math.round(s.absentDays / 7)} weeks` : `${Math.round(s.absentDays / 30)} months`;
+    const burst = Array.from({ length: 24 }, (_, i) => { const a = (i / 24) * Math.PI * 2 - Math.PI / 2; const out = i % 2 === 0; const j = 1 + (rng(i * 3 + 11) - 0.5) * 0.12; return `${(220 + Math.cos(a) * (out ? 214 : 176) * j).toFixed(1)},${(160 + Math.sin(a) * (out ? 156 : 124) * j).toFixed(1)}`; }).join(' ');
+
+    // ---------- Rubik's cube: one sticker model drives the picture on the shelf and the 3D cube ----------
+    const stickers = this.stickersFor(s.moves);
+    const CS = 62;
+    const tmv = s.turn ? this.MOVES[s.turn] || s.turn.split(',').map(Number) : null;
+    const ANG = [90, -90, 90];
+    const byPos = {};
+    stickers.forEach((q) => { const key = q.p.join(','); (byPos[key] = byPos[key] || []).push(q); });
+    const NORMALS = [[0, 0, 1], [0, 0, -1], [1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0]];
+    // Front, back, right, left, top, bottom: lit from the upper left, so the top is brightest and the right side darkest.
+    const LIT = [0.94, 0.62, 0.74, 1.0, 1.1, 0.55];
+    const shadeFace = (c, fi) => (LIT[fi] >= 1 ? mix(c, '#ffffff', (LIT[fi] - 1) * 1.6) : mix(c, '#000000', 1 - LIT[fi]));
+    const FT = ['translateZ(31px)', 'rotateY(180deg) translateZ(31px)', 'rotateY(90deg) translateZ(31px)', 'rotateY(-90deg) translateZ(31px)', 'rotateX(90deg) translateZ(31px)', 'rotateX(-90deg) translateZ(31px)'];
+    const cube3d = [];
+    for (let x = -1; x <= 1; x += 1) for (let y = -1; y <= 1; y += 1) for (let z = -1; z <= 1; z += 1) {
+      if (!x && !y && !z) continue;
+      const here = byPos[`${x},${y},${z}`] || [];
+      const faces = NORMALS.map((n, fi) => { const st = here.find((q) => q.n[0] === n[0] && q.n[1] === n[1] && q.n[2] === n[2]); const pos = [x, y, z]; return { t: FT[fi], c: shadeFace(st ? st.c : '#1c1a18', fi), edge: shadeFace('#161412', fi), cursor: st ? 'pointer' : 'grab', down: st ? (e) => this.stickerDown(e, pos, n) : undefined }; });
+      const inLayer = tmv && [x, y, z][tmv[0]] === tmv[1];
+      const ang = inLayer ? ANG[tmv[0]] * (tmv[2] === 1 ? 1 : -1) : 0;
+      cube3d.push({ x: x * CS, y: -y * CS, z: z * CS, ax: tmv && tmv[0] === 0 ? ang : 0, ay: tmv && tmv[0] === 1 ? ang : 0, az: tmv && tmv[0] === 2 ? ang : 0, faces });
+    }
+    const clockOf = (ms) => { const sec = Math.max(0, Math.floor(ms / 1000)); return `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`; };
+    const elapsed = s.playing ? Date.now() - s.startAt : s.partyMs;
+    const userMove = (m) => { if (this.state.scrambling) return; this.startTurn(m); };
+    const solvedNow = this.isSolved(s.moves);
+    const cubeUI = {
+      open: s.cubeOpen, rx: s.rx.toFixed(1), ry: s.ry.toFixed(1), ms: s.scrambling ? 90 : 200, anim: s.snap ? '' : 'cturn',
+      moveCount: s.moveCount, time: clockOf(elapsed),
+      status: s.scrambling ? 'shuffling…' : s.playing ? 'get every face back to one colour' : solvedNow ? 'shuffle it, then solve it against the clock' : 'free play: shuffle to start the clock',
+    };
+    const PC = ['#c9473b', '#d9a541', '#3f9a5a', '#2f6fb8', '#e58a2e', '#f2b6c4', '#9bd0e8'];
+    const party = {
+      on: s.party, line: `Solved in ${s.partyMoves} moves, ${clockOf(s.partyMs)}.`,
+      confetti: Array.from({ length: 70 }, (_, i) => ({ x: Math.round(rng(i * 5 + 1) * 1400), w: 6 + Math.round(rng(i * 7 + 2) * 6), h: 10 + Math.round(rng(i * 11 + 3) * 8), c: PC[i % PC.length], d: (rng(i * 13 + 4) * 3).toFixed(2), t: (2.6 + rng(i * 17 + 5) * 1.8).toFixed(2), s: Math.round((rng(i * 19 + 6) - 0.5) * 220) })),
+      sparks: [[200, 170], [1200, 150], [330, 640], [1080, 660], [700, 110], [140, 430], [1260, 450]].flatMap(([bx, by], bi) => Array.from({ length: 14 }, (_, j) => { const an = (j / 14) * Math.PI * 2; const R = 70 + rng(bi * 31 + j) * 50; return { x: bx, y: by, dx: Math.round(Math.cos(an) * R), dy: Math.round(Math.sin(an) * R), c: PC[(bi + j) % PC.length], d: (bi * 0.35).toFixed(2) }; })),
+    };
+
+    // ---------- the visitors' notes ----------
+    const NOTE_C = ['#ffe27a', '#f7b8c8', '#bfe3c0', '#b9d9f2'];
+    const SEEDS = [{ id: 'seed1', text: 'Hi! Leave me a note: who are you, and what brought you here?', name: 'Gokul', c: 0, seed: true }, { id: 'seed2', text: 'Everything on this shelf does something. Try the match.', name: 'Gokul', c: 2, seed: true }];
+    const shown = [...s.notes, ...SEEDS].slice(0, 15);
+    let cork = '';
+    for (let i = 0; i < 60; i += 1) { const x = 12 + rng(i * 59 + 3) * 128, y = 12 + rng(i * 61 + 5) * 188, r = 0.7 + rng(i * 67 + 1); cork += `M${(x - r).toFixed(1)} ${y.toFixed(1)} a${r.toFixed(1)} ${r.toFixed(1)} 0 1 0 ${(2 * r).toFixed(1)} 0 a${r.toFixed(1)} ${r.toFixed(1)} 0 1 0 ${(-2 * r).toFixed(1)} 0 `; }
+    const board = {
+      open: s.notesOpen, cork, draft: s.draft, draftName: s.draftName, draftColor: NOTE_C[s.draftColor],
+      count: s.notes.length ? `${s.notes.length} note${s.notes.length === 1 ? '' : 's'} pinned from this browser` : 'Be the first to pin one.',
+      aria: `Notes board: ${shown.length} notes. Open it to read them and pin your own`,
+      notes: shown.slice(0, 14).map((n, i) => { const slot = i >= 13 ? i + 1 : i; return { slot, n }; }).map(({ slot, n }, i) => ({ text: n.text, name: n.name || 'a visitor', c: NOTE_C[n.c] || NOTE_C[0], mine: !n.seed, x: Math.round(22 + (slot % 5) * 150 + rng(i * 7 + 1) * 10), y: Math.round(82 + Math.floor(slot / 5) * 160 + rng(i * 9 + 2) * 12), r: ((rng(i * 11 + 3) - 0.5) * 8).toFixed(1), remove: () => { const notes = this.state.notes.filter((m) => m.id !== n.id); this.saveNotes(notes); this.setState({ notes }); } })),
+      mini: shown.slice(0, 6).map((n, i) => ({ c: NOTE_C[n.c] || NOTE_C[0], x: 36 + (i % 3) * 40, y: Math.round(52 + Math.floor(i / 3) * 64 + rng(i * 5 + 7) * 10), r: ((rng(i * 3 + 9) - 0.5) * 14).toFixed(1) })),
+      colors: NOTE_C.map((c, i) => ({ c, aria: `Note colour: ${['yellow', 'pink', 'green', 'blue'][i]}`, pressed: i === s.draftColor ? 'true' : 'false', lift: i === s.draftColor ? 'translateX(-6px) rotate(-4deg)' : 'none', shadow: i === s.draftColor ? '0 6px 10px rgba(0,0,0,0.3), 2px 2px 0 rgba(0,0,0,0.12)' : '0 2px 3px rgba(0,0,0,0.25), 2px 2px 0 rgba(0,0,0,0.12)', pick: () => this.setState({ draftColor: i }) })),
+    };
+
+    const burn = s.fire === 'held' ? Math.min(1, (Date.now() - s.burnStart) / 14000) : 0;
+    const LINES = ['Beep. 200 OK.', 'p90 under 200 ms!', 'Hello, world.', 'Zero downtime, boss.'];
+    const d = s.open ? FILES[s.open] : null;
+
+    return {
+      v, panes, windows,
+      boards: [{ ty: 256, ts: 0, yf: 256, yu: 296, us: 11 }, { ty: 542, ts: 3, yf: 545, yu: 585, us: 3 }, { ty: 810, ts: 20, yf: 830, yu: 870, us: 0 }],
+      work: ['tw', 'ot', 'cg', 'ai'].map(file),
+      edu: ['ed', 'ag', 'sk', 'cv'].map(file),
+      gitFlat: ['ch', 'oo', 'lv'].map(file),
+      gitUp: ['dth', 'rig', 'tu', 'pf', 'ov', 'kr', 'nf', 'mc'].map(file),
+      pothos, vines, ech, tri, fallen, can, tag,
+      plantLeave: () => this.setState({ plantHover: null }),
+      canClick: () => { if (this.state.canMode === 'home' && this.state.can === 'home') this.pickUpCan(); },
+      pourStart: (e) => {
+        const p = this.toShelf(e);
+        if (!p) return;
+        // a press on the east sill puts the can back
+        if (p.x > 1075 && p.x < 1275 && p.y > 560 && p.y < 760) { this.returnCan(); return; }
+        this.setState({ pouring: true, canX: p.x - 52, canY: p.y - 42 });
+        this.later('canIdle', 15000, () => this.returnCan());
+      },
+      pourStop: () => this.setState({ pouring: false }),
+      scold: s.scold ? { show: true, line: s.scold.line, x: { pothos: 40, echeveria: 520, cactus: 600, haworthia: 640, aloe: 660 }[s.scold.id], y: { pothos: 300, echeveria: 336, cactus: 640, haworthia: 620, aloe: 650 }[s.scold.id] } : { show: false, line: '', x: 0, y: 0 },
+      spill: s.spill ? { show: true, ...{
+        pothos: { d: 'M152 292 Q151 296 152 300', px: -50, py: -50, prx: 0, drips: [{ x: 150, y: 294, d: 0 }, { x: 166, y: 296, d: 0.3 }, { x: 186, y: 294, d: 0.6 }] },
+        echeveria: { d: 'M665 493 C668 506 662 530 665 544', px: 665, py: 546, prx: 22, drips: [{ x: 657, y: 585, d: 0.5 }, { x: 673, y: 585, d: 0.8 }] },
+        cactus: { d: 'M779 786 C782 796 776 812 779 826', px: 779, py: 828, prx: 18, drips: [{ x: 773, y: 868, d: 0.5 }, { x: 786, y: 868, d: 0.8 }] },
+        haworthia: { d: 'M828 779 C831 792 825 812 828 826', px: 828, py: 828, prx: 16, drips: [{ x: 822, y: 868, d: 0.5 }, { x: 834, y: 868, d: 0.8 }] },
+        aloe: { d: 'M874 796 C877 806 871 816 874 826', px: 874, py: 828, prx: 15, drips: [{ x: 868, y: 868, d: 0.5 }, { x: 880, y: 868, d: 0.8 }] },
+      }[s.spill] } : { show: false, d: '', px: 0, py: 0, prx: 0, drips: [] },
+
+      webs, poofs: s.poofs,
+      spider: { show: s.webs.includes('w2') },
+      dust: { op: dustNow.toFixed(2), specks },
+      duster: { show: s.dusting, x: Math.round(s.dx - 35), y: Math.round(s.dy - 28), left: s.webs.length === 1 ? 'One cobweb left' : `${s.webs.length} cobwebs left` },
+      pop: { hello: s.pop === 'hello', thanks: s.pop === 'thanks', burst, bubble: 'M22 10 C120 2 260 4 352 12 C368 14 374 26 372 46 C374 92 372 140 368 170 C366 186 354 194 338 194 L130 196 L92 234 L100 196 L28 194 C12 192 4 182 4 164 C2 120 2 76 6 36 C8 20 12 12 22 10 Z', body: `You were away ${away} and the spiders moved in. Help me clean up?` },
+      grabDuster: () => this.setState({ pop: 'none', dusting: true }),
+      laterPop: () => this.setState({ pop: 'none' }),
+
+      move: (e) => {
+        const st = this.state;
+        if (this.swipe) {
+          const sw = this.swipe;
+          if (!sw.done && Math.hypot(e.clientX - sw.x, e.clientY - sw.y) > 12) { sw.done = true; this.startTurn(this.swipeTurn(sw, e.clientX - sw.x, e.clientY - sw.y)); }
+          return;
+        }
+        if (st.fire !== 'held' && !st.dusting && !this.carDrag && !this.pullDrag && !this.orbit && st.canMode !== 'held') return;
+        const p = this.toShelf(e);
+        if (!p) return;
+        if (st.canMode === 'held') { this.setState({ canX: p.x - 52, canY: p.y - 42 }); return; }
+        if (this.orbit) {
+          const o = this.orbit;
+          this.setState({ ry: o.ry + ((e.clientX - o.cx) / p.sc) * 0.5, rx: Math.max(-85, Math.min(85, o.rx - ((e.clientY - o.cy) / p.sc) * 0.5)) });
+          return;
+        }
+        if (this.carDrag) {
+          const d = this.carDrag;
+          const now = Date.now();
+          const nx = Math.max(254, Math.min(412, p.x - d.off));
+          d.v = ((p.x - d.lx) / Math.max(8, now - d.lt)) * 16;
+          d.lx = p.x; d.lt = now;
+          if (Math.abs(p.x - d.x0) > 3) d.moved = true;
+          this.setState({ carX: nx, carLight: true });
+          return;
+        }
+        if (this.pullDrag) {
+          const dy = Math.max(0, Math.min(70, p.y - this.pullDrag.y0));
+          this.pullDrag.dy = dy;
+          this.setState({ pull: dy });
+          return;
+        }
+        const x = p.x, y = p.y;
+        if (st.dusting) {
+          this.setState({ dx: x, dy: y });
+          st.webs.forEach((id) => { const [cx, cy] = webCentre(id); if (Math.hypot(x - cx, y - cy) < 50) this.clearWeb(id, Math.round(cx), Math.round(cy)); });
+          return;
+        }
+        // The flame sits about 10px above the match head; the wick tip is at (825, 208).
+        if (st.candle !== 'lit' && Math.hypot(x - 825, y - 10 - 206) < 24) {
+          this.setState({ mx: x, my: y, candle: 'lit', litAt: Date.now() });
+          this.later('spent', 800, () => this.dropMatch());
+        } else this.setState({ mx: x, my: y });
+      },
+      up: () => {
+        if (this.state.pouring) this.setState({ pouring: false });
+        if (this.swipe) this.swipe = null;
+        if (this.orbit) this.orbit = null;
+        if (this.carDrag) { const d = this.carDrag; this.carDrag = null; this.coast(d.moved ? d.v : 9); }
+        if (this.pullDrag) {
+          const dy = this.pullDrag.dy || 0;
+          this.pullDrag = null;
+          if (dy > 30) { this.skipClick = true; this.later('skipClick', 60, () => { this.skipClick = false; }); this.setState({ pull: 0, contactOpen: !this.state.contactOpen }); } else this.setState({ pull: 0 });
+        }
+      },
+      carDown: (e) => { const p = this.toShelf(e); if (!p) return; this.stop('coast'); this.carDrag = { off: p.x - this.state.carX, x0: p.x, moved: false, lx: p.x, lt: Date.now(), v: 0 }; },
+      carKey: (e) => { if (e.key === 'ArrowRight') this.coast(7); else if (e.key === 'ArrowLeft') this.coast(-7); },
+      car: { x: Math.round(s.carX), wheel: (s.carX * 5.3).toFixed(1), light: s.carLight ? '#fff1a8' : '#efe6d6' },
+      tagDown: (e) => { const p = this.toShelf(e); if (p) this.pullDrag = { y0: p.y, dy: 0 }; },
+      tagClick: () => { if (this.skipClick) { this.skipClick = false; return; } this.setState({ contactOpen: !this.state.contactOpen }); },
+      closeContact: () => this.setState({ contactOpen: false }),
+      copyEmail: () => {
+        try { if (navigator.clipboard) navigator.clipboard.writeText('reddy.gokul@gmail.com'); } catch (e) { /* no clipboard: the address is on the card */ }
+        this.setState({ copied: true });
+        this.later('copied', 1600, () => this.setState({ copied: false }));
+      },
+      contact: {
+        open: s.contactOpen, expanded: s.contactOpen ? 'true' : 'false', pull: Math.round(s.pull + (s.contactOpen ? 14 : 0)), threadY: Math.round(60 + s.pull + (s.contactOpen ? 14 : 0)), copyLabel: s.copied ? 'Copied!' : 'Copy email',
+        rows: [
+          { label: 'Email', value: 'reddy.gokul@gmail.com', href: 'mailto:reddy.gokul@gmail.com', canCopy: true, copyAria: s.copied ? 'Copied' : 'Copy email address', icon: s.copied ? 'M3 8 L6.5 11.5 L12.5 4' : 'M5 5 V2.5 H12.5 V10 H10 M2.5 5 H10 V12.5 H2.5 Z', copy: () => { try { if (navigator.clipboard) navigator.clipboard.writeText('reddy.gokul@gmail.com'); } catch (e) { /* no clipboard: the address is on the tag */ } this.setState({ copied: true }); this.later('copied', 1600, () => this.setState({ copied: false })); } },
+          { label: 'Phone', value: '+91 80194 43788', href: 'tel:+918019443788', canCopy: false },
+          { label: 'LinkedIn', value: 'linkedin.com/in/gokulmv', href: 'https://www.linkedin.com/in/gokulmv', canCopy: false },
+          { label: 'GitHub', value: 'github.com/GokulMV', href: 'https://github.com/GokulMV', canCopy: false },
+          { label: 'Based in', value: 'Hyderabad, India · IST', href: 'https://www.google.com/maps/place/Hyderabad', canCopy: false },
+        ],
+      },
+      wind: {
+        on: s.gust, flip: !day || east ? 'translate(1000 0) scale(-1 1)' : '',
+        leaves: s.gust && season === 'autumn' ? [[300, 0], [420, 0.6], [520, 1.2]].map(([y, d], i) => ({ x: !day || east ? 1010 : -20, y, d, cls: !day || east ? 'blowLeafL' : 'blowLeaf', c: ['#d9822b', '#c0532a', '#e3a33b'][i] })) : [],
+      },
+      cube3d, cubeUI, party,
+      openCube: () => this.setState({ cubeOpen: true, cubeHover: false }),
+      cubeHover: () => this.setState({ cubeHover: true }),
+      cubeLeave: () => this.setState({ cubeHover: false }),
+      shelfCube: { top: 426, rx: 0, ry: 0, lift: s.cubeHover ? -8 : 0 },
+      closeCube: () => this.setState({ cubeOpen: false, party: false }),
+      orbitDown: (e) => { this.orbit = { cx: e.clientX, cy: e.clientY, rx: this.state.rx, ry: this.state.ry }; },
+      cubeKey: (e) => {
+        const k = (e.key || '').toLowerCase();
+        if (k.length === 1 && 'udlrfb'.includes(k)) { if (e.preventDefault) e.preventDefault(); userMove(k.toUpperCase() + (e.shiftKey ? "'" : '')); }
+        else if (e.key === 'Escape') this.setState({ cubeOpen: false, party: false });
+      },
+      scramble: () => this.scramble(),
+      resetCube: () => { if (this.turning) return; this.stop('cubeclock'); this.queue = []; this.setState({ moves: [], playing: false, scrambling: false, party: false, moveCount: 0, partyMs: 0 }); },
+      board,
+      notesOpen: () => this.setState({ notesOpen: true }),
+      notesClose: () => this.setState({ notesOpen: false }),
+      onDraft: (e) => this.setState({ draft: String((e && e.target && e.target.value) || '').slice(0, 140) }),
+      onDraftName: (e) => this.setState({ draftName: String((e && e.target && e.target.value) || '').slice(0, 24) }),
+      pinNote: () => {
+        const st = this.state;
+        const text = st.draft.trim();
+        if (!text) return;
+        const notes = [{ id: `n${Date.now()}`, text: text.slice(0, 140), name: st.draftName.trim().slice(0, 24), c: st.draftColor, at: Date.now() }, ...st.notes].slice(0, 60);
+        this.saveNotes(notes);
+        this.setState({ notes, draft: '' });
+      },
+      strike: () => {
+        const st = this.state;
+        if (st.dusting) return;
+        if (st.fire === 'held') { this.dropMatch(); return; }
+        if (st.fire !== 'idle') return;
+        this.setState({ fire: 'striking', mx: 872, my: 212, smoke: null });
+        this.later('strike', 650, () => {
+          this.setState({ fire: 'held', burnStart: Date.now() });
+          this.every('burn', 250, () => {
+            const s2 = this.state;
+            if (s2.fire !== 'held') { this.stop('burn'); return; }
+            if (Date.now() - s2.burnStart > 14000) this.dropMatch();
+            else this.setState({ tick: s2.tick + 1 });
+          });
+        });
+      },
+      candleClick: () => {
+        const st = this.state;
+        // Holding the match, or a moment after it caught: that click is the hand arriving, not a breath.
+        if (st.candle === 'lit' && (st.fire === 'held' || Date.now() - (st.litAt || 0) < 1500)) return;
+        if (st.candle === 'lit') {
+          this.setState({ candle: 'smoke' });
+          this.later('csmoke', 1500, () => this.setState({ candle: 'off' }));
+        } else if (st.fire === 'held') {
+          this.setState({ candle: 'lit', litAt: Date.now(), mx: 825, my: 214 });
+          this.later('spent', 800, () => this.dropMatch());
+        } else {
+          this.setState({ candleHint: true });
+          this.later('hint', 1800, () => this.setState({ candleHint: false }));
+        }
+      },
+      mb: { drawer: s.fire === 'idle' ? 0 : -14, aria: s.fire === 'held' ? 'Shake out the match' : 'Strike a match, then carry it to the candle' },
+      match: { show: s.fire === 'held' || s.fire === 'striking', striking: s.fire === 'striking', x: Math.round(s.mx - 15), y: Math.round(s.my - 20), char: (2 + burn * 34).toFixed(1), fl: (1 - (Math.max(0, burn - 0.7) / 0.3) * 0.55).toFixed(2) },
+      smoke: s.smoke ? { show: true, x: s.smoke.x, y: s.smoke.y } : { show: false, x: 0, y: 0 },
+      candle: {
+        lit: s.candle === 'lit', smoke: s.candle === 'smoke', hint: s.candleHint,
+        aria: s.candle === 'lit' ? 'Candle (lit): click to blow it out' : s.fire === 'held' ? 'Light the candle with the match' : 'Candle (strike a match first)',
+      },
+
+      lamp: { on: lampOn, shade: lampOn ? '#ffe2ae' : '#efe2c9', tug: s.tug ? 'tug' : '', pressed: lampOn ? 'true' : 'false', aria: lampOn ? 'Pull the cord: lamp off' : 'Pull the cord: lamp on' },
+      toggleLamp: () => { this.setState({ lamp: !lampOn, tug: true }); this.later('tug', 440, () => this.setState({ tug: false })); },
+
+
+      robot: {
+        on: s.robotOn, cls: s.robotOn ? 'walking' : '', says: LINES[s.robotSays % LINES.length],
+        eye: s.robotOn ? '#e9a93a' : '#2a2420', bulb: s.robotOn ? '#f4c23c' : '#c9473b',
+        l1: s.robotOn ? '#5fbf5a' : '#6b6b6b', l2: s.robotOn ? '#4a9ad8' : '#6b6b6b',
+        nx: s.robotOn ? 31 : 24, ny: s.robotOn ? 58 : 57.5,
+        aria: s.robotOn ? 'The robot is walking' : 'Wind up the tin robot',
+      },
+      wake: () => {
+        const st = this.state;
+        if (st.robotOn) return;
+        this.setState({ robotOn: true, robotSays: st.robotSays + 1 });
+        this.later('robot', 3000, () => this.setState({ robotOn: false }));
+      },
+      cradleCls: s.cradleOn ? 'swing' : '',
+      swing: () => { if (this.state.cradleOn) return; this.setState({ cradleOn: true }); this.later('cradle', 4600, () => this.setState({ cradleOn: false })); },
+
+      doc: d ? { ...d, show: true, inCls: s.docClosing ? 'folderOut' : 'folderIn', fadeCls: s.docClosing ? 'fadeOut' : 'fadeIn', stackLine: (d.stack || []).join(' · '), summary: d.summary || '', listTitle: d.listTitle || 'What I did', hasLink: !!d.link, link: d.link || '', linkText: d.linkText || '', isCV: !!d.isCV, hasStats: !!(d.stats && d.stats.length), stats: (d.stats || []).map(([n, l]) => ({ n, l })), hasStack: !!(d.stack && d.stack.length), stack: (d.stack || []).map((t) => ({ t })), points: d.points.map((text) => ({ text })) } : { show: false, inCls: '', fadeCls: '', stackLine: '', hasLink: false, link: '', linkText: '', isCV: false, hasStats: false, stats: [], hasStack: false, stack: [], name: '', kind: '', role: '', dates: '', summary: '', listTitle: '', color: '#fbf6ec', ink: '#2a2420', points: [] },
+      closeDoc: () => { if (!this.state.open || this.state.docClosing) return; this.setState({ docClosing: true, hover: null }); this.later('docClose', 260, () => this.setState({ open: null, docClosing: false })); },
+    };
+  }
+}
+</script>
+</body>
+</html>

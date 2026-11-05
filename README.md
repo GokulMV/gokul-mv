@@ -1,41 +1,65 @@
-# Gokul M V — The Ascent
+# Gokul MV — the shelf
 
-A 3D scrollytelling portfolio: React 18 + TypeScript, Three.js via `@react-three/fiber` / `drei` /
-`postprocessing`, GSAP `ScrollTrigger`, `@studio-freight/lenis`, and Zustand. It's built to deploy on
-[Railway](https://railway.com) from the first commit.
+A portfolio that is one room: three black floating shelves on a cream wall, between two windows. The files on the
+shelves are the work: hover one to lift it out, click it and a manila folder opens with the whole story.
 
-> **Phase 0** is the deployment-verification build. It renders a 3D world across the full 10-scene timeline:
-> stand-in geometry for the protagonist and gear, a cloud curtain, project beacons, the summit and horizon,
-> and the contact paper. It also shows a live Railway health/runtime telemetry panel.
+- **Top shelf, work:** Thoughtworks, OpenText, Cognizant, and how I build with AI.
+- **Middle shelf, education:** the B.Tech, the Agile & Scrum certificate, skills, and the résumé.
+- **Bottom shelf, GitHub:** every public project with a README that is released (green dot) or nearly done (amber).
+
+The room is live. The light follows the visitor's clock: sunrise in the east window, sunset in the west, the lamp
+at night. The season follows the date, and the weather changes every six hours (rain, snow, clouds). The plants
+grow when they are watered and wilt when nobody does; the shelf gathers dust and cobwebs while nobody visits.
+Strike a match and carry it to the candle, pull the thread for contact details and the résumé, pick up the
+watering can, play with the Rubik's cube, wind the robot, drag the car, and leave a note on the cork board.
+
+## How it's built
+
+The room is drawn in SVG and HTML, with CSS for the light and the animation; there is no WebGL and no framework
+beyond [Preact](https://preactjs.com) for rendering.
+
+| Path | What it is |
+| ---- | ---------- |
+| `src/shelf/Shelf.dc.html` | **The design file**: the room's template and its logic class (time, weather, plants, files, cube, notes…). This is the file to edit. |
+| `scripts/build-shelf.mjs` | Compiles the design file into `src/shelf/shelf.generated.js` (logic + `renderTree`) and `shelf.generated.css`. Runs before `dev`, `typecheck` and `build`. |
+| `src/main.ts` | Mounts the room, redraws it on every state change, and scales the 1400 × 1000 room to fit the window. |
+| `public/Gokul_MV_Resume.pdf` | The résumé the contact tag and the Résumé file offer for download. |
+
+The template language in the design file is small: `{{a.b}}` lookups, `<sc-for list="{{…}}" as="x">`,
+`<sc-if value="{{…}}">`, and a `<helmet>` whose `<style>` becomes the generated CSS. Don't edit the generated
+files by hand; change `Shelf.dc.html` and run `npm run shelf` (or any of the scripts below).
+
+Visitor state (plant health, the last visit and its cobwebs, pinned notes) is kept in the visitor's own
+`localStorage`, so it is per browser. A shared notes board or a site-wide "nobody has visited" would need a small
+server.
 
 ## Run locally
 
 ```bash
 npm ci
 npm run dev        # http://localhost:5173  (/healthz is mirrored by a Vite middleware)
-npm run build      # tsc --noEmit && vite build
+npm run build      # compile the shelf → tsc --noEmit → vite build
 npm run preview    # http://localhost:4173
 ```
 
-Append `?audit=1` to the URL, or press <kbd>`</kbd>, to toggle audit mode. It expands the telemetry panel and
-draws the protagonist's path and waypoints.
+Add `?debug` to the URL for a bar that sets the time of day, season, weather, plant health, time away and wind
+by hand, plus a button that forgets your visit; for example `/?debug&mood=night&season=winter&weather=snow`.
+In debug mode the room's logic is on `window.shelf`.
 
 ## Deploy on Railway
 
 1. Create a service from this repository and set its source branch to **`main`** (Service → Settings → Source).
-   Leave **Root Directory** empty. `railway.json` (same layout as the TeamUp service) selects the root `Dockerfile`,
-   one replica, the `/healthz` healthcheck and the restart policy.
+   Leave **Root Directory** empty. `railway.json` selects the root `Dockerfile`, one replica, the `/healthz`
+   healthcheck and the restart policy.
 2. You don't need any variables. Railway injects `PORT`, and the image defaults to `8080`.
-   `RAILWAY_GIT_COMMIT_SHA` / `RAILWAY_ENVIRONMENT_NAME` are baked into the build and shown in the telemetry panel.
 3. Railway gates each deploy on the `/healthz` healthcheck, which returns
    `{"status":"ok","service":"portfolio","port":"…","time":"…"}`.
-4. When adding a domain, enter target port **8080**. The deploy logs confirm the bound port with a line like
-   `40-ipv6-listen.sh: … listener(s) on port 8080`.
+4. When adding a domain, enter target port **8080**.
 
 ### CI
 
 `.github/workflows/ci.yml` runs on every push and PR to `main`:
-- **Typecheck & build:** the same `npm ci` → `tsc` → `vite build` as the container.
+- **Typecheck & build:** the same `npm ci` → shelf compile → `tsc` → `vite build` as the container.
 - **Docker image & /healthz smoke test:** builds the exact Railway image, boots it on `PORT=8080` and checks
   `/healthz`, the SPA fallback, 404s, gzip, immutable asset caching, the startup port line and the nginx worker count.
 
@@ -44,41 +68,16 @@ Railway deploys through its own GitHub integration, not GitHub Actions. To deplo
 
 ### Container
 
-| Stage   | Image              | Notes                                                                                   |
-| ------- | ------------------ | --------------------------------------------------------------------------------------- |
-| builder | `node:20-alpine`   | `npm ci` then `npm run build`, with a 2 GB heap cap and vendor chunks split for low peak memory |
+| Stage   | Image              | Notes |
+| ------- | ------------------ | ----- |
+| builder | `node:20-alpine`   | `npm ci` then `npm run build` |
 | runtime | `nginx:1.27-alpine`| `nginx.conf.template` rendered by envsubst on `$PORT`: gzip, SPA fallback, immutable `/assets`, 2 workers, `warn`-level logs |
 
 The IPv6 listener (Railway private networking) is added at boot by `docker/40-ipv6-listen.sh`, and only when
 the kernel supports IPv6.
 
-## Architecture rules
+## Credits
 
-- **No React re-renders on scroll.** Lenis writes progress into the mutable singleton
-  `src/store/scrollStore.ts`. R3F `useFrame` callbacks and DOM `requestAnimationFrame` loops read it directly.
-- **Everything is damped** with `THREE.MathUtils.damp(current, target, lambda, delta)`.
-- **Decluttered HUD.** The previous scene's card fully fades out before the next one fades in.
-- **Track-relative progress.** Progress reaches exactly 1.0 when the 1400vh track ends
-  (`scroll = trackEnd − innerHeight`) and stays 1.0 while the credits / footer (`CreditsFooter`) scroll in
-  after it. `scrollToProgress(p)` always targets the track, so "Back to base camp" works from the footer.
-- **The ending.** `LensPaper` (WebGL) is the sheet the gust tears out of the backpack and slaps onto the lens;
-  `LensPaperOverlay` puts the contact details on it as real, clickable DOM text, aligned every frame
-  through `lensPaperState`. Both share one layout (`lensPaperNote.ts`).
-- **Content** lives in `src/store/portfolioStore.ts`, a Zustand store persisted to `localStorage`. The
-  `OFFICIAL_TECH_LOGOS` dictionary holds 55 brand SVG paths and hex colours from Simple Icons (CC0).
-  The brand marks are trademarks of their owners.
-
-### Timeline (0 → 1 over 1400vh)
-
-| #  | Range       | Scene                          | Gear |
-| -- | ----------- | ------------------------------ | ---- |
-| 1  | 0.00 – 0.08 | Volumetric clouds & welcome    | 0/4  |
-| 2  | 0.08 – 0.18 | Base camp                      | 0/4  |
-| 3  | 0.18 – 0.28 | Getting equipped               | 4/4  |
-| 4  | 0.28 – 0.45 | First ascent (rope coil drops at 0.42)       | 3/4 |
-| 5  | 0.45 – 0.62 | First chasm jump (harness drops at 0.56)     | 2/4 |
-| 6  | 0.62 – 0.78 | Extreme chasm leap (ice axes drop at 0.72)   | 1/4 |
-| 7  | 0.78 – 0.86 | The summit (only the backpack left)          | 1/4 |
-| 8  | 0.86 – 0.92 | Horizon reveal: the next big mountain        | 1/4 |
-| 9  | 0.92 – 0.98 | Last pull before the next mountain; a gust blows the contact paper out of the backpack onto the lens | 1/4 |
-| 10 | 0.98 – 1.00 | Scrolling peels the paper away; dissolve to the void, then the credits / footer section | 1/4 |
+The portraits are flat illustrations after Leonardo's *Mona Lisa* (c. 1503) and Vermeer's *Girl with a Pearl
+Earring* (1665), both in the public domain. Fonts from Google Fonts: Instrument Serif, Inter, Courier Prime and
+Caveat (SIL Open Font License).

@@ -1,44 +1,9 @@
 import { defineConfig, type Plugin } from 'vite';
-import react from '@vitejs/plugin-react';
 
 const BUILD_SHA = process.env.RAILWAY_GIT_COMMIT_SHA ?? process.env.VITE_BUILD_SHA ?? 'local';
 const BUILD_ENV = process.env.RAILWAY_ENVIRONMENT_NAME ?? process.env.NODE_ENV ?? 'development';
 
-/**
- * Splits heavy vendors into stable, separately cached chunks. Keeping each
- * chunk well below Rollup's single-chunk memory peak keeps Railway builders
- * comfortably inside their memory budget.
- */
-function manualChunks(id: string): string | undefined {
-  if (!id.includes('node_modules')) return undefined;
-  if (id.includes('/pdfjs-dist/')) return 'pdf-vendor';
-  if (id.includes('/gsap/') || id.includes('/@studio-freight/lenis/')) return 'gsap-vendor';
-  if (
-    id.includes('/three/') ||
-    id.includes('/three-stdlib/') ||
-    id.includes('/@react-three/') ||
-    id.includes('/postprocessing/') ||
-    id.includes('/maath/') ||
-    id.includes('/troika-') ||
-    id.includes('/camera-controls/') ||
-    id.includes('/meshline/') ||
-    id.includes('/stats-gl/')
-  ) {
-    return 'three-vendor';
-  }
-  if (
-    id.includes('/react/') ||
-    id.includes('/react-dom/') ||
-    id.includes('/scheduler/') ||
-    id.includes('/zustand/') ||
-    id.includes('/use-sync-external-store/')
-  ) {
-    return 'react-vendor';
-  }
-  return undefined;
-}
-
-/** Mirrors NGINX's /healthz in `vite dev` and `vite preview` so telemetry works locally. */
+/** Mirrors NGINX's /healthz in `vite dev` and `vite preview`. */
 function healthz(): Plugin {
   const handler = (port: number) => (req: { url?: string }, res: import('node:http').ServerResponse, next: () => void) => {
     if (req.url?.split('?')[0] !== '/healthz') return next();
@@ -58,9 +23,7 @@ function healthz(): Plugin {
 }
 
 export default defineConfig({
-  plugins: [react(), healthz()],
-  // Lets several local dev servers run side by side without sharing a deps cache.
-  cacheDir: process.env.VITE_CACHE_DIR ?? 'node_modules/.vite',
+  plugins: [healthz()],
   define: {
     __BUILD_SHA__: JSON.stringify(BUILD_SHA),
     __BUILD_ENV__: JSON.stringify(BUILD_ENV),
@@ -79,16 +42,6 @@ export default defineConfig({
     outDir: 'dist',
     assetsDir: 'assets',
     sourcemap: false,
-    cssCodeSplit: true,
     reportCompressedSize: false,
-    chunkSizeWarningLimit: 1600,
-    rollupOptions: {
-      output: {
-        manualChunks,
-      },
-    },
-  },
-  optimizeDeps: {
-    include: ['three', '@react-three/fiber', '@react-three/drei', 'gsap', '@studio-freight/lenis'],
   },
 });

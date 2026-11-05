@@ -30,3 +30,7 @@ coverage/
 
 # local visual-test harnesses
 harness/
+
+# generated from src/shelf/Shelf.dc.html by scripts/build-shelf.mjs (npm run shelf)
+src/shelf/shelf.generated.js
+src/shelf/shelf.generated.css
