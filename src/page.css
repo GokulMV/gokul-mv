@@ -17,7 +17,23 @@ body {
 
 #stage {
   position: relative;
+  z-index: 1;
   overflow: hidden;
+}
+
+/* The room's time-of-day tint, laid over the wall that carries on past the room. */
+#tint {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  mix-blend-mode: multiply;
+  transition: opacity 600ms, background-color 600ms;
+}
+
+/* After a click or tap the focus ring is noise; keyboard users still get it. */
+html[data-input='pointer'] :focus-visible {
+  outline: none !important;
 }
 
 #room {

@@ -99,6 +99,7 @@ a{color:inherit}
 .puddle{transform-box:fill-box;transform-origin:50% 50%;animation:puddle 2.2s ease-out forwards}
 @keyframes dripLong{0%{transform:translateY(0);opacity:0}10%{opacity:1}100%{transform:translateY(260px);opacity:0}}
 .dripLong{animation:dripLong 0.9s ease-in infinite}
+.secHand{transform-box:view-box;transform-origin:60px 60px;animation:spin 60s steps(60) infinite}
 @keyframes hangGust{0%,100%{transform:rotate(-1deg)}30%{transform:rotate(5deg)}65%{transform:rotate(-3deg)}}
 .gusty .hang{animation:hangGust 1.6s ease-in-out 3}
 @keyframes treeGust{0%,100%{transform:rotate(0)}35%{transform:rotate(3.5deg)}70%{transform:rotate(-1.5deg)}}
@@ -132,7 +133,7 @@ a{color:inherit}
 @keyframes fadeIn{from{opacity:0}to{opacity:1}}
 .fadeIn{animation:fadeIn 0.3s both}
 .fadeOut{animation:fadeIn 0.26s reverse both}
-@media (prefers-reduced-motion: reduce){.flame,.ignite,.smoke,.drip,.perk,.drive,.drive .wheel,.walking,.walking *,.swing .pl,.swing .pr,.twist,.tug,.pop,.s1,.s2,.s3,.s4,.rainfall,.snowfall,.sway,.drift,.leafFall,.twinkle,.poof,.boing,.dangle,.hang,.gusty .hang,.gusty .treeTop,.gusty .flame,.gusty .note,.windLine,.candleLight,.wobble,.tipOut,.tipHang,.spillStream,.puddle,.dripLong,.blowLeaf,.blowLeafL,.folderIn,.folderIn .cover,.folderOut,.fadeIn,.fadeOut,.confetti,.spark,.unroll{animation:none !important}.lift,.can{transition:none}}
+@media (prefers-reduced-motion: reduce){.flame,.ignite,.smoke,.drip,.perk,.drive,.drive .wheel,.walking,.walking *,.swing .pl,.swing .pr,.twist,.tug,.pop,.s1,.s2,.s3,.s4,.rainfall,.snowfall,.sway,.drift,.leafFall,.twinkle,.poof,.boing,.dangle,.hang,.gusty .hang,.gusty .treeTop,.gusty .flame,.gusty .note,.windLine,.secHand,.candleLight,.wobble,.tipOut,.tipHang,.spillStream,.puddle,.dripLong,.blowLeaf,.blowLeafL,.folderIn,.folderIn .cover,.folderOut,.fadeIn,.fadeOut,.confetti,.spark,.unroll{animation:none !important}.lift,.can{transition:none}}
 </style>
 </helmet>
 <div data-room="1" class="{{v.rootClass}}" onPointerMove="{{move}}" onPointerUp="{{up}}" onPointerLeave="{{up}}" style="width: 1400px; height: 1000px; position: relative; overflow: hidden; background: linear-gradient(90deg, {{v.wallL}} 0%, {{v.wallR}} 100%); font-family: Inter, system-ui, sans-serif; color: #2a2420">
@@ -151,6 +152,29 @@ a{color:inherit}
       <rect x="262" y="872" width="650" height="18" rx="9" style="filter: blur(8px)"/>
     </g>
   </svg>
+
+  <!-- a wall clock: the visitor's own time -->
+  <svg width="120" height="120" viewBox="0 0 120 120" role="img" aria-label="{{clock.aria}}" style="position: absolute; left: 852px; top: 296px; overflow: visible">
+    <circle cx="60" cy="60" r="54" fill="#2a2420" opacity="0.16" transform="translate(3 5)"/>
+    <circle cx="60" cy="60" r="54" fill="#c8714a" stroke="#2a2420" stroke-width="2"/>
+    <circle cx="60" cy="60" r="45" fill="#fbf6ec" stroke="#2a2420" stroke-width="1.5"/>
+    <path d="{{clock.ticks}}" stroke="#2a2420" stroke-width="1.6" stroke-linecap="round"/>
+    <g font-family="'Instrument Serif', Georgia, serif" font-size="13" fill="#2a2420" text-anchor="middle"><text x="60" y="30">12</text><text x="91" y="64.5">3</text><text x="60" y="98">6</text><text x="29" y="64.5">9</text></g>
+    <line x1="60" y1="60" x2="{{clock.hx}}" y2="{{clock.hy}}" stroke="#2a2420" stroke-width="4" stroke-linecap="round"/>
+    <line x1="60" y1="60" x2="{{clock.mx}}" y2="{{clock.my}}" stroke="#2a2420" stroke-width="2.6" stroke-linecap="round"/>
+    <g class="secHand" style="animation-delay: -{{clock.sec}}s"><line x1="60" y1="70" x2="60" y2="22" stroke="#c9473b" stroke-width="1.3" stroke-linecap="round"/></g>
+    <circle cx="60" cy="60" r="3.6" fill="#2a2420"/><circle cx="60" cy="60" r="1.4" fill="#c9473b"/>
+  </svg>
+  <div class="hand" style="position: absolute; left: 832px; top: 414px; width: 160px; text-align: center; font-size: 19px; font-weight: 700; color: {{v.letter}}; white-space: nowrap">{{clock.date}}</div>
+
+  <!-- the weather where the visitor is, on a paper tag under the west window -->
+  <div style="position: absolute; left: -190px; top: 760px; width: 172px; padding: 10px 14px 12px; box-sizing: border-box; background: #fbf6ec; box-shadow: 0 6px 14px rgba(40,25,10,0.25); transform: rotate(-1.5deg); color: #2a2420; display: flex; flex-direction: column; gap: 2px">
+    <span style="position: absolute; left: 80px; top: -6px; width: 12px; height: 12px; border-radius: 50%; background: radial-gradient(circle at 35% 35%, #e97b6c, #b3372f); box-shadow: 0 2px 2px rgba(0,0,0,0.3)"></span>
+    <span class="typed" style="font-size: 10.5px; letter-spacing: 0.14em; text-transform: uppercase; color: #6a5d4f">{{wx.place}}</span>
+    <span style="display: flex; align-items: baseline; gap: 8px"><span class="hand" style="font-size: 40px; font-weight: 700; line-height: 1">{{wx.temp}}</span><span class="hand" style="font-size: 22px; line-height: 1.05">{{wx.cond}}</span></span>
+    <span class="typed" style="font-size: 10.5px; line-height: 1.5; color: #4f4438">{{wx.detail}}</span>
+    <sc-if value="{{wx.canLocate}}" hint-placeholder-val="{{ false }}"><button type="button" class="scribble" onClick="{{wx.locate}}" style="align-self: flex-start; margin-top: 4px; font-size: 18px; color: #2a2420">use my location</button></sc-if>
+  </div>
 
   <!-- an old portrait on the right wall, above the lamp: after Vermeer's Girl with a Pearl Earring (1665) -->
   <svg width="180" height="240" viewBox="0 0 180 240" aria-hidden="true" style="position: absolute; left: 815px; top: 70px">
@@ -822,7 +846,6 @@ a{color:inherit}
       </sc-for>
     </svg>
   </button>
-  <div style="position: absolute; left: 36px; bottom: 24px; font-size: 11px; letter-spacing: 0.04em; color: {{v.note}}; white-space: nowrap">{{v.clock}}</div>
 
   <!-- the contact card: a kraft luggage tag that drops off the thread -->
   <sc-if value="{{contact.open}}" hint-placeholder-val="{{ false }}">
@@ -1170,6 +1193,39 @@ class Component extends DCLogic {
     this.setState({ canMode: 'returning', pouring: false });
     this.later('canHome', 700, () => this.setState({ canMode: 'home' }));
   }
+  // Where the visitor probably is, without asking: their time zone's city (India → Hyderabad, where the shelf lives).
+  async guessPlace() {
+    let tz = '';
+    try { tz = Intl.DateTimeFormat().resolvedOptions().timeZone || ''; } catch (e) { tz = ''; }
+    if (!tz || tz === 'Asia/Kolkata' || tz === 'Asia/Calcutta') return { name: 'Hyderabad', lat: 17.385, lon: 78.4867 };
+    const city = tz.split('/').pop().replace(/_/g, ' ');
+    const r = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(city)}&count=1&language=en&format=json`);
+    const j = await r.json();
+    const hit = j && j.results && j.results[0];
+    return hit ? { name: hit.name, lat: hit.latitude, lon: hit.longitude } : { name: 'Hyderabad', lat: 17.385, lon: 78.4867 };
+  }
+  async fetchWeather(place) {
+    try {
+      const where = place || (await this.guessPlace());
+      this.wxPlace = where;
+      const q = `latitude=${where.lat}&longitude=${where.lon}&current=temperature_2m,apparent_temperature,relative_humidity_2m,weather_code,wind_speed_10m&daily=sunrise,sunset&forecast_days=1&timezone=auto`;
+      const r = await fetch(`https://api.open-meteo.com/v1/forecast?${q}`);
+      if (!r.ok) return;
+      const j = await r.json();
+      const c = j.current || {};
+      const code = c.weather_code;
+      const kind = [0, 1].includes(code) ? 'clear' : [2, 3, 45, 48].includes(code) ? 'cloudy' : (code >= 71 && code <= 77) || code === 85 || code === 86 ? 'snow' : code >= 51 ? 'rain' : 'clear';
+      const COND = { 0: 'clear sky', 1: 'mostly clear', 2: 'partly cloudy', 3: 'overcast', 45: 'fog', 48: 'freezing fog', 51: 'light drizzle', 53: 'drizzle', 55: 'heavy drizzle', 56: 'freezing drizzle', 57: 'freezing drizzle', 61: 'light rain', 63: 'rain', 65: 'heavy rain', 66: 'freezing rain', 67: 'freezing rain', 71: 'light snow', 73: 'snow', 75: 'heavy snow', 77: 'snow grains', 80: 'showers', 81: 'showers', 82: 'heavy showers', 85: 'snow showers', 86: 'snow showers', 95: 'thunderstorm', 96: 'thunderstorm, hail', 99: 'thunderstorm, hail' };
+      const hrs = (iso) => { const t = String(iso || '').split('T')[1] || ''; const [hh, mm] = t.split(':').map(Number); return Number.isFinite(hh) ? hh + (mm || 0) / 60 : null; };
+      const d = j.daily || {};
+      this.setState({ liveWx: { kind, cond: COND[code] || 'clear sky', temp: Math.round(c.temperature_2m), feels: Math.round(c.apparent_temperature), wind: Math.round(c.wind_speed_10m), humid: Math.round(c.relative_humidity_2m), place: where.name, lat: where.lat, sunrise: hrs(d.sunrise && d.sunrise[0]), sunset: hrs(d.sunset && d.sunset[0]), precise: !!where.precise } });
+    } catch (e) { /* no network or blocked: the room keeps its own weather */ }
+  }
+  locate() {
+    try {
+      navigator.geolocation.getCurrentPosition((pos) => this.fetchWeather({ name: 'your location', lat: +pos.coords.latitude.toFixed(3), lon: +pos.coords.longitude.toFixed(3), precise: true }), () => {}, { maximumAge: 3600000, timeout: 10000 });
+    } catch (e) { /* no geolocation */ }
+  }
   coast(v) {
     this.carV = v;
     this.every('coast', 16, () => {
@@ -1225,7 +1281,10 @@ class Component extends DCLogic {
       else if (st.contactOpen) this.setState({ contactOpen: false });
     };
     try { window.addEventListener('keydown', this.onKey); } catch (e) { /* no window: nothing to listen to */ }
-    this.every('clock', 60000, () => this.setState({ now: Date.now() }));
+    this.every('clock', 15000, () => this.setState({ now: Date.now() }));
+    // The real weather where the visitor is: every half hour. Without a network (or on the design canvas) the room keeps its own weather.
+    this.fetchWeather();
+    this.every('wx', 30 * 60000, () => this.fetchWeather(this.wxPlace));
     this.later('gustWait', 6000, () => this.gust());
   }
   componentDidUpdate(prev) {
@@ -1269,13 +1328,19 @@ class Component extends DCLogic {
     const mood = this.props.mood ?? 'live';
     const d0 = new Date(s.now);
     const MOODS = { sunrise: 6.4, morning: 8.5, golden: 17.2, sunset: 18.6, night: 22 };
-    const H = MOODS[mood] ?? d0.getHours() + d0.getMinutes() / 60;
-    const month = d0.getMonth();
+    const Hreal = MOODS[mood] ?? d0.getHours() + d0.getMinutes() / 60;
+    const lw = mood === 'live' ? s.liveWx : null;
+    const SR = lw && lw.sunrise != null ? lw.sunrise : 6, SS = lw && lw.sunset != null ? lw.sunset : 19;
+    // Map the real hour onto the room's 6:00 sunrise → 19:00 sunset, so the windows and the light follow the real sun.
+    const H = Hreal >= SR && Hreal <= SS ? 6 + ((Hreal - SR) / (SS - SR)) * 13 : Hreal < SR ? 6 - (SR - Hreal) : 19 + (Hreal - SS);
+    // Southern hemisphere: the seasons are the other way round.
+    const month = (d0.getMonth() + (lw && lw.lat < 0 ? 6 : 0)) % 12;
     const seasonP = this.props.season ?? 'auto';
     const season = seasonP !== 'auto' ? seasonP : [11, 0, 1].includes(month) ? 'winter' : month <= 4 ? 'spring' : month <= 7 ? 'summer' : 'autumn';
     const weatherP = this.props.weather ?? 'auto';
     let weather = 'clear';
     if (weatherP !== 'auto') weather = weatherP;
+    else if (lw) weather = lw.kind;
     else {
       // The same weather for everyone in a six-hour block, with odds that follow the season.
       const seed = (d0.getFullYear() * 372 + month * 31 + d0.getDate()) * 4 + Math.floor(d0.getHours() / 6);
@@ -1308,7 +1373,7 @@ class Component extends DCLogic {
     const sxv = !day ? (lampOn ? -7 : 0) : overcast ? 0 : (east ? -1 : 1) * (5 + 12 * (1 - k));
     const syv = !day ? 6 : overcast ? 4 : 6 + 5 * k;
     const sa = !day ? (lampOn ? 0.32 : 0.2) : overcast ? 0.18 : 0.3;
-    const hh = String(Math.floor(H)).padStart(2, '0'), mm = String(mood === 'live' ? d0.getMinutes() : Math.round((H % 1) * 60)).padStart(2, '0');
+    const hh = String(Math.floor(Hreal)).padStart(2, '0'), mm = String(mood === 'live' ? d0.getMinutes() : Math.round((Hreal % 1) * 60)).padStart(2, '0');
     const WX = { clear: day ? 'clear' : 'clear sky', cloudy: 'cloudy', rain: 'rain', snow: 'snow' };
     const v = {
       rootClass: `${s.fire === 'held' || s.dusting || s.canMode === 'held' ? 'holding' : ''}${s.gust ? ' gusty' : ''}`,
@@ -1868,6 +1933,20 @@ class Component extends DCLogic {
 
     return {
       v, panes, windows,
+      clock: (() => {
+        const hr = Math.floor(Hreal), mn = mood === 'live' ? d0.getMinutes() : Math.round((Hreal % 1) * 60), sc = mood === 'live' ? d0.getSeconds() : 0;
+        const at = (deg, len) => [60 + Math.sin((deg * Math.PI) / 180) * len, 60 - Math.cos((deg * Math.PI) / 180) * len];
+        const hp = at(((hr % 12) + mn / 60) * 30, 25), mp = at(mn * 6 + sc / 10, 37);
+        let ticks = '';
+        for (let i = 0; i < 60; i += 1) { const a = (i * 6 * Math.PI) / 180, r0 = i % 5 === 0 ? 37 : 40.5; ticks += `M${(60 + Math.sin(a) * r0).toFixed(1)} ${(60 - Math.cos(a) * r0).toFixed(1)} L${(60 + Math.sin(a) * 43).toFixed(1)} ${(60 - Math.cos(a) * 43).toFixed(1)} `; }
+        let date = '';
+        try { date = d0.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' }); } catch (e) { date = d0.toDateString().slice(0, 10); }
+        return { hx: hp[0].toFixed(1), hy: hp[1].toFixed(1), mx: mp[0].toFixed(1), my: mp[1].toFixed(1), sec: sc, ticks, date, aria: `Clock: ${hh}:${mm}, ${date}` };
+      })(),
+      wx: lw ? {
+        place: lw.place, temp: `${lw.temp}°`, cond: lw.cond, canLocate: !lw.precise,
+        detail: `feels ${lw.feels}° · wind ${lw.wind} km/h · ${lw.humid}% humid`, locate: () => this.locate(),
+      } : { place: `${season}`, temp: '', cond: WX[weather], canLocate: false, detail: 'the room keeps its own weather here', locate: () => {} },
       boards: [{ ty: 256, ts: 0, yf: 256, yu: 296, us: 11 }, { ty: 542, ts: 3, yf: 545, yu: 585, us: 3 }, { ty: 810, ts: 20, yf: 830, yu: 870, us: 0 }],
       work: ['tw', 'ot', 'cg', 'ai'].map(file),
       edu: ['ed', 'ag', 'sk', 'cv'].map(file),
