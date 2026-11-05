@@ -136,16 +136,18 @@ a{color:inherit}
 @media (prefers-reduced-motion: reduce){.flame,.ignite,.smoke,.drip,.perk,.drive,.drive .wheel,.walking,.walking *,.swing .pl,.swing .pr,.twist,.tug,.pop,.s1,.s2,.s3,.s4,.rainfall,.snowfall,.sway,.drift,.leafFall,.twinkle,.poof,.boing,.dangle,.hang,.gusty .hang,.gusty .treeTop,.gusty .flame,.gusty .note,.windLine,.secHand,.candleLight,.wobble,.tipOut,.tipHang,.spillStream,.puddle,.dripLong,.blowLeaf,.blowLeafL,.folderIn,.folderIn .cover,.folderOut,.fadeIn,.fadeOut,.confetti,.spark,.unroll{animation:none !important}.lift,.can{transition:none}}
 </style>
 </helmet>
-<div data-room="1" class="{{v.rootClass}}" onPointerMove="{{move}}" onPointerUp="{{up}}" onPointerLeave="{{up}}" style="width: 1400px; height: 1000px; position: relative; overflow: hidden; background: linear-gradient(90deg, {{v.wallL}} 0%, {{v.wallR}} 100%); font-family: Inter, system-ui, sans-serif; color: #2a2420">
+<div data-room="1" class="{{v.rootClass}}" onPointerMove="{{move}}" onPointerUp="{{up}}" onPointerLeave="{{up}}" style="width: 1400px; height: 1000px; position: relative; overflow: {{v.overflow}}; font-family: Inter, system-ui, sans-serif; color: #2a2420">
+<!-- the wall: wallL at the room's left edge to wallR at its right, then carrying on flat either side -->
+<div aria-hidden="true" style="position: absolute; left: -1400px; top: -1000px; width: 4200px; height: 3000px; background: linear-gradient(90deg, {{v.wallL}} 0px, {{v.wallL}} 1400px, {{v.wallR}} 2800px, {{v.wallR}} 4200px)"></div>
 <!-- the room, 1000px wide and centred; the windows sit in the 200px either side -->
 <div style="position: absolute; left: 200px; top: 0; width: 1000px; height: 1000px">
 
   <!-- wall grain and the boards' shadows on the wall -->
-  <svg width="1400" height="1000" viewBox="-200 0 1400 1000" aria-hidden="true" style="position: absolute; left: -200px; top: 0">
+  <svg width="4200" height="3000" viewBox="-1600 -1000 4200 3000" aria-hidden="true" style="position: absolute; left: -1600px; top: -1000px">
     <defs>
       <filter id="plaster" x="0" y="0" width="100%" height="100%"><feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" seed="7"/><feColorMatrix values="0 0 0 0 0.45  0 0 0 0 0.38  0 0 0 0 0.3  0 0 0 0.045 0"/></filter>
     </defs>
-    <rect x="-200" width="1400" height="1000" filter="url(#plaster)"/>
+    <rect x="-1600" y="-1000" width="4200" height="3000" filter="url(#plaster)"/>
     <g fill="#3a2614" opacity="{{v.boardShadow}}" transform="translate({{v.bsx}} 0)">
       <rect x="262" y="300" width="650" height="26" rx="13" style="filter: blur(9px)"/>
       <rect x="262" y="588" width="650" height="22" rx="11" style="filter: blur(8px)"/>
@@ -594,10 +596,10 @@ a{color:inherit}
   </svg>
 
   <!-- the room's light: the sun's panes come from the east window in the morning, the west window in the afternoon -->
-  <svg width="1400" height="1000" viewBox="-200 0 1400 1000" aria-hidden="true" style="position: absolute; left: -200px; top: 0; pointer-events: none; mix-blend-mode: multiply">
-    <rect x="-200" width="1400" height="1000" fill="{{v.shadeTint}}" opacity="{{v.shadeAmount}}"/>
+  <svg width="4200" height="3000" viewBox="-1600 -1000 4200 3000" aria-hidden="true" style="position: absolute; left: -1600px; top: -1000px; pointer-events: none; mix-blend-mode: multiply">
+    <rect x="-1600" y="-1000" width="4200" height="3000" fill="{{v.shadeTint}}" opacity="{{v.shadeAmount}}"/>
   </svg>
-  <svg width="1400" height="1000" viewBox="-200 0 1400 1000" aria-hidden="true" style="position: absolute; left: -200px; top: 0; pointer-events: none; mix-blend-mode: screen">
+  <svg width="4200" height="3000" viewBox="-1600 -1000 4200 3000" aria-hidden="true" style="position: absolute; left: -1600px; top: -1000px; pointer-events: none; mix-blend-mode: screen">
     <defs>
       <filter id="paneSoft" x="-10%" y="-10%" width="120%" height="120%"><feGaussianBlur stdDeviation="4"/></filter>
       <clipPath id="panes"><sc-for list="{{panes}}" as="pn" hint-placeholder-count="4"><polygon points="{{pn.pts}}"/></sc-for></clipPath>
@@ -612,8 +614,8 @@ a{color:inherit}
       <rect x="175" y="810" width="650" height="20" fill="#fff3d4" opacity="0.4"/><rect x="175" y="829" width="650" height="2" fill="#fff8e4" opacity="0.9"/>
       <rect x="175" y="256" width="650" height="40" fill="#fff0cc" opacity="0.16"/><rect x="175" y="545" width="650" height="40" fill="#fff0cc" opacity="0.16"/><rect x="175" y="830" width="650" height="40" fill="#fff0cc" opacity="0.16"/>
     </g>
-    <rect x="-200" width="1400" height="1000" fill="url(#lampPool)" opacity="{{v.lamp}}"/>
-    <rect class="{{v.candleCls}}" x="-200" width="1400" height="1000" fill="url(#candleGlow)" opacity="{{v.candle}}" style="transition: opacity 600ms"/>
+    <rect x="-1600" y="-1000" width="4200" height="3000" fill="url(#lampPool)" opacity="{{v.lamp}}"/>
+    <rect class="{{v.candleCls}}" x="-1600" y="-1000" width="4200" height="3000" fill="url(#candleGlow)" opacity="{{v.candle}}" style="transition: opacity 600ms"/>
   </svg>
 
   <!-- ============ THE TWO WINDOWS: west on the left (sunset), east on the right (sunrise) ============ -->
@@ -874,7 +876,7 @@ a{color:inherit}
 
   <!-- the opened file: a manila folder that comes out and opens on its cover -->
   <sc-if value="{{doc.show}}" hint-placeholder-val="{{ false }}">
-    <div class="{{doc.fadeCls}}" onClick="{{closeDoc}}" style="position: absolute; left: -200px; top: 0; width: 1400px; height: 1000px; background: radial-gradient(ellipse at 50% 52%, rgba(24,17,10,0.3), rgba(24,17,10,0.72))"></div>
+    <div class="{{doc.fadeCls}}" onClick="{{closeDoc}}" style="position: absolute; left: -1600px; top: -1000px; width: 4200px; height: 3000px; background: radial-gradient(ellipse 860px 620px at 2100px 1520px, rgba(24,17,10,0.3), rgba(24,17,10,0.72))"></div>
     <div role="dialog" aria-label="{{doc.name}}" class="{{doc.inCls}}" style="position: absolute; left: 20px; top: 160px; width: 960px; height: 680px; perspective: 2000px">
       <div class="typed" style="position: absolute; left: 500px; top: -30px; width: 220px; height: 34px; background: #d4b273; border: 1px solid #8a6a3a; border-bottom: 0; border-radius: 9px 9px 0 0; box-sizing: border-box; padding: 8px 16px; font-size: 12px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: #4a3a22; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{doc.name}}</div>
       <div style="position: absolute; left: 480px; top: 0; width: 480px; height: 680px; background: #d9bb7e; border: 1px solid #8a6a3a; border-radius: 0 7px 7px 0; box-sizing: border-box; box-shadow: 0 34px 70px rgba(0,0,0,0.4)">
@@ -919,7 +921,7 @@ a{color:inherit}
 
   <!-- the visitors' board, taken down to read: pin a note from the pad -->
   <sc-if value="{{board.open}}" hint-placeholder-val="{{ false }}">
-    <div class="fadeIn" onClick="{{notesClose}}" style="position: absolute; left: -200px; top: 0; width: 1400px; height: 1000px; background: radial-gradient(ellipse at 50% 50%, rgba(24,17,10,0.3), rgba(24,17,10,0.72))"></div>
+    <div class="fadeIn" onClick="{{notesClose}}" style="position: absolute; left: -1600px; top: -1000px; width: 4200px; height: 3000px; background: radial-gradient(ellipse 860px 620px at 2100px 1500px, rgba(24,17,10,0.3), rgba(24,17,10,0.72))"></div>
     <div role="dialog" aria-label="Notes from visitors" class="folderIn" style="position: absolute; left: 60px; top: 170px; width: 880px; height: 620px; background: #8a5a32; border: 1.5px solid #2a2420; border-radius: 4px; box-sizing: border-box; padding: 16px; box-shadow: 0 34px 70px rgba(0,0,0,0.45)">
       <div style="position: relative; width: 100%; height: 100%; background-color: #c79a62; background-image: radial-gradient(#a97b45 1.2px, transparent 1.4px), radial-gradient(#d9ad74 1px, transparent 1.2px); background-size: 9px 9px, 13px 13px; background-position: 0 0, 4px 6px; border: 1px solid #2a2420; overflow: hidden">
         <div class="hand" style="position: absolute; left: 22px; top: 16px; padding: 4px 16px; background: #fbf6ec; border: 1px solid rgba(42,36,32,0.6); transform: rotate(-2deg); font-size: 30px; font-weight: 700; box-shadow: 0 3px 6px rgba(0,0,0,0.15)">Notes from visitors</div>
@@ -954,7 +956,7 @@ a{color:inherit}
 
   <!-- the Rubik's cube, taken off the shelf: drag a row to turn it -->
   <sc-if value="{{cubeUI.open}}" hint-placeholder-val="{{ false }}">
-    <div class="fadeIn" style="position: absolute; left: -200px; top: 0; width: 1400px; height: 1000px; background: radial-gradient(circle at 50% 46%, rgba(255,236,200,0.1) 0, rgba(18,12,7,0.82) 250px, rgba(10,7,4,0.93) 560px)"></div>
+    <div class="fadeIn" style="position: absolute; left: -1600px; top: -1000px; width: 4200px; height: 3000px; background: radial-gradient(circle at 2100px 1460px, rgba(255,236,200,0.1) 0, rgba(18,12,7,0.82) 250px, rgba(10,7,4,0.93) 560px)"></div>
     <div role="dialog" aria-label="Rubik's cube" tabindex="0" onKeyDown="{{cubeKey}}" style="position: absolute; left: 160px; top: 90px; width: 680px; height: 820px; outline: none; color: #fbf6ec; text-shadow: 0 2px 8px rgba(0,0,0,0.85)">
       <div class="typed" style="position: absolute; left: 0; right: 0; top: 0; text-align: center; font-size: 13px; letter-spacing: 0.16em; text-transform: uppercase; opacity: 0.85">{{cubeUI.moveCount}} moves · {{cubeUI.time}}</div>
       <div class="hand" style="position: absolute; left: 0; right: 0; top: 26px; text-align: center; font-size: 26px">{{cubeUI.status}}</div>
@@ -997,7 +999,7 @@ a{color:inherit}
 </div>
 </div>
 </x-dc>
-<script type="text/x-dc" data-dc-script data-props='{"boards":{"editor":"enum","options":["black","oak"],"default":"black"},"mood":{"editor":"enum","options":["live","sunrise","morning","golden","sunset","night"],"default":"live"},"season":{"editor":"enum","options":["auto","spring","summer","autumn","winter"],"default":"auto"},"weather":{"editor":"enum","options":["auto","clear","cloudy","rain","snow"],"default":"auto"},"plants":{"editor":"enum","options":["live","thriving","thirsty","wilting","dead"],"default":"live"},"absence":{"editor":"enum","options":["auto","fresh","days","weeks","months"],"default":"auto"},"wind":{"editor":"enum","options":["auto","breezy","calm"],"default":"auto"},"$preview":{"width":1400,"height":1000}}'>
+<script type="text/x-dc" data-dc-script data-props='{"boards":{"editor":"enum","options":["black","oak"],"default":"black"},"mood":{"editor":"enum","options":["live","sunrise","morning","golden","sunset","night"],"default":"live"},"season":{"editor":"enum","options":["auto","spring","summer","autumn","winter"],"default":"auto"},"weather":{"editor":"enum","options":["auto","clear","cloudy","rain","snow"],"default":"auto"},"plants":{"editor":"enum","options":["live","thriving","thirsty","wilting","dead"],"default":"live"},"absence":{"editor":"enum","options":["auto","fresh","days","weeks","months"],"default":"auto"},"wind":{"editor":"enum","options":["auto","breezy","calm"],"default":"auto"},"bleed":{"editor":"enum","options":["no","yes"],"default":"no"},"$preview":{"width":1400,"height":1000}}'>
 class Component extends DCLogic {
   constructor(props) {
     super(props);
@@ -1376,6 +1378,7 @@ class Component extends DCLogic {
     const hh = String(Math.floor(Hreal)).padStart(2, '0'), mm = String(mood === 'live' ? d0.getMinutes() : Math.round((Hreal % 1) * 60)).padStart(2, '0');
     const WX = { clear: day ? 'clear' : 'clear sky', cloudy: 'cloudy', rain: 'rain', snow: 'snow' };
     const v = {
+      overflow: this.props.bleed === 'yes' ? 'visible' : 'hidden',
       rootClass: `${s.fire === 'held' || s.dusting || s.canMode === 'held' ? 'holding' : ''}${s.gust ? ' gusty' : ''}`,
       wallL: !day ? '#d6c6ab' : overcast ? '#e4dfd6' : warm ? '#ecd8b8' : '#eee5d4',
       wallR: !day ? '#e2d0b2' : overcast ? '#ebe6dd' : warm ? '#f3e2c6' : '#f4ecdf',

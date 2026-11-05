@@ -15,20 +15,9 @@ body {
   overflow: hidden;
 }
 
+/* The room's wall and light bleed past the stage to the screen edges; the body clips them. */
 #stage {
   position: relative;
-  z-index: 1;
-  overflow: hidden;
-}
-
-/* The room's time-of-day tint, laid over the wall that carries on past the room. */
-#tint {
-  position: fixed;
-  inset: 0;
-  z-index: 0;
-  pointer-events: none;
-  mix-blend-mode: multiply;
-  transition: opacity 600ms, background-color 600ms;
 }
 
 /* After a click or tap the focus ring is noise; keyboard users still get it. */
@@ -43,6 +32,8 @@ html[data-input='pointer'] :focus-visible {
 }
 
 #debug-bar {
+  position: relative;
+  z-index: 10;
   align-self: stretch;
   display: flex;
   flex-wrap: wrap;

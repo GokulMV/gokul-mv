@@ -15,35 +15,18 @@ const ROOM_H = 1000;
 const params = new URLSearchParams(location.search);
 const props: ShelfProps = {};
 for (const [key, spec] of Object.entries(CONTROLS)) props[key] = params.get(key) ?? spec.default;
+// On the site the wall and its light carry on past the room to the edges of the screen.
+props.bleed = 'yes';
 
 const stage = document.getElementById('stage');
 const room = document.getElementById('room');
 if (!stage || !room) throw new Error('index.html needs #stage and #room');
 
 const logic = new Component({ ...props });
-const tint = document.getElementById('tint');
-
-interface RoomLook { v?: { wallL?: string; wallR?: string; shadeTint?: string; shadeAmount?: number } }
-let look: RoomLook['v'] = {};
 let queued = false;
 function draw(): void {
   queued = false;
-  const values = logic.renderVals() as RoomLook;
-  render(h('div', { style: `width:${ROOM_W}px;height:${ROOM_H}px` }, ...renderTree(values)), room as HTMLElement);
-  look = values.v ?? {};
-  paintWall();
-}
-
-/** The wall carries on past the room to the edges of the screen, in the room's own colour and light. */
-function paintWall(): void {
-  const { wallL = '#eee5d4', wallR = '#f4ecdf', shadeTint = '#000', shadeAmount = 0 } = look ?? {};
-  const roomW = (stage as HTMLElement).offsetWidth || 1;
-  const side = Math.max(0, (window.innerWidth - roomW) / 2 / window.innerWidth) * 100;
-  document.body.style.background = `linear-gradient(90deg, ${wallL} 0%, ${wallL} ${side}%, ${wallR} ${100 - side}%, ${wallR} 100%)`;
-  if (tint) {
-    tint.style.background = shadeTint;
-    tint.style.opacity = String(shadeAmount);
-  }
+  render(h('div', { style: `width:${ROOM_W}px;height:${ROOM_H}px` }, ...renderTree(logic.renderVals())), room as HTMLElement);
 }
 logic.onChange = () => {
   if (queued) return;
@@ -60,7 +43,6 @@ function fit(): void {
   (room as HTMLElement).style.transform = `scale(${scale})`;
   (stage as HTMLElement).style.width = `${ROOM_W * scale}px`;
   (stage as HTMLElement).style.height = `${ROOM_H * scale}px`;
-  paintWall();
 }
 
 // Focus rings are for the keyboard: hide them after a click or tap, show them again on Tab.
@@ -79,6 +61,7 @@ function buildDebugBar(): void {
   const bar = document.createElement('div');
   bar.id = 'debug-bar';
   for (const [key, spec] of Object.entries(CONTROLS)) {
+    if (key === 'bleed') continue;
     const label = document.createElement('label');
     label.textContent = `${key} `;
     const select = document.createElement('select');
