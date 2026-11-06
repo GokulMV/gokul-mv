@@ -38,6 +38,11 @@ html[data-input='pointer'] :focus-visible {
   height: 1000px;
 }
 
+/* while the room slides under a finger it is moved as one picture, not redrawn */
+#room.panning {
+  will-change: transform;
+}
+
 /* the camera eases in on something taken off the shelf, and back out */
 #room.glide {
   transition: transform 520ms cubic-bezier(0.3, 0.7, 0.2, 1);

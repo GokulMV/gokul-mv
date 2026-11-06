@@ -115,7 +115,9 @@ function fit(glide = false): void {
   } else {
     cam.s = base;
     cam.cx = narrow ? lookX : ROOM_W / 2;
-    cam.cy = ROOM_H / 2;
+    // A tall screen sees more height than the room has: keep the ceiling at the top and let the
+    // floor take the rest, so the lamp stands on something.
+    cam.cy = Math.max(ROOM_H / 2, hh / (2 * cam.s));
   }
   apply(glide);
 }
@@ -152,13 +154,23 @@ window.addEventListener('pointermove', (e) => {
   if (!drag || e.pointerId !== drag.id) return;
   const dx = e.clientX - drag.x;
   if (!drag.moved && Math.abs(dx) < 6) return;
-  if (!drag.moved) hideHint();
+  if (!drag.moved) { hideHint(); room.classList.add('panning'); }
   drag.moved = true;
   lookX = clampLook(drag.from - dx / base);
   cam.cx = lookX;
-  apply(false);
+  frame();
 });
-const endDrag = (e: PointerEvent): void => { if (drag && e.pointerId === drag.id) drag = null; };
+const endDrag = (e: PointerEvent): void => {
+  if (!drag || e.pointerId !== drag.id) return;
+  drag = null;
+  room.classList.remove('panning');
+};
+// One transform per frame however fast the finger moves.
+let framed = 0;
+function frame(): void {
+  if (framed) return;
+  framed = requestAnimationFrame(() => { framed = 0; apply(false); });
+}
 window.addEventListener('pointerup', endDrag);
 window.addEventListener('pointercancel', endDrag);
 stage.addEventListener('wheel', (e) => {
@@ -169,7 +181,7 @@ stage.addEventListener('wheel', (e) => {
   hideHint();
   lookX = clampLook(lookX + d / base);
   cam.cx = lookX;
-  apply(false);
+  frame();
 }, { passive: false });
 
 // A one-time nudge that the room carries on past the edges.
