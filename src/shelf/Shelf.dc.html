@@ -130,10 +130,14 @@ a{color:inherit}
 .folderIn .cover{animation:coverOpen 0.8s 0.3s cubic-bezier(.3,.7,.2,1) both}
 @keyframes folderOut{0%{transform:none;opacity:1}100%{transform:translateY(70px) scale(0.84);opacity:0}}
 .folderOut{animation:folderOut 0.26s ease-in both}
+@keyframes certIn{0%{transform:translateY(90px) rotate(-5deg) scale(0.8);opacity:0}65%{transform:translateY(-6px) rotate(0.8deg) scale(1.01);opacity:1}100%{transform:none;opacity:1}}
+.certIn{animation:certIn 0.55s cubic-bezier(.2,.8,.2,1) both}
+@keyframes certOut{0%{transform:none;opacity:1}100%{transform:translateY(80px) rotate(-4deg) scale(0.84);opacity:0}}
+.certOut{animation:certOut 0.26s ease-in both}
 @keyframes fadeIn{from{opacity:0}to{opacity:1}}
 .fadeIn{animation:fadeIn 0.3s both}
 .fadeOut{animation:fadeIn 0.26s reverse both}
-@media (prefers-reduced-motion: reduce){.flame,.ignite,.smoke,.drip,.perk,.drive,.drive .wheel,.walking,.walking *,.swing .pl,.swing .pr,.twist,.tug,.pop,.s1,.s2,.s3,.s4,.rainfall,.snowfall,.sway,.drift,.leafFall,.twinkle,.poof,.boing,.dangle,.hang,.gusty .hang,.gusty .treeTop,.gusty .flame,.gusty .note,.windLine,.secHand,.candleLight,.wobble,.tipOut,.tipHang,.spillStream,.puddle,.dripLong,.blowLeaf,.blowLeafL,.folderIn,.folderIn .cover,.folderOut,.fadeIn,.fadeOut,.confetti,.spark,.unroll{animation:none !important}.lift,.can{transition:none}}
+@media (prefers-reduced-motion: reduce){.flame,.ignite,.smoke,.drip,.perk,.drive,.drive .wheel,.walking,.walking *,.swing .pl,.swing .pr,.twist,.tug,.pop,.s1,.s2,.s3,.s4,.rainfall,.snowfall,.sway,.drift,.leafFall,.twinkle,.poof,.boing,.dangle,.hang,.gusty .hang,.gusty .treeTop,.gusty .flame,.gusty .note,.windLine,.secHand,.candleLight,.wobble,.tipOut,.tipHang,.spillStream,.puddle,.dripLong,.blowLeaf,.blowLeafL,.folderIn,.folderIn .cover,.folderOut,.certIn,.certOut,.fadeIn,.fadeOut,.confetti,.spark,.unroll{animation:none !important}.lift,.can{transition:none}}
 </style>
 </helmet>
 <div data-room="1" class="{{v.rootClass}}" onPointerMove="{{move}}" onPointerUp="{{up}}" onPointerLeave="{{up}}" style="width: 1400px; height: 1000px; position: relative; overflow: {{v.overflow}}; font-family: Inter, system-ui, sans-serif; color: #2a2420">
@@ -336,6 +340,30 @@ a{color:inherit}
 
   <!-- ============ MIDDLE BOARD · EDUCATION ============ -->
   <div style="position: absolute; left: 0; top: 0; width: 1000px; height: 1000px; pointer-events: none; filter: {{v.rowShadow}}">
+    <!-- the degree, framed, standing at the end of the board -->
+    <button class="tap" type="button" onMouseEnter="{{cert.hover}}" onMouseLeave="{{cert.leave}}" onFocus="{{cert.hover}}" onBlur="{{cert.leave}}" onClick="{{cert.open}}" aria-label="{{cert.aria}}" style="position: absolute; left: {{cert.x}}px; top: {{cert.hy}}px; width: {{cert.w}}px; height: {{cert.hh}}px; z-index: {{cert.z}}">
+      <span class="lift" style="position: absolute; left: 0; top: {{cert.ht}}px; width: {{cert.w}}px; height: {{cert.h}}px; transform: translateY({{cert.lift}}px) rotate({{cert.tilt}}deg); transform-origin: 50% 100%">
+        <svg width="{{cert.w}}" height="{{cert.h}}" viewBox="0 0 80 104" aria-hidden="true" style="display: block; overflow: visible">
+          <rect x="0.75" y="0.75" width="78.5" height="102.5" rx="1" fill="#6b4228" stroke="#2a2420" stroke-width="1.5"/>
+          <path d="M3.5 100.5 V3.5 H76.5" fill="none" stroke="#8d5c3a" stroke-width="2"/>
+          <path d="M76.5 3.5 V100.5 H3.5" fill="none" stroke="#4f2f1c" stroke-width="2"/>
+          <rect x="7" y="7" width="66" height="90" fill="#d9a541" stroke="#2a2420" stroke-width="0.8"/>
+          <rect x="9" y="9" width="62" height="86" fill="#f1e8d6"/>
+          <rect x="15" y="15" width="50" height="74" fill="#fbf3df" stroke="#c9b48a" stroke-width="0.8"/>
+          <rect x="18" y="18" width="44" height="68" fill="none" stroke="#b08d4a" stroke-width="0.7"/>
+          <path d="M28 25 H52 M33 29 H47 M27 50 H53 M31 54 H49" stroke="#8a7a5a" stroke-width="1.1"/>
+          <text x="40" y="44" text-anchor="middle" font-family="'Instrument Serif', Georgia, serif" font-size="11" fill="#2a2420">B.Tech</text>
+          <text x="40" y="64" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="5.5" font-weight="600" letter-spacing="0.6" fill="#6b5a46">ECE · 2018</text>
+          <path d="M25 78 l-3 9 l3 -2 l2 3 z M29 78 l3 9 l-3 -2 l-2 3 z" fill="#b3372f"/>
+          <circle cx="27" cy="76" r="5.5" fill="#d9a541" stroke="#9c7426" stroke-width="0.8"/>
+          <circle cx="27" cy="76" r="3.4" fill="none" stroke="#9c7426" stroke-width="0.5"/>
+          <path d="M44 78 c2 -4 4 4 6 0 s3 -3 5 1 s2 0 4 -1" fill="none" stroke="#2f4058" stroke-width="0.9"/>
+          <path d="M43 81 H59" stroke="#8a7a5a" stroke-width="0.6"/>
+          <path d="M9 58 L39 9 H50 L9 76 Z" fill="#ffffff" opacity="0.22"/>
+          <path d="M9 86 L56 9 H59 L9 90 Z" fill="#ffffff" opacity="0.14"/>
+        </svg>
+      </span>
+    </button>
     <sc-for list="{{edu}}" as="b" hint-placeholder-count="2">
       <button class="tap" type="button" onMouseEnter="{{b.hover}}" onMouseLeave="{{b.leave}}" onFocus="{{b.hover}}" onBlur="{{b.leave}}" onClick="{{b.open}}" aria-label="{{b.aria}}" style="position: absolute; left: {{b.x}}px; top: {{b.hy}}px; width: {{b.w}}px; height: {{b.hh}}px; z-index: {{b.z}}">
         <span class="lift" style="position: absolute; left: 0; top: {{b.ht}}px; width: {{b.w}}px; height: {{b.h}}px; transform: translateY({{b.lift}}px) rotate({{b.tilt}}deg); background: {{b.color}}; border: 1.5px solid #2a2420; box-sizing: border-box; box-shadow: inset -7px 0 0 rgba(0,0,0,0.16); display: flex; flex-direction: column; align-items: center; padding: 10px 0 9px">
@@ -351,14 +379,14 @@ a{color:inherit}
     </sc-for>
 
     <!-- two books lying flat, drawn straight on like the project stack; the cube rests on the top one -->
-    <div style="position: absolute; left: 470px; top: 519px; width: 126px; height: 26px; background: #e9dcc4; border: 1.5px solid #2a2420; box-sizing: border-box; box-shadow: inset 0 -5px 0 rgba(0,0,0,0.1); display: flex; align-items: center; justify-content: center; white-space: nowrap; color: #2a2420">
+    <div style="position: absolute; left: 488px; top: 519px; width: 126px; height: 26px; background: #e9dcc4; border: 1.5px solid #2a2420; box-sizing: border-box; box-shadow: inset 0 -5px 0 rgba(0,0,0,0.1); display: flex; align-items: center; justify-content: center; white-space: nowrap; color: #2a2420">
       <span style="font-family: 'Instrument Serif', Georgia, serif; font-size: 11.5px; line-height: 1">The Pragmatic Programmer</span>
     </div>
-    <div style="position: absolute; left: 476px; top: 494px; width: 114px; height: 26px; background: #c8714a; border: 1.5px solid #2a2420; box-sizing: border-box; box-shadow: inset 0 -5px 0 rgba(0,0,0,0.12); display: flex; align-items: center; justify-content: center; gap: 6px; white-space: nowrap; color: #fbeee4">
+    <div style="position: absolute; left: 494px; top: 494px; width: 114px; height: 26px; background: #c8714a; border: 1.5px solid #2a2420; box-sizing: border-box; box-shadow: inset 0 -5px 0 rgba(0,0,0,0.12); display: flex; align-items: center; justify-content: center; gap: 6px; white-space: nowrap; color: #fbeee4">
       <span style="font-family: 'Instrument Serif', Georgia, serif; font-size: 11.5px; line-height: 1">Clean Architecture</span>
       <span style="font-size: 6px; font-weight: 600; letter-spacing: 0.12em">MARTIN</span>
     </div>
-    <button class="tap" type="button" onClick="{{openCube}}" onMouseEnter="{{cubeHover}}" onMouseLeave="{{cubeLeave}}" onFocus="{{cubeHover}}" onBlur="{{cubeLeave}}" aria-label="Rubik's cube: pick it up and play" style="position: absolute; left: 492px; top: {{shelfCube.top}}px; width: 80px; height: 78px; perspective: 340px; perspective-origin: 40px 41px">
+    <button class="tap" type="button" onClick="{{openCube}}" onMouseEnter="{{cubeHover}}" onMouseLeave="{{cubeLeave}}" onFocus="{{cubeHover}}" onBlur="{{cubeLeave}}" aria-label="Rubik's cube: pick it up and play" style="position: absolute; left: 510px; top: {{shelfCube.top}}px; width: 80px; height: 78px; perspective: 340px; perspective-origin: 40px 41px">
       <div style="position: absolute; left: 40px; top: 41px; width: 0; height: 0; transform-style: preserve-3d; transform: translateY({{shelfCube.lift}}px) rotateX({{shelfCube.rx}}deg) rotateY({{shelfCube.ry}}deg) scale3d(0.27, 0.27, 0.27); transition: transform 600ms cubic-bezier(.3,.7,.3,1); --turn: 200ms">
         <sc-for list="{{cube3d}}" as="cb" hint-placeholder-count="26">
           <div class="{{cubeUI.anim}}" style="position: absolute; left: -31px; top: -31px; width: 62px; height: 62px; transform-style: preserve-3d; transform: rotateX({{cb.ax}}deg) rotateY({{cb.ay}}deg) rotateZ({{cb.az}}deg) translate3d({{cb.x}}px, {{cb.y}}px, {{cb.z}}px)">
@@ -877,6 +905,7 @@ a{color:inherit}
   <!-- the opened file: a manila folder that comes out and opens on its cover -->
   <sc-if value="{{doc.show}}" hint-placeholder-val="{{ false }}">
     <div class="{{doc.fadeCls}}" onClick="{{closeDoc}}" style="position: absolute; left: -1600px; top: -1000px; width: 4200px; height: 3000px; background: radial-gradient(ellipse 860px 620px at 2100px 1520px, rgba(24,17,10,0.3), rgba(24,17,10,0.72))"></div>
+    <sc-if value="{{doc.isFolder}}" hint-placeholder-val="{{ true }}">
     <div role="dialog" aria-label="{{doc.name}}" class="{{doc.inCls}}" style="position: absolute; left: 20px; top: 160px; width: 960px; height: 680px; perspective: 2000px">
       <div class="typed" style="position: absolute; left: 500px; top: -30px; width: 220px; height: 34px; background: #d4b273; border: 1px solid #8a6a3a; border-bottom: 0; border-radius: 9px 9px 0 0; box-sizing: border-box; padding: 8px 16px; font-size: 12px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: #4a3a22; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{doc.name}}</div>
       <div style="position: absolute; left: 480px; top: 0; width: 480px; height: 680px; background: #d9bb7e; border: 1px solid #8a6a3a; border-radius: 0 7px 7px 0; box-sizing: border-box; box-shadow: 0 34px 70px rgba(0,0,0,0.4)">
@@ -917,6 +946,53 @@ a{color:inherit}
       </div>
       <button type="button" class="scribble" onClick="{{closeDoc}}" style="position: absolute; right: 0; top: -54px; color: #fbf6ec">put it back</button>
     </div>
+    </sc-if>
+
+    <!-- the degree, taken down off the shelf: a walnut frame, a gold fillet, the mat, and the certificate behind glass -->
+    <sc-if value="{{doc.isCert}}" hint-placeholder-val="{{ false }}">
+    <div role="dialog" aria-label="{{doc.role}}" class="{{doc.certCls}}" style="position: absolute; left: 110px; top: 150px; width: 780px; height: 700px">
+      <div style="position: absolute; left: 0; top: 30px; width: 480px; height: 624px; box-sizing: border-box; padding: 22px; background: #6b4228; border: 1.5px solid #2a2420; border-radius: 3px; box-shadow: inset 3px 3px 0 #8d5c3a, inset -3px -3px 0 #4f2f1c, 0 34px 70px rgba(0,0,0,0.45)">
+        <div style="width: 100%; height: 100%; box-sizing: border-box; padding: 4px; background: #d9a541; border: 1px solid #2a2420; box-shadow: inset 0 0 0 1px #f0cf7a">
+          <div style="position: relative; width: 100%; height: 100%; box-sizing: border-box; padding: 34px 30px; background: #f1e8d6; box-shadow: inset 2px 3px 6px rgba(60,40,10,0.28)">
+            <div style="width: 100%; height: 100%; box-sizing: border-box; padding: 6px; background: #fbf3df; border: 1px solid #c9b48a; box-shadow: 0 1px 3px rgba(60,40,10,0.18)">
+              <div style="position: relative; width: 100%; height: 100%; box-sizing: border-box; border: 3px double #b08d4a; padding: 26px 22px 20px; display: flex; flex-direction: column; align-items: center; text-align: center; color: #2a2420; font-family: 'Instrument Serif', Georgia, serif">
+                <div style="font-size: 15px; letter-spacing: 0.16em; text-transform: uppercase; line-height: 1.3">Jawaharlal Nehru<br/>Technological University</div>
+                <div style="margin-top: 4px; font-family: Inter, system-ui, sans-serif; font-size: 9.5px; font-weight: 600; letter-spacing: 0.3em; color: #6b5a46">ANANTAPUR</div>
+                <svg width="120" height="12" viewBox="0 0 120 12" aria-hidden="true" style="margin-top: 14px"><path d="M4 6 H50 M70 6 H116" stroke="#b08d4a" stroke-width="1"/><path d="M60 1 L65 6 L60 11 L55 6 Z" fill="#d9a541" stroke="#9c7426" stroke-width="0.8"/></svg>
+                <div style="margin-top: 16px; font-style: italic; font-size: 17px; color: #4f4438">This is to certify that</div>
+                <div style="margin-top: 6px; font-style: italic; font-size: 50px; line-height: 1.05">Gokul MV</div>
+                <div style="margin-top: 8px; font-style: italic; font-size: 15px; color: #4f4438">has been admitted to the degree of</div>
+                <div style="margin-top: 10px; font-size: 30px; line-height: 1.1">Bachelor of Technology</div>
+                <div style="margin-top: 6px; font-size: 16px; line-height: 1.3">in Electronics and Communications Engineering</div>
+                <div style="margin-top: 8px; font-family: Inter, system-ui, sans-serif; font-size: 11px; font-weight: 600; letter-spacing: 0.24em; color: #6b5a46">2018</div>
+                <div style="margin-top: auto; align-self: stretch; display: flex; align-items: flex-end; justify-content: space-between; padding: 0 6px">
+                  <svg width="70" height="84" viewBox="0 0 70 84" aria-hidden="true">
+                    <path d="M24 44 L12 82 L22 75 L28 84 L36 52 Z M46 44 L58 82 L48 75 L42 84 L34 52 Z" fill="#b3372f" stroke="#2a2420" stroke-width="1"/>
+                    <path d="M35 4 L39.5 9.2 L46 7.4 L47.1 14.1 L53.6 16 L51.3 22.4 L56 27.3 L51 31.8 L52.7 38.4 L46.1 39.7 L44.4 46.3 L38 44.2 L33 48.8 L28.6 43.6 L22 45.4 L21 38.7 L14.4 36.8 L16.7 30.4 L12 25.5 L17 21 L15.3 14.4 L21.9 13.1 L23.6 6.5 L30 8.6 Z" fill="#d9a541" stroke="#9c7426" stroke-width="1"/>
+                    <circle cx="34" cy="26.6" r="12.5" fill="none" stroke="#9c7426" stroke-width="1"/>
+                    <circle cx="34" cy="26.6" r="9" fill="#e6b956" stroke="#9c7426" stroke-width="0.6"/>
+                    <path d="M28 27 l4 4 l8 -9" fill="none" stroke="#9c7426" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+                  </svg>
+                  <svg width="140" height="54" viewBox="0 0 140 54" aria-hidden="true">
+                    <path d="M8 34 C16 10 24 40 32 24 S44 8 50 30 S62 38 70 22 S88 20 92 30 S110 26 128 18" fill="none" stroke="#2f4058" stroke-width="1.6" stroke-linecap="round"/>
+                    <path d="M4 44 H136" stroke="#8a7a5a" stroke-width="1"/>
+                  </svg>
+                </div>
+              </div>
+            </div>
+            <div aria-hidden="true" style="position: absolute; inset: 0; pointer-events: none; background: linear-gradient(118deg, rgba(255,255,255,0) 30%, rgba(255,255,255,0.2) 36%, rgba(255,255,255,0) 44%, rgba(255,255,255,0) 58%, rgba(255,255,255,0.12) 61%, rgba(255,255,255,0) 64%)"></div>
+          </div>
+        </div>
+      </div>
+      <!-- a note tucked beside it -->
+      <div style="position: absolute; left: 512px; top: 150px; width: 252px; box-sizing: border-box; padding: 22px 22px 18px; background: #ffe88a; transform: rotate(2.4deg); box-shadow: 0 10px 18px rgba(0,0,0,0.3); color: #2a2420">
+        <span aria-hidden="true" style="position: absolute; left: 86px; top: -10px; width: 80px; height: 22px; background: rgba(239,230,214,0.75); transform: rotate(-3deg)"></span>
+        <div class="hand" style="font-size: 27px; font-weight: 700; line-height: 1">{{doc.kind}}</div>
+        <div class="hand" style="margin-top: 10px; font-size: 20px; line-height: 1.15">{{doc.summary}}</div>
+      </div>
+      <button type="button" class="scribble" onClick="{{closeDoc}}" style="position: absolute; right: 16px; top: -22px; color: #fbf6ec">put it back</button>
+    </div>
+    </sc-if>
   </sc-if>
 
   <!-- the visitors' board, taken down to read: pin a note from the pad -->
@@ -1535,21 +1611,21 @@ class Component extends DCLogic {
         stack: ['Claude Code', 'GitHub Copilot', 'LangChain4j', 'MCP', 'RAG pipelines', 'AWS CloudWatch'],
       },
       ed: {
-        x: 290, y: 333, w: 50, h: 212, color: '#d9a541', rule: '#f6e3b4', ink: '#2a2420', hole: '#9c7426', yA: 'ECE', yB: '2018', name: 'B.Tech · JNTU',
+        frame: true, x: 379, y: 410, w: 104, h: 135, color: '#d9a541', yA: 'ECE', yB: '2018', name: 'B.Tech · JNTU',
         kind: 'Education', role: 'B.Tech, Electronics and Communications Engineering', dates: 'Jawaharlal Nehru Technological University (JNTU), Anantapur · 2018',
         summary: 'A degree in electronics and communications engineering. I moved into software straight after, joining Cognizant as a programmer analyst in February 2019.',
         listTitle: 'Details',
         points: ['Bachelor of Technology (B.Tech), Electronics and Communications Engineering, 2018.', 'Jawaharlal Nehru Technological University (JNTU), Anantapur.'],
       },
       ag: {
-        x: 344, y: 353, w: 40, h: 192, color: '#c98f86', rule: '#f3d9d4', ink: '#2a2420', hole: '#8e5a52', yA: '2025', yB: 'cert', name: 'Agile & Scrum',
+        x: 262, y: 353, w: 40, h: 192, color: '#c98f86', rule: '#f3d9d4', ink: '#2a2420', hole: '#8e5a52', yA: '2025', yB: 'cert', name: 'Agile & Scrum',
         kind: 'Certification', role: 'Agile and Scrum Product Management', dates: 'HP LIFE · 2025',
         summary: 'It backs up the product-owner side of my work: at OpenText I owned OT2Central end to end, as product owner, developer and QA.',
         listTitle: 'Details',
         points: ['Agile and Scrum Product Management, HP LIFE, 2025.', 'Put to use owning OT2Central from roadmap and requirements through delivery and release.'],
       },
       sk: {
-        x: 388, y: 345, w: 34, h: 200, color: '#e9dcc4', rule: '#b8a98e', ink: '#2a2420', hole: '#b8a98e', yA: 'Java', yB: '& co', name: 'Skills',
+        x: 306, y: 345, w: 34, h: 200, color: '#e9dcc4', rule: '#b8a98e', ink: '#2a2420', hole: '#b8a98e', yA: 'Java', yB: '& co', name: 'Skills',
         kind: 'Skills', role: 'What I build with, every day and when it is needed', dates: 'Seven years in production, front end to infrastructure',
         summary: 'Every day: Java 17/21, Spring Boot, Kafka, PostgreSQL, AWS, Terraform and GitHub Actions. I have shipped with plenty more, front end included.',
         stats: [['7+', 'years in production'], ['3', 'companies'], ['11', 'projects on the GitHub shelf']],
@@ -1566,7 +1642,7 @@ class Component extends DCLogic {
         ],
       },
       cv: {
-        x: 426, y: 363, w: 30, h: 182, color: '#8fa58a', rule: '#e3ecdf', ink: '#2a2420', hole: '#5f7559', yA: 'PDF', yB: '↓', name: 'Résumé',
+        x: 344, y: 363, w: 30, h: 182, color: '#8fa58a', rule: '#e3ecdf', ink: '#2a2420', hole: '#5f7559', yA: 'PDF', yB: '↓', name: 'Résumé',
         kind: 'Résumé', role: 'Gokul MV · AI full stack engineer', dates: 'Hyderabad, India · reddy.gokul@gmail.com · +91 80194 43788',
         summary: 'Senior software engineer with 7+ years building and operating Java platforms in production: multi-tenant systems sustaining 50K+ API calls a minute at 100–120 ms over 600M+ records, and event-driven microservices on AWS processing millions of Kafka events. End-to-end ownership, from ambiguous requirements through architecture, delivery and production support.',
         listTitle: 'In short', isCV: true, link: 'https://www.linkedin.com/in/gokulmv', linkText: 'LinkedIn ↗',
@@ -1683,10 +1759,10 @@ class Component extends DCLogic {
       const f = FILES[id];
       const up = s.hover === id || s.open === id;
       return {
-        ...f, lift: up ? (f.flat ? -9 : -28) : 0, tilt: up ? (f.flat ? -1.5 : -2) : 0, sc: f.flat && up ? 1.04 : 1, lw: Math.max(18, (f.w || 32) - 16),
+        ...f, lift: up ? (f.flat ? -9 : f.frame ? -14 : -28) : 0, tilt: up ? (f.flat ? -1.5 : f.frame ? -3 : -2) : 0, sc: f.flat && up ? 1.04 : 1, lw: Math.max(18, (f.w || 32) - 16),
         // The button is a still hit area covering the file and the space it lifts into; only the file inside moves.
         hy: f.y - (f.flat ? 12 : 34), hh: (f.flat ? 26 : f.h) + (f.flat ? 12 : 34), ht: f.flat ? 12 : 34, z: up ? 5 : 1,
-        aria: `${f.name}, ${f.yA ? `${f.yA}–${f.yB}` : f.lang}: open`,
+        aria: f.frame ? `${f.name} degree certificate, ${f.yB}: take it down` : `${f.name}, ${f.yA ? `${f.yA}–${f.yB}` : f.lang}: open`,
         hover: () => this.setState({ hover: id }),
         leave: () => this.setState({ hover: null }),
         open: () => this.setState({ open: id, docClosing: false }),
@@ -1952,7 +2028,8 @@ class Component extends DCLogic {
       } : { place: `${season}`, temp: '', cond: WX[weather], canLocate: false, detail: 'the room keeps its own weather here', locate: () => {} },
       boards: [{ ty: 256, ts: 0, yf: 256, yu: 296, us: 11 }, { ty: 542, ts: 3, yf: 545, yu: 585, us: 3 }, { ty: 810, ts: 20, yf: 830, yu: 870, us: 0 }],
       work: ['tw', 'ot', 'cg', 'ai'].map(file),
-      edu: ['ed', 'ag', 'sk', 'cv'].map(file),
+      edu: ['ag', 'sk', 'cv'].map(file),
+      cert: file('ed'),
       gitFlat: ['ch', 'oo', 'lv'].map(file),
       gitUp: ['dth', 'rig', 'tu', 'pf', 'ov', 'kr', 'nf', 'mc'].map(file),
       pothos, vines, ech, tri, fallen, can, tag,
@@ -2150,7 +2227,7 @@ class Component extends DCLogic {
       cradleCls: s.cradleOn ? 'swing' : '',
       swing: () => { if (this.state.cradleOn) return; this.setState({ cradleOn: true }); this.later('cradle', 4600, () => this.setState({ cradleOn: false })); },
 
-      doc: d ? { ...d, show: true, inCls: s.docClosing ? 'folderOut' : 'folderIn', fadeCls: s.docClosing ? 'fadeOut' : 'fadeIn', stackLine: (d.stack || []).join(' · '), summary: d.summary || '', listTitle: d.listTitle || 'What I did', hasLink: !!d.link, link: d.link || '', linkText: d.linkText || '', isCV: !!d.isCV, hasStats: !!(d.stats && d.stats.length), stats: (d.stats || []).map(([n, l]) => ({ n, l })), hasStack: !!(d.stack && d.stack.length), stack: (d.stack || []).map((t) => ({ t })), points: d.points.map((text) => ({ text })) } : { show: false, inCls: '', fadeCls: '', stackLine: '', hasLink: false, link: '', linkText: '', isCV: false, hasStats: false, stats: [], hasStack: false, stack: [], name: '', kind: '', role: '', dates: '', summary: '', listTitle: '', color: '#fbf6ec', ink: '#2a2420', points: [] },
+      doc: d ? { ...d, show: true, isCert: !!d.frame, isFolder: !d.frame, certCls: s.docClosing ? 'certOut' : 'certIn', inCls: s.docClosing ? 'folderOut' : 'folderIn', fadeCls: s.docClosing ? 'fadeOut' : 'fadeIn', stackLine: (d.stack || []).join(' · '), summary: d.summary || '', listTitle: d.listTitle || 'What I did', hasLink: !!d.link, link: d.link || '', linkText: d.linkText || '', isCV: !!d.isCV, hasStats: !!(d.stats && d.stats.length), stats: (d.stats || []).map(([n, l]) => ({ n, l })), hasStack: !!(d.stack && d.stack.length), stack: (d.stack || []).map((t) => ({ t })), points: d.points.map((text) => ({ text })) } : { show: false, isCert: false, isFolder: false, certCls: '', inCls: '', fadeCls: '', stackLine: '', hasLink: false, link: '', linkText: '', isCV: false, hasStats: false, stats: [], hasStack: false, stack: [], name: '', kind: '', role: '', dates: '', summary: '', listTitle: '', color: '#fbf6ec', ink: '#2a2420', points: [] },
       closeDoc: () => { if (!this.state.open || this.state.docClosing) return; this.setState({ docClosing: true, hover: null }); this.later('docClose', 260, () => this.setState({ open: null, docClosing: false })); },
     };
   }
