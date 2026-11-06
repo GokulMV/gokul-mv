@@ -128,6 +128,9 @@ a{color:inherit}
 .folderIn{animation:folderIn 0.4s cubic-bezier(.2,.8,.2,1) both}
 @keyframes coverOpen{0%{transform:rotateY(178deg)}100%{transform:rotateY(0)}}
 .folderIn .cover{animation:coverOpen 0.8s 0.3s cubic-bezier(.3,.7,.2,1) both}
+@keyframes coverOpenL{0%{transform:rotateY(0)}100%{transform:rotateY(-178deg)}}
+.folderIn .coverL{animation:coverOpenL 0.8s 0.3s cubic-bezier(.3,.7,.2,1) both}
+.folderOut .coverL{transform:rotateY(-178deg)}
 @keyframes folderOut{0%{transform:none;opacity:1}100%{transform:translateY(70px) scale(0.84);opacity:0}}
 .folderOut{animation:folderOut 0.26s ease-in both}
 @keyframes certIn{0%{transform:translateY(90px) rotate(-5deg) scale(0.8);opacity:0}65%{transform:translateY(-6px) rotate(0.8deg) scale(1.01);opacity:1}100%{transform:none;opacity:1}}
@@ -137,7 +140,7 @@ a{color:inherit}
 @keyframes fadeIn{from{opacity:0}to{opacity:1}}
 .fadeIn{animation:fadeIn 0.3s both}
 .fadeOut{animation:fadeIn 0.26s reverse both}
-@media (prefers-reduced-motion: reduce){.flame,.ignite,.smoke,.drip,.perk,.drive,.drive .wheel,.walking,.walking *,.swing .pl,.swing .pr,.twist,.tug,.pop,.s1,.s2,.s3,.s4,.rainfall,.snowfall,.sway,.drift,.leafFall,.twinkle,.poof,.boing,.dangle,.hang,.gusty .hang,.gusty .treeTop,.gusty .flame,.gusty .note,.windLine,.secHand,.candleLight,.wobble,.tipOut,.tipHang,.spillStream,.puddle,.dripLong,.blowLeaf,.blowLeafL,.folderIn,.folderIn .cover,.folderOut,.certIn,.certOut,.fadeIn,.fadeOut,.confetti,.spark,.unroll{animation:none !important}.lift,.can{transition:none}}
+@media (prefers-reduced-motion: reduce){.flame,.ignite,.smoke,.drip,.perk,.drive,.drive .wheel,.walking,.walking *,.swing .pl,.swing .pr,.twist,.tug,.pop,.s1,.s2,.s3,.s4,.rainfall,.snowfall,.sway,.drift,.leafFall,.twinkle,.poof,.boing,.dangle,.hang,.gusty .hang,.gusty .treeTop,.gusty .flame,.gusty .note,.windLine,.secHand,.candleLight,.wobble,.tipOut,.tipHang,.spillStream,.puddle,.dripLong,.blowLeaf,.blowLeafL,.folderIn,.folderIn .cover,.folderIn .coverL,.folderOut,.certIn,.certOut,.fadeIn,.fadeOut,.confetti,.spark,.unroll{animation:none !important}.lift,.can{transition:none}}
 </style>
 </helmet>
 <div data-room="1" class="{{v.rootClass}}" onPointerMove="{{move}}" onPointerUp="{{up}}" onPointerLeave="{{up}}" style="width: 1400px; height: 1000px; position: relative; overflow: {{v.overflow}}; font-family: Inter, system-ui, sans-serif; color: #2a2420">
@@ -948,6 +951,93 @@ a{color:inherit}
     </div>
     </sc-if>
 
+    <!-- on a narrow screen the folder is one page: everything on one sheet, and the cover swings open to the left -->
+    <sc-if value="{{doc.isFolderC}}" hint-placeholder-val="{{ false }}">
+    <div role="dialog" aria-label="{{doc.name}}" class="{{doc.inCls}}" style="position: absolute; left: 260px; top: 130px; width: 480px; height: 740px; perspective: 2000px">
+      <div class="typed" style="position: absolute; left: 230px; top: -30px; width: 230px; height: 34px; background: #d4b273; border: 1px solid #8a6a3a; border-bottom: 0; border-radius: 9px 9px 0 0; box-sizing: border-box; padding: 8px 16px; font-size: 12px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: #4a3a22; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{doc.name}}</div>
+      <div style="position: absolute; left: 0; top: 0; width: 480px; height: 740px; background: #d9bb7e; border: 1px solid #8a6a3a; border-radius: 7px; box-sizing: border-box; box-shadow: 0 34px 70px rgba(0,0,0,0.4)">
+        <div class="typed" style="position: absolute; left: 16px; top: 18px; right: 18px; bottom: 18px; background-color: #fffdf7; background-image: linear-gradient(90deg, transparent 26px, rgba(201,71,59,0.32) 26px, rgba(201,71,59,0.32) 27px, transparent 27px); box-shadow: 0 1px 0 #e8e1d2, 0 3px 0 #fffdf7, 0 4px 0 #e1d9c8, 0 10px 18px rgba(60,40,10,0.2); padding: 26px 22px 24px 40px; box-sizing: border-box; overflow-y: auto; overscroll-behavior: contain; touch-action: pan-y; color: #2a2420">
+          <div style="display: flex; align-items: stretch; align-self: flex-start; width: max-content; background: #fffdf7; border: 1px solid #b89a62; transform: rotate(-1.2deg)"><span style="width: 10px; background: {{doc.color}}"></span><span style="padding: 4px 11px; font-size: 11px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase">{{doc.kind}}</span></div>
+          <div style="font-family: 'Instrument Serif', Georgia, serif; font-size: 40px; line-height: 1; margin-top: 14px">{{doc.name}}</div>
+          <div style="margin-top: 8px; font-size: 14px; font-weight: 700; line-height: 1.4">{{doc.role}}</div>
+          <div style="margin-top: 4px; font-size: 12.5px; color: #5a4a32">{{doc.dates}}</div>
+          <div style="margin-top: 12px; font-size: 13.5px; line-height: 1.6">{{doc.summary}}</div>
+          <sc-if value="{{doc.hasStats}}" hint-placeholder-val="{{ false }}">
+            <div style="margin: 18px 0 4px; background: #ffe88a; padding: 12px 16px 10px; transform: rotate(-1deg); box-shadow: 0 6px 12px rgba(60,40,10,0.18); display: flex; flex-direction: column; gap: 2px">
+              <sc-for list="{{doc.stats}}" as="st" hint-placeholder-count="3">
+                <div class="hand" style="display: flex; gap: 10px; align-items: baseline"><span style="font-size: 24px; font-weight: 700; min-width: 96px; white-space: nowrap">{{st.n}}</span><span style="font-size: 17px; line-height: 1.05">{{st.l}}</span></div>
+              </sc-for>
+            </div>
+          </sc-if>
+          <div style="margin-top: 20px; font-size: 12px; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase; padding-bottom: 7px; border-bottom: 1px solid #2a2420; margin-bottom: 14px">{{doc.listTitle}}</div>
+          <sc-for list="{{doc.points}}" as="pt" hint-placeholder-count="4">
+            <div style="display: flex; gap: 10px; font-size: 13px; line-height: 1.5; margin-bottom: 10px"><span style="flex: none">—</span><span>{{pt.text}}</span></div>
+          </sc-for>
+          <sc-if value="{{doc.hasStack}}" hint-placeholder-val="{{ false }}">
+            <div style="margin-top: 14px; font-size: 12px; line-height: 1.65; color: #4f4438"><b style="letter-spacing: 0.14em">BUILT WITH</b> {{doc.stackLine}}</div>
+          </sc-if>
+          <div style="margin-top: 18px; display: flex; gap: 22px; align-items: center; flex-wrap: wrap">
+            <sc-if value="{{doc.hasLink}}" hint-placeholder-val="{{ false }}"><a class="hand" href="{{doc.link}}" target="_blank" rel="noopener" style="font-size: 23px; font-weight: 700; color: #2f4058; text-decoration: none; word-break: break-word">→ {{doc.linkText}}</a></sc-if>
+            <sc-if value="{{doc.isCV}}" hint-placeholder-val="{{ false }}"><a class="stamp" href="/_blob/43da7d3578c29d1ed2ce3e345e33799a" download="Gokul_MV_Resume.pdf" target="_blank" rel="noopener">Download résumé</a></sc-if>
+          </div>
+        </div>
+        <svg width="26" height="60" viewBox="0 0 26 60" aria-hidden="true" style="position: absolute; left: 60px; top: 2px"><path d="M8 54 V10 a5 5 0 0 1 10 0 V48 a3 3 0 0 1 -6 0 V16" fill="none" stroke="#8d96a0" stroke-width="2.4" stroke-linecap="round"/></svg>
+      </div>
+      <div class="coverL" style="position: absolute; left: 0; top: 0; width: 480px; height: 740px; transform-origin: 0 50%; transform-style: preserve-3d; pointer-events: none">
+        <div style="position: absolute; inset: 0; background: #e4c68c; border: 1px solid #8a6a3a; border-radius: 7px; box-sizing: border-box; backface-visibility: hidden; display: flex; align-items: center; justify-content: center">
+          <div class="typed" style="padding: 10px 22px; background: #fffdf7; border: 1px solid #b89a62; font-size: 18px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase">{{doc.name}}</div>
+        </div>
+        <div style="position: absolute; inset: 0; background: #dfbf82; border: 1px solid #8a6a3a; border-radius: 7px; box-sizing: border-box; transform: rotateY(180deg); backface-visibility: hidden"></div>
+      </div>
+      <button type="button" class="scribble" onClick="{{closeDoc}}" style="position: absolute; left: 0; top: -48px; color: #fbf6ec">put it back</button>
+    </div>
+    </sc-if>
+
+    <!-- on a narrow screen the certificate's note sits under the frame -->
+    <sc-if value="{{doc.isCertC}}" hint-placeholder-val="{{ false }}">
+    <div role="dialog" aria-label="{{doc.role}}" class="{{doc.certCls}}" style="position: absolute; left: 260px; top: 110px; width: 480px; height: 820px">
+      <div style="position: absolute; left: 0; top: 0; width: 480px; height: 624px; box-sizing: border-box; padding: 22px; background: #6b4228; border: 1.5px solid #2a2420; border-radius: 3px; box-shadow: inset 3px 3px 0 #8d5c3a, inset -3px -3px 0 #4f2f1c, 0 34px 70px rgba(0,0,0,0.45)">
+        <div style="width: 100%; height: 100%; box-sizing: border-box; padding: 4px; background: #d9a541; border: 1px solid #2a2420; box-shadow: inset 0 0 0 1px #f0cf7a">
+          <div style="position: relative; width: 100%; height: 100%; box-sizing: border-box; padding: 34px 30px; background: #f1e8d6; box-shadow: inset 2px 3px 6px rgba(60,40,10,0.28)">
+            <div style="width: 100%; height: 100%; box-sizing: border-box; padding: 6px; background: #fbf3df; border: 1px solid #c9b48a; box-shadow: 0 1px 3px rgba(60,40,10,0.18)">
+              <div style="position: relative; width: 100%; height: 100%; box-sizing: border-box; border: 3px double #b08d4a; padding: 26px 22px 20px; display: flex; flex-direction: column; align-items: center; text-align: center; color: #2a2420; font-family: 'Instrument Serif', Georgia, serif">
+                <div style="font-size: 15px; letter-spacing: 0.16em; text-transform: uppercase; line-height: 1.3">Jawaharlal Nehru<br/>Technological University</div>
+                <div style="margin-top: 4px; font-family: Inter, system-ui, sans-serif; font-size: 9.5px; font-weight: 600; letter-spacing: 0.3em; color: #6b5a46">ANANTAPUR</div>
+                <svg width="120" height="12" viewBox="0 0 120 12" aria-hidden="true" style="margin-top: 14px"><path d="M4 6 H50 M70 6 H116" stroke="#b08d4a" stroke-width="1"/><path d="M60 1 L65 6 L60 11 L55 6 Z" fill="#d9a541" stroke="#9c7426" stroke-width="0.8"/></svg>
+                <div style="margin-top: 16px; font-style: italic; font-size: 17px; color: #4f4438">This is to certify that</div>
+                <div style="margin-top: 6px; font-style: italic; font-size: 50px; line-height: 1.05">Gokul MV</div>
+                <div style="margin-top: 8px; font-style: italic; font-size: 15px; color: #4f4438">has been admitted to the degree of</div>
+                <div style="margin-top: 10px; font-size: 30px; line-height: 1.1">Bachelor of Technology</div>
+                <div style="margin-top: 6px; font-size: 16px; line-height: 1.3">in Electronics and Communications Engineering</div>
+                <div style="margin-top: 8px; font-family: Inter, system-ui, sans-serif; font-size: 11px; font-weight: 600; letter-spacing: 0.24em; color: #6b5a46">2018</div>
+                <div style="margin-top: auto; align-self: stretch; display: flex; align-items: flex-end; justify-content: space-between; padding: 0 6px">
+                  <svg width="70" height="84" viewBox="0 0 70 84" aria-hidden="true">
+                    <path d="M24 44 L12 82 L22 75 L28 84 L36 52 Z M46 44 L58 82 L48 75 L42 84 L34 52 Z" fill="#b3372f" stroke="#2a2420" stroke-width="1"/>
+                    <path d="M35 4 L39.5 9.2 L46 7.4 L47.1 14.1 L53.6 16 L51.3 22.4 L56 27.3 L51 31.8 L52.7 38.4 L46.1 39.7 L44.4 46.3 L38 44.2 L33 48.8 L28.6 43.6 L22 45.4 L21 38.7 L14.4 36.8 L16.7 30.4 L12 25.5 L17 21 L15.3 14.4 L21.9 13.1 L23.6 6.5 L30 8.6 Z" fill="#d9a541" stroke="#9c7426" stroke-width="1"/>
+                    <circle cx="34" cy="26.6" r="12.5" fill="none" stroke="#9c7426" stroke-width="1"/>
+                    <circle cx="34" cy="26.6" r="9" fill="#e6b956" stroke="#9c7426" stroke-width="0.6"/>
+                    <path d="M28 27 l4 4 l8 -9" fill="none" stroke="#9c7426" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+                  </svg>
+                  <svg width="140" height="54" viewBox="0 0 140 54" aria-hidden="true">
+                    <path d="M8 34 C16 10 24 40 32 24 S44 8 50 30 S62 38 70 22 S88 20 92 30 S110 26 128 18" fill="none" stroke="#2f4058" stroke-width="1.6" stroke-linecap="round"/>
+                    <path d="M4 44 H136" stroke="#8a7a5a" stroke-width="1"/>
+                  </svg>
+                </div>
+              </div>
+            </div>
+            <div aria-hidden="true" style="position: absolute; inset: 0; pointer-events: none; background: linear-gradient(118deg, rgba(255,255,255,0) 30%, rgba(255,255,255,0.2) 36%, rgba(255,255,255,0) 44%, rgba(255,255,255,0) 58%, rgba(255,255,255,0.12) 61%, rgba(255,255,255,0) 64%)"></div>
+          </div>
+        </div>
+      </div>
+      <div style="position: absolute; left: 150px; top: 606px; width: 320px; box-sizing: border-box; padding: 20px 22px 16px; background: #ffe88a; transform: rotate(2deg); box-shadow: 0 10px 18px rgba(0,0,0,0.3); color: #2a2420">
+        <span aria-hidden="true" style="position: absolute; left: 120px; top: -10px; width: 80px; height: 22px; background: rgba(239,230,214,0.75); transform: rotate(-3deg)"></span>
+        <div class="hand" style="font-size: 26px; font-weight: 700; line-height: 1">{{doc.kind}}</div>
+        <div class="hand" style="margin-top: 8px; font-size: 20px; line-height: 1.15">{{doc.summary}}</div>
+      </div>
+      <button type="button" class="scribble" onClick="{{closeDoc}}" style="position: absolute; right: 0; top: -48px; color: #fbf6ec">put it back</button>
+    </div>
+    </sc-if>
+
     <!-- the degree, taken down off the shelf: a walnut frame, a gold fillet, the mat, and the certificate behind glass -->
     <sc-if value="{{doc.isCert}}" hint-placeholder-val="{{ false }}">
     <div role="dialog" aria-label="{{doc.role}}" class="{{doc.certCls}}" style="position: absolute; left: 110px; top: 150px; width: 780px; height: 700px">
@@ -998,7 +1088,7 @@ a{color:inherit}
   <!-- the visitors' board, taken down to read: pin a note from the pad -->
   <sc-if value="{{board.open}}" hint-placeholder-val="{{ false }}">
     <div class="fadeIn" onClick="{{notesClose}}" style="position: absolute; left: -1600px; top: -1000px; width: 4200px; height: 3000px; background: radial-gradient(ellipse 860px 620px at 2100px 1500px, rgba(24,17,10,0.3), rgba(24,17,10,0.72))"></div>
-    <div role="dialog" aria-label="Notes from visitors" class="folderIn" style="position: absolute; left: 60px; top: 170px; width: 880px; height: 620px; background: #8a5a32; border: 1.5px solid #2a2420; border-radius: 4px; box-sizing: border-box; padding: 16px; box-shadow: 0 34px 70px rgba(0,0,0,0.45)">
+    <div role="dialog" aria-label="Notes from visitors" class="folderIn" style="position: absolute; left: {{board.bl}}px; top: {{board.bt}}px; width: {{board.bw}}px; height: {{board.bh}}px; background: #8a5a32; border: 1.5px solid #2a2420; border-radius: 4px; box-sizing: border-box; padding: 16px; box-shadow: 0 34px 70px rgba(0,0,0,0.45)">
       <div style="position: relative; width: 100%; height: 100%; background-color: #c79a62; background-image: radial-gradient(#a97b45 1.2px, transparent 1.4px), radial-gradient(#d9ad74 1px, transparent 1.2px); background-size: 9px 9px, 13px 13px; background-position: 0 0, 4px 6px; border: 1px solid #2a2420; overflow: hidden">
         <div class="hand" style="position: absolute; left: 22px; top: 16px; padding: 4px 16px; background: #fbf6ec; border: 1px solid rgba(42,36,32,0.6); transform: rotate(-2deg); font-size: 30px; font-weight: 700; box-shadow: 0 3px 6px rgba(0,0,0,0.15)">Notes from visitors</div>
         <sc-for list="{{board.notes}}" as="nt" hint-placeholder-count="6">
@@ -1010,7 +1100,7 @@ a{color:inherit}
           </div>
         </sc-for>
         <!-- the pad: write on the top sheet, pick a colour, pin it -->
-        <div style="position: absolute; left: 628px; top: 352px; width: 200px; height: 200px">
+        <div style="position: absolute; left: {{board.padL}}px; top: {{board.padT}}px; width: 200px; height: 200px">
           <div style="position: absolute; left: 6px; top: 6px; width: 190px; height: 190px; background: {{board.draftColor}}; filter: brightness(0.9); box-shadow: 0 4px 6px rgba(0,0,0,0.2)"></div>
           <div style="position: absolute; left: 3px; top: 3px; width: 190px; height: 190px; background: {{board.draftColor}}; filter: brightness(0.95)"></div>
           <div style="position: absolute; left: 0; top: 0; width: 190px; height: 190px; background: {{board.draftColor}}; box-shadow: 0 1px 2px rgba(0,0,0,0.15); display: flex; flex-direction: column; padding: 12px 14px 10px; box-sizing: border-box">
@@ -1018,10 +1108,10 @@ a{color:inherit}
             <input class="hand" value="{{board.draftName}}" onInput="{{onDraftName}}" maxlength="24" placeholder="— your name" aria-label="Your name" style="border: 0; border-top: 1px dashed rgba(42,36,32,0.35); outline: none; background: transparent; font-size: 17px; color: #4f4438; padding: 4px 0 0">
           </div>
         </div>
-        <div style="position: absolute; left: 560px; top: 360px; display: flex; flex-direction: column; gap: 10px">
+        <div style="position: absolute; left: {{board.colL}}px; top: {{board.colT}}px; display: flex; flex-direction: column; gap: 10px">
           <sc-for list="{{board.colors}}" as="co" hint-placeholder-count="4"><button type="button" onClick="{{co.pick}}" aria-label="{{co.aria}}" aria-pressed="{{co.pressed}}" style="appearance: none; width: 34px; height: 34px; cursor: pointer; border: 0; background: {{co.c}}; box-shadow: {{co.shadow}}; transform: {{co.lift}}; transition: transform 160ms"></button></sc-for>
         </div>
-        <button type="button" class="scribble" onClick="{{pinNote}}" style="position: absolute; left: 690px; top: 556px; color: #2a2420; display: flex; align-items: center; gap: 6px">
+        <button type="button" class="scribble" onClick="{{pinNote}}" style="position: absolute; left: {{board.pinL}}px; top: {{board.pinT}}px; color: #2a2420; display: flex; align-items: center; gap: 6px">
           <svg width="18" height="22" viewBox="0 0 18 22" aria-hidden="true"><circle cx="9" cy="7" r="6.5" fill="#c9473b" stroke="#2a2420" stroke-width="1"/><circle cx="7" cy="5" r="2" fill="#f2a397"/><path d="M9 13 V21" stroke="#2a2420" stroke-width="1.6" stroke-linecap="round"/></svg>pin it
         </button>
         <div class="typed" style="position: absolute; left: 22px; bottom: 12px; font-size: 11px; color: #4a3220">{{board.count}}</div>
@@ -1033,11 +1123,11 @@ a{color:inherit}
   <!-- the Rubik's cube, taken off the shelf: drag a row to turn it -->
   <sc-if value="{{cubeUI.open}}" hint-placeholder-val="{{ false }}">
     <div class="fadeIn" style="position: absolute; left: -1600px; top: -1000px; width: 4200px; height: 3000px; background: radial-gradient(circle at 2100px 1460px, rgba(255,236,200,0.1) 0, rgba(18,12,7,0.82) 250px, rgba(10,7,4,0.93) 560px)"></div>
-    <div role="dialog" aria-label="Rubik's cube" tabindex="0" onKeyDown="{{cubeKey}}" style="position: absolute; left: 160px; top: 90px; width: 680px; height: 820px; outline: none; color: #fbf6ec; text-shadow: 0 2px 8px rgba(0,0,0,0.85)">
+    <div role="dialog" aria-label="Rubik's cube" tabindex="0" onKeyDown="{{cubeKey}}" style="position: absolute; left: {{cubeUI.dl}}px; top: 90px; width: {{cubeUI.dw}}px; height: 820px; outline: none; color: #fbf6ec; text-shadow: 0 2px 8px rgba(0,0,0,0.85)">
       <div class="typed" style="position: absolute; left: 0; right: 0; top: 0; text-align: center; font-size: 13px; letter-spacing: 0.16em; text-transform: uppercase; opacity: 0.85">{{cubeUI.moveCount}} moves · {{cubeUI.time}}</div>
       <div class="hand" style="position: absolute; left: 0; right: 0; top: 26px; text-align: center; font-size: 26px">{{cubeUI.status}}</div>
-      <div onPointerDown="{{orbitDown}}" style="position: absolute; left: 0; top: 90px; width: 680px; height: 560px; perspective: 1100px; cursor: grab; touch-action: none; --turn: {{cubeUI.ms}}ms">
-        <div style="position: absolute; left: 340px; top: 280px; width: 0; height: 0; transform-style: preserve-3d; transform: rotateX({{cubeUI.rx}}deg) rotateY({{cubeUI.ry}}deg)">
+      <div onPointerDown="{{orbitDown}}" style="position: absolute; left: 0; top: 90px; width: {{cubeUI.dw}}px; height: 560px; perspective: 1100px; cursor: grab; touch-action: none; --turn: {{cubeUI.ms}}ms">
+        <div style="position: absolute; left: {{cubeUI.cx}}px; top: 280px; width: 0; height: 0; transform-style: preserve-3d; transform: rotateX({{cubeUI.rx}}deg) rotateY({{cubeUI.ry}}deg)">
           <sc-for list="{{cube3d}}" as="cb" hint-placeholder-count="26">
             <div class="{{cubeUI.anim}}" style="position: absolute; left: -31px; top: -31px; width: 62px; height: 62px; transform-style: preserve-3d; transform: rotateX({{cb.ax}}deg) rotateY({{cb.ay}}deg) rotateZ({{cb.az}}deg) translate3d({{cb.x}}px, {{cb.y}}px, {{cb.z}}px)">
               <sc-for list="{{cb.faces}}" as="fc" hint-placeholder-count="6"><div onPointerDown="{{fc.down}}" style="position: absolute; left: 0; top: 0; width: 62px; height: 62px; box-sizing: border-box; background-color: {{fc.c}}; background-image: linear-gradient(135deg, rgba(255,255,255,0.3) 0%, rgba(255,255,255,0) 46%); border: 4px solid {{fc.edge}}; border-radius: 9px; transform: {{fc.t}}; backface-visibility: hidden; cursor: {{fc.cursor}}"></div></sc-for>
@@ -1075,7 +1165,7 @@ a{color:inherit}
 </div>
 </div>
 </x-dc>
-<script type="text/x-dc" data-dc-script data-props='{"boards":{"editor":"enum","options":["black","oak"],"default":"black"},"mood":{"editor":"enum","options":["live","sunrise","morning","golden","sunset","night"],"default":"live"},"season":{"editor":"enum","options":["auto","spring","summer","autumn","winter"],"default":"auto"},"weather":{"editor":"enum","options":["auto","clear","cloudy","rain","snow"],"default":"auto"},"plants":{"editor":"enum","options":["live","thriving","thirsty","wilting","dead"],"default":"live"},"absence":{"editor":"enum","options":["auto","fresh","days","weeks","months"],"default":"auto"},"wind":{"editor":"enum","options":["auto","breezy","calm"],"default":"auto"},"bleed":{"editor":"enum","options":["no","yes"],"default":"no"},"$preview":{"width":1400,"height":1000}}'>
+<script type="text/x-dc" data-dc-script data-props='{"boards":{"editor":"enum","options":["black","oak"],"default":"black"},"mood":{"editor":"enum","options":["live","sunrise","morning","golden","sunset","night"],"default":"live"},"season":{"editor":"enum","options":["auto","spring","summer","autumn","winter"],"default":"auto"},"weather":{"editor":"enum","options":["auto","clear","cloudy","rain","snow"],"default":"auto"},"plants":{"editor":"enum","options":["live","thriving","thirsty","wilting","dead"],"default":"live"},"absence":{"editor":"enum","options":["auto","fresh","days","weeks","months"],"default":"auto"},"wind":{"editor":"enum","options":["auto","breezy","calm"],"default":"auto"},"bleed":{"editor":"enum","options":["no","yes"],"default":"no"},"compact":{"editor":"enum","options":["no","yes"],"default":"no"},"$preview":{"width":1400,"height":1000}}'>
 class Component extends DCLogic {
   constructor(props) {
     super(props);
@@ -1395,6 +1485,7 @@ class Component extends DCLogic {
     if (done && st.websStart) this.later('thanks', 2600, () => this.setState({ pop: 'none' }));
   }
   renderVals() {
+    const compact = this.props.compact === 'yes';
     const s = this.state;
     const oak = (this.props.boards ?? 'black') === 'oak';
     const clamp01 = (x) => Math.max(0, Math.min(1, x));
@@ -1980,7 +2071,7 @@ class Component extends DCLogic {
     const userMove = (m) => { if (this.state.scrambling) return; this.startTurn(m); };
     const solvedNow = this.isSolved(s.moves);
     const cubeUI = {
-      open: s.cubeOpen, rx: s.rx.toFixed(1), ry: s.ry.toFixed(1), ms: s.scrambling ? 90 : 200, anim: s.snap ? '' : 'cturn',
+      open: s.cubeOpen, dl: compact ? 260 : 160, dw: compact ? 480 : 680, cx: compact ? 240 : 340, rx: s.rx.toFixed(1), ry: s.ry.toFixed(1), ms: s.scrambling ? 90 : 200, anim: s.snap ? '' : 'cturn',
       moveCount: s.moveCount, time: clockOf(elapsed),
       status: s.scrambling ? 'shuffling…' : s.playing ? 'get every face back to one colour' : solvedNow ? 'shuffle it, then solve it against the clock' : 'free play: shuffle to start the clock',
     };
@@ -2001,7 +2092,10 @@ class Component extends DCLogic {
       open: s.notesOpen, cork, draft: s.draft, draftName: s.draftName, draftColor: NOTE_C[s.draftColor],
       count: s.notes.length ? `${s.notes.length} note${s.notes.length === 1 ? '' : 's'} pinned from this browser` : 'Be the first to pin one.',
       aria: `Notes board: ${shown.length} notes. Open it to read them and pin your own`,
-      notes: shown.slice(0, 14).map((n, i) => { const slot = i >= 13 ? i + 1 : i; return { slot, n }; }).map(({ slot, n }, i) => ({ text: n.text, name: n.name || 'a visitor', c: NOTE_C[n.c] || NOTE_C[0], mine: !n.seed, x: Math.round(22 + (slot % 5) * 150 + rng(i * 7 + 1) * 10), y: Math.round(82 + Math.floor(slot / 5) * 160 + rng(i * 9 + 2) * 12), r: ((rng(i * 11 + 3) - 0.5) * 8).toFixed(1), remove: () => { const notes = this.state.notes.filter((m) => m.id !== n.id); this.saveNotes(notes); this.setState({ notes }); } })),
+      ...(compact
+        ? { bl: 260, bt: 100, bw: 480, bh: 830, padL: 200, padT: 560, colL: 136, colT: 566, pinL: 262, pinT: 764 }
+        : { bl: 60, bt: 170, bw: 880, bh: 620, padL: 628, padT: 352, colL: 560, colT: 360, pinL: 690, pinT: 556 }),
+      notes: (compact ? shown.slice(0, 9).map((n, i) => ({ slot: i, n })) : shown.slice(0, 14).map((n, i) => { const slot = i >= 13 ? i + 1 : i; return { slot, n }; })).map(({ slot, n }, i) => ({ text: n.text, name: n.name || 'a visitor', c: NOTE_C[n.c] || NOTE_C[0], mine: !n.seed, x: Math.round(compact ? 10 + (slot % 3) * 146 + rng(i * 7 + 1) * 6 : 22 + (slot % 5) * 150 + rng(i * 7 + 1) * 10), y: Math.round(compact ? 74 + Math.floor(slot / 3) * 156 + rng(i * 9 + 2) * 10 : 82 + Math.floor(slot / 5) * 160 + rng(i * 9 + 2) * 12), r: ((rng(i * 11 + 3) - 0.5) * 8).toFixed(1), remove: () => { const notes = this.state.notes.filter((m) => m.id !== n.id); this.saveNotes(notes); this.setState({ notes }); } })),
       mini: shown.slice(0, 6).map((n, i) => ({ c: NOTE_C[n.c] || NOTE_C[0], x: 36 + (i % 3) * 40, y: Math.round(52 + Math.floor(i / 3) * 64 + rng(i * 5 + 7) * 10), r: ((rng(i * 3 + 9) - 0.5) * 14).toFixed(1) })),
       colors: NOTE_C.map((c, i) => ({ c, aria: `Note colour: ${['yellow', 'pink', 'green', 'blue'][i]}`, pressed: i === s.draftColor ? 'true' : 'false', lift: i === s.draftColor ? 'translateX(-6px) rotate(-4deg)' : 'none', shadow: i === s.draftColor ? '0 6px 10px rgba(0,0,0,0.3), 2px 2px 0 rgba(0,0,0,0.12)' : '0 2px 3px rgba(0,0,0,0.25), 2px 2px 0 rgba(0,0,0,0.12)', pick: () => this.setState({ draftColor: i }) })),
     };
@@ -2227,7 +2321,7 @@ class Component extends DCLogic {
       cradleCls: s.cradleOn ? 'swing' : '',
       swing: () => { if (this.state.cradleOn) return; this.setState({ cradleOn: true }); this.later('cradle', 4600, () => this.setState({ cradleOn: false })); },
 
-      doc: d ? { ...d, show: true, isCert: !!d.frame, isFolder: !d.frame, certCls: s.docClosing ? 'certOut' : 'certIn', inCls: s.docClosing ? 'folderOut' : 'folderIn', fadeCls: s.docClosing ? 'fadeOut' : 'fadeIn', stackLine: (d.stack || []).join(' · '), summary: d.summary || '', listTitle: d.listTitle || 'What I did', hasLink: !!d.link, link: d.link || '', linkText: d.linkText || '', isCV: !!d.isCV, hasStats: !!(d.stats && d.stats.length), stats: (d.stats || []).map(([n, l]) => ({ n, l })), hasStack: !!(d.stack && d.stack.length), stack: (d.stack || []).map((t) => ({ t })), points: d.points.map((text) => ({ text })) } : { show: false, isCert: false, isFolder: false, certCls: '', inCls: '', fadeCls: '', stackLine: '', hasLink: false, link: '', linkText: '', isCV: false, hasStats: false, stats: [], hasStack: false, stack: [], name: '', kind: '', role: '', dates: '', summary: '', listTitle: '', color: '#fbf6ec', ink: '#2a2420', points: [] },
+      doc: d ? { ...d, show: true, isCert: !!d.frame && !compact, isCertC: !!d.frame && compact, isFolder: !d.frame && !compact, isFolderC: !d.frame && compact, certCls: s.docClosing ? 'certOut' : 'certIn', inCls: s.docClosing ? 'folderOut' : 'folderIn', fadeCls: s.docClosing ? 'fadeOut' : 'fadeIn', stackLine: (d.stack || []).join(' · '), summary: d.summary || '', listTitle: d.listTitle || 'What I did', hasLink: !!d.link, link: d.link || '', linkText: d.linkText || '', isCV: !!d.isCV, hasStats: !!(d.stats && d.stats.length), stats: (d.stats || []).map(([n, l]) => ({ n, l })), hasStack: !!(d.stack && d.stack.length), stack: (d.stack || []).map((t) => ({ t })), points: d.points.map((text) => ({ text })) } : { show: false, isCert: false, isCertC: false, isFolder: false, isFolderC: false, certCls: '', inCls: '', fadeCls: '', stackLine: '', hasLink: false, link: '', linkText: '', isCV: false, hasStats: false, stats: [], hasStack: false, stack: [], name: '', kind: '', role: '', dates: '', summary: '', listTitle: '', color: '#fbf6ec', ink: '#2a2420', points: [] },
       closeDoc: () => { if (!this.state.open || this.state.docClosing) return; this.setState({ docClosing: true, hover: null }); this.later('docClose', 260, () => this.setState({ open: null, docClosing: false })); },
     };
   }
