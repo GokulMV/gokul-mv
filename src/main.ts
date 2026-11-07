@@ -32,10 +32,25 @@ const stage: HTMLElement = stageEl;
 const room: HTMLElement = roomEl;
 
 const logic = new Component({ ...props });
+
+/**
+ * How far past each edge of the room the wall and its light are drawn. The design draws them
+ * 1400px out on every side; only what the screen can actually see is kept (plus a margin), so
+ * the browser never has to paint, blend and hold a 4200 × 3000 picture to move or zoom it.
+ */
+const BLEED_X = 1400;
+const BLEED_Y = 1000;
+const bleed = { l: BLEED_X, r: BLEED_X, t: BLEED_Y, b: BLEED_Y };
+
 let queued = false;
 function draw(): void {
   queued = false;
-  render(h('div', { style: `width:${ROOM_W}px;height:${ROOM_H}px` }, ...renderTree(logic.renderVals())), room);
+  const { l, r, t, b } = bleed;
+  render(
+    h('div', { style: `position:absolute;left:${-l}px;top:${-t}px;width:${ROOM_W + l + r}px;height:${ROOM_H + t + b}px;overflow:hidden` },
+      h('div', { style: `position:absolute;left:${l}px;top:${t}px;width:${ROOM_W}px;height:${ROOM_H}px` }, ...renderTree(logic.renderVals()))),
+    room,
+  );
 }
 logic.onChange = () => {
   if (queued) return;
@@ -64,9 +79,46 @@ function screen(): { w: number; h: number } {
   return { w: stage.clientWidth || window.innerWidth, h: stage.clientHeight || window.innerHeight };
 }
 
+/** The part of the room (and past it) a camera shows, in room coordinates. */
+function seen(c: { cx: number; cy: number; s: number }): { x0: number; y0: number; x1: number; y1: number } {
+  const { w, h: hh } = screen();
+  return { x0: c.cx - w / (2 * c.s), x1: c.cx + w / (2 * c.s), y0: c.cy - hh / (2 * c.s), y1: c.cy + hh / (2 * c.s) };
+}
+
+/** Keep enough wall past the edges for every view in `views`; re-render only when that changes. */
+function trimBleed(...views: Array<{ cx: number; cy: number; s: number }>): void {
+  const pad = 32;
+  const next = { l: 0, r: 0, t: 0, b: 0 };
+  for (const c of views) {
+    const v = seen(c);
+    next.l = Math.max(next.l, -v.x0);
+    next.r = Math.max(next.r, v.x1 - ROOM_W);
+    next.t = Math.max(next.t, -v.y0);
+    next.b = Math.max(next.b, v.y1 - ROOM_H);
+  }
+  const fitTo = (n: number, max: number): number => Math.min(max, Math.ceil(Math.max(0, n) + pad));
+  next.l = fitTo(next.l, BLEED_X);
+  next.r = fitTo(next.r, BLEED_X);
+  next.t = fitTo(next.t, BLEED_Y);
+  next.b = fitTo(next.b, BLEED_Y);
+  if (next.l === bleed.l && next.r === bleed.r && next.t === bleed.t && next.b === bleed.b) return;
+  Object.assign(bleed, next);
+  logic.onChange?.();
+}
+
+let settle = 0;
 function apply(glide: boolean): void {
   const { w, h: hh } = screen();
   room.classList.toggle('glide', glide);
+  // While the camera eases in or out the room moves as one finished picture; it is redrawn
+  // sharp at the new size once it lands.
+  clearTimeout(settle);
+  if (glide) {
+    room.classList.add('moving');
+    settle = window.setTimeout(() => room.classList.remove('moving'), 600);
+  } else if (!drag) {
+    room.classList.remove('moving');
+  }
   room.style.transform = `translate(${(w / 2 - cam.cx * cam.s).toFixed(2)}px, ${(hh / 2 - cam.cy * cam.s).toFixed(2)}px) scale(${cam.s.toFixed(4)})`;
 }
 
@@ -102,6 +154,7 @@ function fit(glide = false): void {
   lookX = clampLook(lookX);
   document.documentElement.dataset.view = narrow ? 'narrow' : 'wide';
 
+  const from = { ...cam };
   const dialog = room.querySelector<HTMLElement>('[role="dialog"]');
   focused = dialog;
   if (dialog && (narrow || hh < 520)) {
@@ -119,6 +172,8 @@ function fit(glide = false): void {
     // floor take the rest, so the lamp stands on something.
     cam.cy = Math.max(ROOM_H / 2, hh / (2 * cam.s));
   }
+  // During a glide both ends of it are on screen at some point.
+  if (glide) trimBleed(from, cam); else trimBleed(cam);
   apply(glide);
 }
 
@@ -154,7 +209,7 @@ window.addEventListener('pointermove', (e) => {
   if (!drag || e.pointerId !== drag.id) return;
   const dx = e.clientX - drag.x;
   if (!drag.moved && Math.abs(dx) < 6) return;
-  if (!drag.moved) { hideHint(); room.classList.add('panning'); }
+  if (!drag.moved) { hideHint(); room.classList.add('moving'); }
   drag.moved = true;
   lookX = clampLook(drag.from - dx / base);
   cam.cx = lookX;
@@ -163,7 +218,7 @@ window.addEventListener('pointermove', (e) => {
 const endDrag = (e: PointerEvent): void => {
   if (!drag || e.pointerId !== drag.id) return;
   drag = null;
-  room.classList.remove('panning');
+  room.classList.remove('moving');
 };
 // One transform per frame however fast the finger moves.
 let framed = 0;
@@ -174,7 +229,8 @@ function frame(): void {
 window.addEventListener('pointerup', endDrag);
 window.addEventListener('pointercancel', endDrag);
 stage.addEventListener('wheel', (e) => {
-  if (!canLook()) return;
+  // ctrl + wheel is the browser's own zoom (and a trackpad pinch): leave it alone.
+  if (!canLook() || e.ctrlKey) return;
   const d = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
   if (!d) return;
   e.preventDefault();
@@ -223,14 +279,10 @@ narrow = false;
 fit();
 showHint();
 
-let resizeQueued = 0;
-const onResize = (): void => {
-  if (resizeQueued) return;
-  resizeQueued = requestAnimationFrame(() => { resizeQueued = 0; fit(); });
-};
-window.addEventListener('resize', onResize);
-window.visualViewport?.addEventListener('resize', onResize);
-window.addEventListener('orientationchange', onResize);
+// Refit in the same frame as the resize (the browser zooming the page is a resize too), so no
+// frame is ever drawn with the old size. A pinch-zoom only moves the visual viewport over the
+// page and needs nothing.
+window.addEventListener('resize', () => fit());
 
 function buildDebugBar(): void {
   const bar = document.createElement('div');

@@ -38,8 +38,9 @@ html[data-input='pointer'] :focus-visible {
   height: 1000px;
 }
 
-/* while the room slides under a finger it is moved as one picture, not redrawn */
-#room.panning {
+/* while the room slides under a finger, or the camera eases in on something, it is moved as
+   one finished picture instead of being redrawn every frame */
+#room.moving {
   will-change: transform;
 }
 

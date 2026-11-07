@@ -61,7 +61,7 @@ In debug mode the room's logic is on `window.shelf`.
 `.github/workflows/ci.yml` runs on every push and PR to `main`:
 - **Typecheck & build:** the same `npm ci` → shelf compile → `tsc` → `vite build` as the container.
 - **Docker image & /healthz smoke test:** builds the exact Railway image, boots it on `PORT=8080` and checks
-  `/healthz`, the SPA fallback, 404s, gzip, immutable asset caching, the startup port line and the nginx worker count.
+  `/healthz`, the SPA fallback, 404s, gzip, immutable asset caching, the security headers on every route, the startup port line and the nginx worker count.
 
 Railway deploys through its own GitHub integration, not GitHub Actions. To deploy only commits that pass CI, enable
 **Wait for CI** in the Railway service settings.
@@ -71,7 +71,7 @@ Railway deploys through its own GitHub integration, not GitHub Actions. To deplo
 | Stage   | Image              | Notes |
 | ------- | ------------------ | ----- |
 | builder | `node:20-alpine`   | `npm ci` then `npm run build` |
-| runtime | `nginx:1.27-alpine`| `nginx.conf.template` rendered by envsubst on `$PORT`: gzip, SPA fallback, immutable `/assets`, 2 workers, `warn`-level logs |
+| runtime | `nginx:1.27-alpine`| `nginx.conf.template` rendered by envsubst on `$PORT`: gzip, SPA fallback, immutable `/assets`, 2 workers, `warn`-level logs; `nginx/security-headers.conf` (CSP, HSTS, frame, referrer and permissions policies) included in every location |
 
 The IPv6 listener (Railway private networking) is added at boot by `docker/40-ipv6-listen.sh`, and only when
 the kernel supports IPv6.

@@ -2,7 +2,7 @@
   "name": "gokul-mv-portfolio",
   "private": true,
   "version": "0.1.0",
-  "description": "Gokul MV \u2014 the shelf: a bookshelf portfolio drawn in the browser (Preact + a design file compiled at build). Deployed on Railway.",
+  "description": "Gokul MV — the shelf: a bookshelf portfolio drawn in the browser (Preact + a design file compiled at build). Deployed on Railway.",
   "type": "module",
   "engines": {
     "node": ">=20.0.0"
@@ -20,6 +20,6 @@
   "devDependencies": {
     "@types/node": "20.17.6",
     "typescript": "5.6.3",
-    "vite": "5.4.11"
+    "vite": "6.4.5"
   }
 }

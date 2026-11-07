@@ -84,6 +84,16 @@ jobs:
           curl -fsS -D - -o /dev/null -H 'Accept-Encoding: gzip' "$base/$asset" | tee headers.txt
           grep -qi '^content-encoding: gzip' headers.txt
           grep -qi '^cache-control: public, max-age=31536000, immutable' headers.txt
+          grep -qi '^content-security-policy: ' headers.txt
+
+          # every page carries the security headers, the home page included
+          curl -fsS -D - -o /dev/null "$base/" | tee root-headers.txt
+          grep -qi '^content-security-policy: .*frame-ancestors' root-headers.txt
+          grep -qi '^strict-transport-security: ' root-headers.txt
+          grep -qi '^x-frame-options: SAMEORIGIN' root-headers.txt
+          grep -qi '^permissions-policy: .*geolocation=(self)' root-headers.txt
+          grep -qi '^cache-control: no-cache' root-headers.txt
+          curl -fsS -D - -o /dev/null "$base/Gokul_MV_Resume.pdf" | grep -qi '^x-content-type-options: nosniff'
 
       - name: Check NGINX startup
         run: |

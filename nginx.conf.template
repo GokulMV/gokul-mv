@@ -35,17 +35,16 @@ server {
         font/otf;
 
     # ---- Security headers --------------------------------------------------
-    add_header X-Content-Type-Options "nosniff" always;
-    add_header X-Frame-Options "SAMEORIGIN" always;
-    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
-    add_header Permissions-Policy "camera=(), microphone=(), geolocation=()" always;
+    # Included here and again in every location that adds a header of its own
+    # (NGINX does not inherit add_header into such a location).
+    include /etc/nginx/snippets/security-headers.conf;
 
     # ---- Railway healthcheck -----------------------------------------------
     location = /healthz {
         access_log off;
         default_type application/json;
         add_header Cache-Control "no-store" always;
-        add_header X-Content-Type-Options "nosniff" always;
+        include /etc/nginx/snippets/security-headers.conf;
         return 200 '{"status":"ok","service":"portfolio","port":"${PORT}","time":"$time_iso8601"}';
     }
 
@@ -53,21 +52,21 @@ server {
     location /assets/ {
         access_log off;
         add_header Cache-Control "public, max-age=31536000, immutable" always;
-        add_header X-Content-Type-Options "nosniff" always;
+        include /etc/nginx/snippets/security-headers.conf;
         try_files $uri =404;
     }
 
     # ---- 3D models, textures, fonts, documents ------------------------------
     location ~* \.(?:glb|gltf|bin|ktx2|hdr|exr|png|jpe?g|webp|avif|svg|woff2?|ttf|otf|pdf|mp3|ogg|wav)$ {
         add_header Cache-Control "public, max-age=604800" always;
-        add_header X-Content-Type-Options "nosniff" always;
+        include /etc/nginx/snippets/security-headers.conf;
         try_files $uri =404;
     }
 
     # ---- index.html must always be revalidated ------------------------------
     location = /index.html {
         add_header Cache-Control "no-cache, no-store, must-revalidate" always;
-        add_header X-Content-Type-Options "nosniff" always;
+        include /etc/nginx/snippets/security-headers.conf;
     }
 
     # ---- SPA fallback --------------------------------------------------------

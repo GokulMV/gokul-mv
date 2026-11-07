@@ -77,7 +77,7 @@ a{color:inherit}
 @keyframes dangle{0%,100%{transform:translateY(0)}50%{transform:translateY(6px)}}
 .dangle{animation:dangle 2.4s ease-in-out infinite}
 @keyframes hang{0%,100%{transform:rotate(-1.1deg)}50%{transform:rotate(1.1deg)}}
-.hang{transform-origin:164px 24px;transform-box:view-box;animation:hang 7s ease-in-out infinite}
+.hang{transform-origin:164px 24px;animation:hang 7s ease-in-out infinite}
 @keyframes unroll{0%{transform:scaleY(0.05);opacity:0}100%{transform:scaleY(1);opacity:1}}
 .unroll{transform-origin:50% 0;animation:unroll 0.38s cubic-bezier(.2,.9,.3,1.2)}
 @keyframes confetti{0%{transform:translate(0,0) rotate(0)}100%{transform:translate(var(--sway),1080px) rotate(760deg)}}
@@ -309,25 +309,6 @@ a{color:inherit}
       </svg>
     </div>
 
-    <!-- jar candle -->
-    <button class="tap" type="button" onClick="{{candleClick}}" aria-label="{{candle.aria}}" style="position: absolute; left: 800px; top: 164px; width: 50px; height: 92px">
-      <svg width="50" height="92" viewBox="0 0 50 92" aria-hidden="true" style="display: block; overflow: visible">
-        <sc-if value="{{candle.lit}}" hint-placeholder-val="{{ false }}">
-          <circle cx="25" cy="34" r="26" fill="#ffd28a" opacity="0.35"/>
-          <g class="ignite"><path class="flame" d="M25 22 C31 30 31 37 25 43 C19 37 19 30 25 22 Z" fill="#f4a73c" stroke="#2a2420" stroke-width="1"/><path class="flame" d="M25 31 C27.5 35 27.5 39 25 42 C22.5 39 22.5 35 25 31 Z" fill="#fff3d0"/></g>
-        </sc-if>
-        <sc-if value="{{candle.smoke}}" hint-placeholder-val="{{ false }}"><path class="smoke" d="M25 42 C21 34 29 28 25 20 C21 12 29 6 25 -2" stroke="#9a948c" stroke-width="2" fill="none" stroke-linecap="round"/></sc-if>
-        <path d="M25 50 L25 44" stroke="#2a2420" stroke-width="1.8"/>
-        <path d="M5 46 H45 V86 Q45 91 40 91 H10 Q5 91 5 86 Z" fill="#dfe7e1" stroke="#2a2420" stroke-width="1.5"/>
-        <rect x="9" y="54" width="32" height="33" rx="2" fill="#f4e8d2"/>
-        <rect x="5" y="64" width="40" height="14" fill="#2f4058"/>
-        <path d="M12 71 H38" stroke="#d9a541" stroke-width="1.5"/>
-        <path d="M10 50 V82" stroke="#ffffff" stroke-width="2.5" opacity="0.6"/>
-        <path d="M5 46 H45 V86 Q45 91 40 91 H10 Q5 91 5 86 Z" fill="none" stroke="#2a2420" stroke-width="1.5"/>
-        <rect x="3" y="43" width="44" height="5" rx="1.5" fill="#cfd9d2" stroke="#2a2420" stroke-width="1.2"/>
-      </svg>
-    </button>
-
     <!-- matchbox: click to strike, then carry the flame to the candle -->
     <button class="tap" type="button" onClick="{{strike}}" aria-label="{{mb.aria}}" style="position: absolute; left: 852px; top: 228px; width: 46px; height: 30px">
       <svg width="46" height="30" viewBox="0 0 46 30" aria-hidden="true" style="display: block; overflow: visible">
@@ -343,6 +324,26 @@ a{color:inherit}
       </svg>
     </button>
   </div>
+
+  <!-- jar candle: outside the board's shadow layer with a shadow of its own, so its flickering
+     flame does not make the browser redraw the whole board's shadow every frame -->
+  <button class="tap" type="button" onClick="{{candleClick}}" aria-label="{{candle.aria}}" style="position: absolute; left: 800px; top: 164px; width: 50px; height: 92px; filter: {{v.rowShadow}}">
+    <svg width="50" height="92" viewBox="0 0 50 92" aria-hidden="true" style="display: block; overflow: visible">
+      <sc-if value="{{candle.lit}}" hint-placeholder-val="{{ false }}">
+        <circle cx="25" cy="34" r="26" fill="#ffd28a" opacity="0.35"/>
+        <g class="ignite"><path class="flame" d="M25 22 C31 30 31 37 25 43 C19 37 19 30 25 22 Z" fill="#f4a73c" stroke="#2a2420" stroke-width="1"/><path class="flame" d="M25 31 C27.5 35 27.5 39 25 42 C22.5 39 22.5 35 25 31 Z" fill="#fff3d0"/></g>
+      </sc-if>
+      <sc-if value="{{candle.smoke}}" hint-placeholder-val="{{ false }}"><path class="smoke" d="M25 42 C21 34 29 28 25 20 C21 12 29 6 25 -2" stroke="#9a948c" stroke-width="2" fill="none" stroke-linecap="round"/></sc-if>
+      <path d="M25 50 L25 44" stroke="#2a2420" stroke-width="1.8"/>
+      <path d="M5 46 H45 V86 Q45 91 40 91 H10 Q5 91 5 86 Z" fill="#dfe7e1" stroke="#2a2420" stroke-width="1.5"/>
+      <rect x="9" y="54" width="32" height="33" rx="2" fill="#f4e8d2"/>
+      <rect x="5" y="64" width="40" height="14" fill="#2f4058"/>
+      <path d="M12 71 H38" stroke="#d9a541" stroke-width="1.5"/>
+      <path d="M10 50 V82" stroke="#ffffff" stroke-width="2.5" opacity="0.6"/>
+      <path d="M5 46 H45 V86 Q45 91 40 91 H10 Q5 91 5 86 Z" fill="none" stroke="#2a2420" stroke-width="1.5"/>
+      <rect x="3" y="43" width="44" height="5" rx="1.5" fill="#cfd9d2" stroke="#2a2420" stroke-width="1.2"/>
+    </svg>
+  </button>
 
   <!-- ============ MIDDLE BOARD · EDUCATION ============ -->
   <div style="position: absolute; left: 0; top: 0; width: 1000px; height: 1000px; pointer-events: none; filter: {{v.rowShadow}}">
@@ -392,13 +393,13 @@ a{color:inherit}
       <span style="font-family: 'Instrument Serif', Georgia, serif; font-size: 11.5px; line-height: 1">Clean Architecture</span>
       <span style="font-size: 6px; font-weight: 600; letter-spacing: 0.12em">MARTIN</span>
     </div>
-    <button class="tap" type="button" onClick="{{openCube}}" onMouseEnter="{{cubeHover}}" onMouseLeave="{{cubeLeave}}" onFocus="{{cubeHover}}" onBlur="{{cubeLeave}}" aria-label="Rubik's cube: pick it up and play" style="position: absolute; left: 510px; top: {{shelfCube.top}}px; width: 80px; height: 78px; perspective: 340px; perspective-origin: 40px 41px">
-      <div style="position: absolute; left: 40px; top: 41px; width: 0; height: 0; transform-style: preserve-3d; transform: translateY({{shelfCube.lift}}px) rotateX({{shelfCube.rx}}deg) rotateY({{shelfCube.ry}}deg) scale3d(0.27, 0.27, 0.27); transition: transform 600ms cubic-bezier(.3,.7,.3,1); --turn: 200ms">
-        <sc-for list="{{cube3d}}" as="cb" hint-placeholder-count="26">
-          <div class="{{cubeUI.anim}}" style="position: absolute; left: -31px; top: -31px; width: 62px; height: 62px; transform-style: preserve-3d; transform: rotateX({{cb.ax}}deg) rotateY({{cb.ay}}deg) rotateZ({{cb.az}}deg) translate3d({{cb.x}}px, {{cb.y}}px, {{cb.z}}px)">
-            <sc-for list="{{cb.faces}}" as="fc" hint-placeholder-count="6"><div style="position: absolute; left: 0; top: 0; width: 62px; height: 62px; box-sizing: border-box; background-color: {{fc.c}}; background-image: linear-gradient(135deg, rgba(255,255,255,0.3) 0%, rgba(255,255,255,0) 46%); border: 5px solid {{fc.edge}}; border-radius: 10px; transform: {{fc.t}}; backface-visibility: hidden"></div></sc-for>
-          </div>
-        </sc-for>
+    <!-- the cube on the shelf, face on: only its front face can be seen from here, so it is drawn flat
+         (the same stickers, at the size the 3D cube's front face projects to). The full 3D cube is only
+         built when it is picked up; 160-odd 3D layers sitting on the shelf made phones flicker. -->
+    <button class="tap" type="button" onClick="{{openCube}}" onMouseEnter="{{cubeHover}}" onMouseLeave="{{cubeLeave}}" onFocus="{{cubeHover}}" onBlur="{{cubeLeave}}" aria-label="Rubik's cube: pick it up and play" style="position: absolute; left: 510px; top: {{shelfCube.top}}px; width: 80px; height: 78px">
+      <div style="position: absolute; left: 0; top: 0; width: 80px; height: 78px; transform: translateY({{shelfCube.flatLift}}px); transition: transform 600ms cubic-bezier(.3,.7,.3,1)">
+        <div style="position: absolute; left: 12.3px; top: 13.3px; width: 55.4px; height: 55.4px; border-radius: 3.6px; background: {{shelfFaceBody}}"></div>
+        <sc-for list="{{shelfFace}}" as="sf" hint-placeholder-count="9"><div style="position: absolute; left: {{sf.x}}px; top: {{sf.y}}px; width: 18.07px; height: 18.07px; box-sizing: border-box; background-color: {{sf.c}}; background-image: linear-gradient(135deg, rgba(255,255,255,0.3) 0%, rgba(255,255,255,0) 46%); border: 1.46px solid {{sf.edge}}; border-radius: 2.9px"></div></sc-for>
       </div>
     </button>
 
@@ -560,8 +561,11 @@ a{color:inherit}
   </svg>
 
   <!-- the hanging pothos: a ceiling hook, three threads, a full crown in the pot, vines trailing beside the shelf. Click to water -->
+  <!-- the sway is on an HTML box around the drawing, so the browser turns the finished, shadowed
+       picture instead of redrawing the plant and its shadow every frame -->
+  <div class="hang" aria-hidden="true" style="position: absolute; left: 0; top: 0; width: 1000px; height: 1000px; pointer-events: none">
   <svg class="{{pothos.tipSvg}}" width="1000" height="1000" viewBox="0 0 1000 1000" aria-hidden="true" style="position: absolute; left: 0; top: 0; pointer-events: none; overflow: visible; filter: {{v.rowShadow}}">
-    <g class="hang">
+    <g>
       <rect x="156" y="0" width="28" height="5" rx="1.5" fill="#2a2420"/>
       <rect x="166.5" y="4" width="7" height="3" rx="1" fill="#3e3630"/>
       <path d="M164 28.5 L124 232 M164 28.5 L170 229 M164 28.5 L216 232" stroke="#6b5a46" stroke-width="1.5" fill="none"/>
@@ -608,6 +612,7 @@ a{color:inherit}
       </sc-for>
     </g>
   </svg>
+  </div>
   <svg width="1000" height="1000" viewBox="0 0 1000 1000" aria-hidden="true" style="position: absolute; left: 0; top: 0; pointer-events: none">
     <sc-for list="{{fallen}}" as="fl" hint-placeholder-count="2">
       <g transform="translate({{fl.x}} {{fl.y}}) scale({{fl.s}} {{fl.sy}}) rotate({{fl.r}})">
@@ -651,7 +656,8 @@ a{color:inherit}
       <rect x="175" y="256" width="650" height="40" fill="#fff0cc" opacity="0.16"/><rect x="175" y="545" width="650" height="40" fill="#fff0cc" opacity="0.16"/><rect x="175" y="830" width="650" height="40" fill="#fff0cc" opacity="0.16"/>
     </g>
     <rect x="-1600" y="-1000" width="4200" height="3000" fill="url(#lampPool)" opacity="{{v.lamp}}"/>
-    <rect class="{{v.candleCls}}" x="-1600" y="-1000" width="4200" height="3000" fill="url(#candleGlow)" opacity="{{v.candle}}" style="transition: opacity 600ms"/>
+    <!-- only the glow's own circle (r 340 round the wick) flickers, not the whole wall -->
+    <rect class="{{v.candleCls}}" x="410" y="-144" width="680" height="680" fill="url(#candleGlow)" opacity="{{v.candle}}" style="transition: opacity 600ms"/>
   </svg>
 
   <!-- ============ THE TWO WINDOWS: west on the left (sunset), east on the right (sunrise) ============ -->
@@ -2071,6 +2077,14 @@ class Component extends DCLogic {
       const ang = inLayer ? ANG[tmv[0]] * (tmv[2] === 1 ? 1 : -1) : 0;
       cube3d.push({ x: x * CS, y: -y * CS, z: z * CS, ax: tmv && tmv[0] === 0 ? ang : 0, ay: tmv && tmv[0] === 1 ? ang : 0, az: tmv && tmv[0] === 2 ? ang : 0, faces });
     }
+    // The shelf's flat front face: the 3D cube at scale 0.27, front face 93 units out, seen through a 340px
+    // perspective from its centre, projects each cubie to 18.07px about the point (40, 41).
+    const FACE_PX = 62 * 0.27 * (340 / (340 - 93 * 0.27));
+    const shelfFace = [];
+    for (let y = 1; y >= -1; y -= 1) for (let x = -1; x <= 1; x += 1) {
+      const st = (byPos[`${x},${y},1`] || []).find((q) => q.n[2] === 1);
+      shelfFace.push({ x: (40 + x * FACE_PX - FACE_PX / 2).toFixed(2), y: (41 - y * FACE_PX - FACE_PX / 2).toFixed(2), c: shadeFace(st ? st.c : '#1c1a18', 0), edge: shadeFace('#161412', 0) });
+    }
     const clockOf = (ms) => { const sec = Math.max(0, Math.floor(ms / 1000)); return `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`; };
     const elapsed = s.playing ? Date.now() - s.startAt : s.partyMs;
     const userMove = (m) => { if (this.state.scrambling) return; this.startTurn(m); };
@@ -2240,11 +2254,11 @@ class Component extends DCLogic {
         on: s.gust, flip: !day || east ? 'translate(1000 0) scale(-1 1)' : '',
         leaves: s.gust && season === 'autumn' ? [[300, 0], [420, 0.6], [520, 1.2]].map(([y, d], i) => ({ x: !day || east ? 1010 : -20, y, d, cls: !day || east ? 'blowLeafL' : 'blowLeaf', c: ['#d9822b', '#c0532a', '#e3a33b'][i] })) : [],
       },
-      cube3d, cubeUI, party,
+      cube3d, shelfFace, shelfFaceBody: shadeFace('#161412', 0), cubeUI, party,
       openCube: () => this.setState({ cubeOpen: true, cubeHover: false }),
       cubeHover: () => this.setState({ cubeHover: true }),
       cubeLeave: () => this.setState({ cubeHover: false }),
-      shelfCube: { top: 426, rx: 0, ry: 0, lift: s.cubeHover ? -8 : 0 },
+      shelfCube: { top: 426, rx: 0, ry: 0, lift: s.cubeHover ? -8 : 0, flatLift: s.cubeHover ? -8.6 : 0 },
       closeCube: () => this.setState({ cubeOpen: false, party: false }),
       orbitDown: (e) => { this.orbit = { cx: e.clientX, cy: e.clientY, rx: this.state.rx, ry: this.state.ry }; },
       cubeKey: (e) => {
