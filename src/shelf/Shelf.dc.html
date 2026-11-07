@@ -636,19 +636,22 @@ a{color:inherit}
     <g class="{{lamp.tug}}"><line x1="948" y1="528" x2="948" y2="580" stroke="#2a2420" stroke-width="1.4"/><circle cx="948" cy="584" r="5" fill="#d9a541" stroke="#2a2420" stroke-width="1.3"/></g>
   </svg>
 
-  <!-- the room's light: the sun's panes come from the east window in the morning, the west window in the afternoon -->
-  <svg width="4200" height="3000" viewBox="-1600 -1000 4200 3000" aria-hidden="true" style="position: absolute; left: -1600px; top: -1000px; pointer-events: none; mix-blend-mode: multiply">
-    <rect x="-1600" y="-1000" width="4200" height="3000" fill="{{v.shadeTint}}" opacity="{{v.shadeAmount}}"/>
+  <!-- the room's light: the sun's panes come from the east window in the morning, the west window in the afternoon.
+       The shade of the hour and the lights are plain translucent layers, not blend modes: their colours are worked
+       out (lt) so that over the wall they give what a multiply shade and screened lights would, and the browser
+       never has to blend whole-screen layers on the GPU (which showed as black or white patches when zooming). -->
+  <svg width="4200" height="3000" viewBox="-1600 -1000 4200 3000" aria-hidden="true" style="position: absolute; left: -1600px; top: -1000px; pointer-events: none">
+    <rect x="-1600" y="-1000" width="4200" height="3000" fill="{{lt.shadeC}}" opacity="{{lt.shadeO}}"/>
   </svg>
-  <svg width="4200" height="3000" viewBox="-1600 -1000 4200 3000" aria-hidden="true" style="position: absolute; left: -1600px; top: -1000px; pointer-events: none; mix-blend-mode: screen">
+  <svg width="4200" height="3000" viewBox="-1600 -1000 4200 3000" aria-hidden="true" style="position: absolute; left: -1600px; top: -1000px; pointer-events: none">
     <defs>
       <filter id="paneSoft" x="-10%" y="-10%" width="120%" height="120%"><feGaussianBlur stdDeviation="4"/></filter>
       <clipPath id="panes"><sc-for list="{{panes}}" as="pn" hint-placeholder-count="4"><polygon points="{{pn.pts}}"/></sc-for></clipPath>
-      <radialGradient id="lampPool" cx="915" cy="530" r="700" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#ffc677" stop-opacity="0.6"/><stop offset="0.45" stop-color="#d98b45" stop-opacity="0.2"/><stop offset="1" stop-color="#d98b45" stop-opacity="0"/></radialGradient>
-<radialGradient id="candleGlow" cx="750" cy="196" r="340" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#ffcf86" stop-opacity="0.75"/><stop offset="0.3" stop-color="#ffb35c" stop-opacity="0.3"/><stop offset="0.7" stop-color="#e08a3e" stop-opacity="0.1"/><stop offset="1" stop-color="#e08a3e" stop-opacity="0"/></radialGradient>
+      <radialGradient id="lampPool" cx="915" cy="530" r="700" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="{{lt.lamp0c}}" stop-opacity="{{lt.lamp0o}}"/><stop offset="0.45" stop-color="{{lt.lamp1c}}" stop-opacity="{{lt.lamp1o}}"/><stop offset="1" stop-color="{{lt.lamp1c}}" stop-opacity="0"/></radialGradient>
+<radialGradient id="candleGlow" cx="750" cy="196" r="340" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="{{lt.c0c}}" stop-opacity="{{lt.c0o}}"/><stop offset="0.3" stop-color="{{lt.c1c}}" stop-opacity="{{lt.c1o}}"/><stop offset="0.7" stop-color="{{lt.c2c}}" stop-opacity="{{lt.c2o}}"/><stop offset="1" stop-color="{{lt.c2c}}" stop-opacity="0"/></radialGradient>
     </defs>
     <g opacity="{{v.sun}}" filter="url(#paneSoft)">
-      <sc-for list="{{panes}}" as="pn" hint-placeholder-count="4"><polygon points="{{pn.pts}}" fill="{{v.sunColor}}" opacity="0.45"/></sc-for>
+      <sc-for list="{{panes}}" as="pn" hint-placeholder-count="4"><polygon points="{{pn.pts}}" fill="{{lt.paneC}}" opacity="{{lt.paneO}}"/></sc-for>
     </g>
     <g clip-path="url(#panes)" opacity="{{v.sun}}">
       <rect x="175" y="256" width="650" height="2" fill="#fff6dc" opacity="0.8"/><rect x="175" y="542" width="650" height="3" fill="#fff6dc" opacity="0.9"/>
@@ -1575,6 +1578,27 @@ class Component extends DCLogic {
       clock: `${hh}:${mm} · ${season} · ${WX[weather]} · ${!day ? (lampOn ? 'night, lamp on' : 'night') : overcast ? 'soft light' : H < 7.5 ? 'sunrise, east window' : east ? 'morning sun, east window' : warm ? 'sunset light, west window' : 'afternoon sun, west window'}`,
     };
 
+    // ---------- the light as plain translucent layers ----------
+    // A multiply shade of tint T at amount a scales each channel by k = 1 - a(1 - T). Over the wall W the same
+    // result comes from a plain layer of opacity α = 1 - min(k) and colour W(k - 1 + α)/α. A screened light L
+    // over the shaded wall W' gives W' + L(1 - W'); a plain layer of opacity m·o (m = L's brightest channel)
+    // and colour W' + L(1 - W')/m gives the same. Exact on the wall, and within a few levels on the boards.
+    const lt = (() => {
+      const unit = (c) => hex(c).map((n) => n / 255);
+      const toHex = (a) => `#${a.map((n) => Math.round(Math.max(0, Math.min(1, n)) * 255).toString(16).padStart(2, '0')).join('')}`;
+      const W = unit(mix(v.wallL, v.wallR, 0.5));
+      const T = unit(v.shadeTint);
+      const kk = T.map((t) => 1 - v.shadeAmount * (1 - t));
+      const alpha = 1 - Math.min(...kk);
+      const shadeC = alpha < 0.002 ? '#000000' : toHex(W.map((w, i) => (w * (kk[i] - 1 + alpha)) / alpha));
+      const lit = W.map((w, i) => w * kk[i]);
+      const light = (c, o) => { const L = unit(c); const m = Math.max(...L, 0.001); return [toHex(lit.map((w, i) => w + (L[i] * (1 - w)) / m)), (o * m).toFixed(3)]; };
+      const [lamp0c, lamp0o] = light('#ffc677', 0.6), [lamp1c, lamp1o] = light('#d98b45', 0.2);
+      const [c0c, c0o] = light('#ffcf86', 0.75), [c1c, c1o] = light('#ffb35c', 0.3), [c2c, c2o] = light('#e08a3e', 0.1);
+      const [paneC, paneO] = light(v.sunColor, 0.45);
+      return { shadeC, shadeO: alpha.toFixed(3), lamp0c, lamp0o, lamp1c, lamp1o, c0c, c0o, c1c, c1o, c2c, c2o, paneC, paneO };
+    })();
+
     // ---------- the two windows ----------
     const dl = clamp01((H - 5) / 1.5) * clamp01((20 - H) / 1.8);
     const glowE = clamp01(1 - Math.abs(H - 6.4) / 1.5), glowW = clamp01(1 - Math.abs(H - 18.6) / 1.5);
@@ -2124,7 +2148,7 @@ class Component extends DCLogic {
     const d = s.open ? FILES[s.open] : null;
 
     return {
-      v, panes, windows,
+      v, lt, panes, windows,
       clock: (() => {
         const hr = Math.floor(Hreal), mn = mood === 'live' ? d0.getMinutes() : Math.round((Hreal % 1) * 60), sc = mood === 'live' ? d0.getSeconds() : 0;
         const at = (deg, len) => [60 + Math.sin((deg * Math.PI) / 180) * len, 60 - Math.cos((deg * Math.PI) / 180) * len];
