@@ -20,6 +20,7 @@ a{color:inherit}
 .can{transition:transform 620ms cubic-bezier(.3,.7,.3,1);transform-origin:52.5px 42px}
 @keyframes flick{0%,100%{transform:scaleY(1)}45%{transform:scaleY(1.14) translateY(-1px)}75%{transform:scaleY(0.9)}}
 .flame{transform-origin:50% 100%;transform-box:fill-box;animation:flick 1s ease-in-out infinite}
+.flameG{transform-origin:50% 100%;transform-box:fill-box}
 @keyframes ignite{0%{transform:scale(0.1);opacity:0}60%{transform:scale(1.35);opacity:1}100%{transform:scale(1)}}
 .ignite{transform-origin:50% 100%;transform-box:fill-box;animation:ignite 0.55s ease-out}
 @keyframes rise{0%{opacity:0.75;transform:translateY(0) scaleX(1)}100%{opacity:0;transform:translateY(-36px) scaleX(1.7)}}
@@ -73,11 +74,11 @@ a{color:inherit}
 @keyframes poof{0%{transform:scale(0.4);opacity:0.9}100%{transform:scale(1.9);opacity:0}}
 .poof{transform-box:fill-box;transform-origin:50% 50%;animation:poof 0.6s ease-out forwards}
 @keyframes boing{0%{transform:scale(0.3) rotate(-8deg);opacity:0}60%{transform:scale(1.08) rotate(2deg);opacity:1}100%{transform:scale(1) rotate(-1.5deg)}}
-.boing{animation:boing 0.45s cubic-bezier(.3,1.4,.5,1) both;transform-origin:50% 50%}
+.boing{animation:boing 0.45s cubic-bezier(.3,1.4,.5,1) backwards;transform-origin:50% 50%;transform:rotate(-1.5deg)}
 @keyframes dangle{0%,100%{transform:translateY(0)}50%{transform:translateY(6px)}}
 .dangle{animation:dangle 2.4s ease-in-out infinite}
 @keyframes hang{0%,100%{transform:rotate(-1.1deg)}50%{transform:rotate(1.1deg)}}
-.hang{transform-origin:164px 24px;animation:hang 7s ease-in-out infinite}
+.hang{transform-origin:164px 24px}
 @keyframes unroll{0%{transform:scaleY(0.05);opacity:0}100%{transform:scaleY(1);opacity:1}}
 .unroll{transform-origin:50% 0;animation:unroll 0.38s cubic-bezier(.2,.9,.3,1.2)}
 @keyframes confetti{0%{transform:translate(0,0) rotate(0)}100%{transform:translate(var(--sway),1080px) rotate(760deg)}}
@@ -99,17 +100,17 @@ a{color:inherit}
 .puddle{transform-box:fill-box;transform-origin:50% 50%;animation:puddle 2.2s ease-out forwards}
 @keyframes dripLong{0%{transform:translateY(0);opacity:0}10%{opacity:1}100%{transform:translateY(260px);opacity:0}}
 .dripLong{animation:dripLong 0.9s ease-in infinite}
-.secHand{transform-box:view-box;transform-origin:60px 60px;animation:spin 60s steps(60) infinite}
+
 @keyframes hangGust{0%,100%{transform:rotate(-1deg)}30%{transform:rotate(5deg)}65%{transform:rotate(-3deg)}}
-.gusty .hang{animation:hangGust 1.6s ease-in-out 3}
+
 @keyframes treeGust{0%,100%{transform:rotate(0)}35%{transform:rotate(3.5deg)}70%{transform:rotate(-1.5deg)}}
 .treeTop{transform-box:fill-box;transform-origin:15% 100%}
-.gusty .treeTop{animation:treeGust 1.2s ease-in-out 4}
+
 @keyframes flickWind{0%,100%{transform:skewX(0) scaleY(1)}40%{transform:skewX(-16deg) scaleY(0.9)}70%{transform:skewX(8deg) scaleY(1.05)}}
 .gusty .flame{animation:flickWind 0.5s ease-in-out infinite}
 @keyframes flutter{0%,100%{transform:rotate(0)}50%{transform:rotate(-6deg)}}
 .note{transform-box:fill-box;transform-origin:50% 0}
-.gusty .note{animation:flutter 0.42s ease-in-out 8}
+
 @keyframes windLine{0%{stroke-dashoffset:1600;opacity:0}15%{opacity:0.9}85%{opacity:0.9}100%{stroke-dashoffset:0;opacity:0}}
 .windLine{stroke-dasharray:180 1420;animation:windLine 2.4s ease-in-out infinite}
 @keyframes blowLeaf{0%{transform:translate(0,0) rotate(0);opacity:0}10%{opacity:1}100%{transform:translate(1300px,-120px) rotate(900deg);opacity:0.9}}
@@ -125,20 +126,20 @@ a{color:inherit}
 .stamp{display:inline-block;padding:7px 14px;border:3px double #b3372f;border-radius:3px;color:#b3372f;font-family:'Courier Prime',monospace;font-weight:700;font-size:13px;letter-spacing:0.14em;text-transform:uppercase;text-decoration:none;transform:rotate(-4deg);opacity:0.9;transition:transform 180ms,opacity 180ms;pointer-events:auto}
 .stamp:hover{transform:rotate(0) scale(1.05);opacity:1}
 @keyframes folderIn{0%{transform:translateY(70px) scale(0.84);opacity:0}100%{transform:none;opacity:1}}
-.folderIn{animation:folderIn 0.4s cubic-bezier(.2,.8,.2,1) both}
+.folderIn{animation:folderIn 0.4s cubic-bezier(.2,.8,.2,1) backwards}
 @keyframes coverOpen{0%{transform:rotateY(178deg)}100%{transform:rotateY(0)}}
-.folderIn .cover{animation:coverOpen 0.8s 0.3s cubic-bezier(.3,.7,.2,1) both}
+.folderIn .cover{animation:coverOpen 0.8s 0.3s cubic-bezier(.3,.7,.2,1) backwards}
 @keyframes coverOpenL{0%{transform:rotateY(0)}100%{transform:rotateY(-178deg)}}
-.folderIn .coverL{animation:coverOpenL 0.8s 0.3s cubic-bezier(.3,.7,.2,1) both}
+.folderIn .coverL{animation:coverOpenL 0.8s 0.3s cubic-bezier(.3,.7,.2,1) backwards}
 .folderOut .coverL{transform:rotateY(-178deg)}
 @keyframes folderOut{0%{transform:none;opacity:1}100%{transform:translateY(70px) scale(0.84);opacity:0}}
 .folderOut{animation:folderOut 0.26s ease-in both}
 @keyframes certIn{0%{transform:translateY(90px) rotate(-5deg) scale(0.8);opacity:0}65%{transform:translateY(-6px) rotate(0.8deg) scale(1.01);opacity:1}100%{transform:none;opacity:1}}
-.certIn{animation:certIn 0.55s cubic-bezier(.2,.8,.2,1) both}
+.certIn{animation:certIn 0.55s cubic-bezier(.2,.8,.2,1) backwards}
 @keyframes certOut{0%{transform:none;opacity:1}100%{transform:translateY(80px) rotate(-4deg) scale(0.84);opacity:0}}
 .certOut{animation:certOut 0.26s ease-in both}
 @keyframes fadeIn{from{opacity:0}to{opacity:1}}
-.fadeIn{animation:fadeIn 0.3s both}
+.fadeIn{animation:fadeIn 0.3s backwards}
 .fadeOut{animation:fadeIn 0.26s reverse both}
 @media (prefers-reduced-motion: reduce){.flame,.ignite,.smoke,.drip,.perk,.drive,.drive .wheel,.walking,.walking *,.swing .pl,.swing .pr,.twist,.tug,.pop,.s1,.s2,.s3,.s4,.rainfall,.snowfall,.sway,.drift,.leafFall,.twinkle,.poof,.boing,.dangle,.hang,.gusty .hang,.gusty .treeTop,.gusty .flame,.gusty .note,.windLine,.secHand,.candleLight,.wobble,.tipOut,.tipHang,.spillStream,.puddle,.dripLong,.blowLeaf,.blowLeafL,.folderIn,.folderIn .cover,.folderIn .coverL,.folderOut,.certIn,.certOut,.fadeIn,.fadeOut,.confetti,.spark,.unroll{animation:none !important}.lift,.can{transition:none}}
 </style>
@@ -157,11 +158,13 @@ a{color:inherit}
   <!-- wall grain and the boards' shadows on the wall -->
   <svg width="4200" height="3000" viewBox="-1600 -1000 4200 3000" aria-hidden="true" style="position: absolute; left: -1600px; top: -1000px">
     <defs>
+      <!-- the boards' shadows: soft bands drawn with gradients, not blur filters, so the wall stays one picture -->
+      <linearGradient id="bShadowV" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3a2614" stop-opacity="0"/><stop offset="0.5" stop-color="#3a2614" stop-opacity="1"/><stop offset="1" stop-color="#3a2614" stop-opacity="0"/></linearGradient>
     </defs>
-    <g fill="#3a2614" opacity="{{v.boardShadow}}" transform="translate({{v.bsx}} 0)">
-      <rect x="262" y="300" width="650" height="26" rx="13" style="filter: blur(9px)"/>
-      <rect x="262" y="588" width="650" height="22" rx="11" style="filter: blur(8px)"/>
-      <rect x="262" y="872" width="650" height="18" rx="9" style="filter: blur(8px)"/>
+    <g opacity="{{v.boardShadow}}" transform="translate({{v.bsx}} 0)">
+      <rect x="253" y="282" width="668" height="62" rx="31" fill="url(#bShadowV)"/>
+      <rect x="254" y="572" width="666" height="54" rx="27" fill="url(#bShadowV)"/>
+      <rect x="254" y="855" width="666" height="52" rx="26" fill="url(#bShadowV)"/>
     </g>
   </svg>
 
@@ -174,7 +177,7 @@ a{color:inherit}
     <g font-family="'Instrument Serif', Georgia, serif" font-size="13" fill="#2a2420" text-anchor="middle"><text x="60" y="30">12</text><text x="91" y="64.5">3</text><text x="60" y="98">6</text><text x="29" y="64.5">9</text></g>
     <line x1="60" y1="60" x2="{{clock.hx}}" y2="{{clock.hy}}" stroke="#2a2420" stroke-width="4" stroke-linecap="round"/>
     <line x1="60" y1="60" x2="{{clock.mx}}" y2="{{clock.my}}" stroke="#2a2420" stroke-width="2.6" stroke-linecap="round"/>
-    <g class="secHand" style="animation-delay: -{{clock.sec}}s"><line x1="60" y1="70" x2="60" y2="22" stroke="#c9473b" stroke-width="1.3" stroke-linecap="round"/></g>
+    <g data-sec-hand="1"><line x1="60" y1="70" x2="60" y2="22" stroke="#c9473b" stroke-width="1.3" stroke-linecap="round"/></g>
     <circle cx="60" cy="60" r="3.6" fill="#2a2420"/><circle cx="60" cy="60" r="1.4" fill="#c9473b"/>
   </svg>
   <div class="hand" style="position: absolute; left: 832px; top: 414px; width: 160px; text-align: center; font-size: 19px; font-weight: 700; color: {{v.letter}}; white-space: nowrap">{{clock.date}}</div>
@@ -331,7 +334,7 @@ a{color:inherit}
     <svg width="50" height="92" viewBox="0 0 50 92" aria-hidden="true" style="display: block; overflow: visible">
       <sc-if value="{{candle.lit}}" hint-placeholder-val="{{ false }}">
         <circle cx="25" cy="34" r="26" fill="#ffd28a" opacity="0.35"/>
-        <g class="ignite"><path class="flame" d="M25 22 C31 30 31 37 25 43 C19 37 19 30 25 22 Z" fill="#f4a73c" stroke="#2a2420" stroke-width="1"/><path class="flame" d="M25 31 C27.5 35 27.5 39 25 42 C22.5 39 22.5 35 25 31 Z" fill="#fff3d0"/></g>
+        <g class="ignite"><path class="flameG" d="M25 22 C31 30 31 37 25 43 C19 37 19 30 25 22 Z" fill="#f4a73c" stroke="#2a2420" stroke-width="1"><animate attributeName="d" dur="1s" repeatCount="indefinite" calcMode="spline" keyTimes="0;0.45;0.75;1" keySplines=".4 0 .6 1;.4 0 .6 1;.4 0 .6 1" values="M25 22 C31 30 31 37 25 43 C19 37 19 30 25 22 Z;M25 18.5 C31 28 31 36.5 25 43 C19 36.5 19 28 25 18.5 Z;M25 24.5 C31 31.5 31 37.5 25 43 C19 37.5 19 31.5 25 24.5 Z;M25 22 C31 30 31 37 25 43 C19 37 19 30 25 22 Z"/></path><path class="flameG" d="M25 31 C27.5 35 27.5 39 25 42 C22.5 39 22.5 35 25 31 Z" fill="#fff3d0"><animate attributeName="d" dur="1s" repeatCount="indefinite" calcMode="spline" keyTimes="0;0.45;0.75;1" keySplines=".4 0 .6 1;.4 0 .6 1;.4 0 .6 1" values="M25 31 C27.5 35 27.5 39 25 42 C22.5 39 22.5 35 25 31 Z;M25 29 C27.5 34 27.5 38.5 25 42 C22.5 38.5 22.5 34 25 29 Z;M25 32.5 C27.5 36 27.5 39.5 25 42 C22.5 39.5 22.5 36 25 32.5 Z;M25 31 C27.5 35 27.5 39 25 42 C22.5 39 22.5 35 25 31 Z"/></path></g>
       </sc-if>
       <sc-if value="{{candle.smoke}}" hint-placeholder-val="{{ false }}"><path class="smoke" d="M25 42 C21 34 29 28 25 20 C21 12 29 6 25 -2" stroke="#9a948c" stroke-width="2" fill="none" stroke-linecap="round"/></sc-if>
       <path d="M25 50 L25 44" stroke="#2a2420" stroke-width="1.8"/>
@@ -561,11 +564,9 @@ a{color:inherit}
   </svg>
 
   <!-- the hanging pothos: a ceiling hook, three threads, a full crown in the pot, vines trailing beside the shelf. Click to water -->
-  <!-- the sway is on an HTML box around the drawing, so the browser turns the finished, shadowed
-       picture instead of redrawing the plant and its shadow every frame -->
-  <div class="hang" aria-hidden="true" style="position: absolute; left: 0; top: 0; width: 1000px; height: 1000px; pointer-events: none">
   <svg class="{{pothos.tipSvg}}" width="1000" height="1000" viewBox="0 0 1000 1000" aria-hidden="true" style="position: absolute; left: 0; top: 0; pointer-events: none; overflow: visible; filter: {{v.rowShadow}}">
     <g>
+      <animateTransform data-gust="0" attributeName="transform" type="rotate" begin="indefinite" dur="1.6s" repeatCount="3" values="-1 164 24;5 164 24;-3 164 24;-1 164 24" keyTimes="0;0.3;0.65;1" calcMode="spline" keySplines=".45 0 .55 1;.45 0 .55 1;.45 0 .55 1"/>
       <rect x="156" y="0" width="28" height="5" rx="1.5" fill="#2a2420"/>
       <rect x="166.5" y="4" width="7" height="3" rx="1" fill="#3e3630"/>
       <path d="M164 28.5 L124 232 M164 28.5 L170 229 M164 28.5 L216 232" stroke="#6b5a46" stroke-width="1.5" fill="none"/>
@@ -612,7 +613,6 @@ a{color:inherit}
       </sc-for>
     </g>
   </svg>
-  </div>
   <svg width="1000" height="1000" viewBox="0 0 1000 1000" aria-hidden="true" style="position: absolute; left: 0; top: 0; pointer-events: none">
     <sc-for list="{{fallen}}" as="fl" hint-placeholder-count="2">
       <g transform="translate({{fl.x}} {{fl.y}}) scale({{fl.s}} {{fl.sy}}) rotate({{fl.r}})">
@@ -650,17 +650,21 @@ a{color:inherit}
       <radialGradient id="lampPool" cx="915" cy="530" r="700" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="{{lt.lamp0c}}" stop-opacity="{{lt.lamp0o}}"/><stop offset="0.45" stop-color="{{lt.lamp1c}}" stop-opacity="{{lt.lamp1o}}"/><stop offset="1" stop-color="{{lt.lamp1c}}" stop-opacity="0"/></radialGradient>
 <radialGradient id="candleGlow" cx="750" cy="196" r="340" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="{{lt.c0c}}" stop-opacity="{{lt.c0o}}"/><stop offset="0.3" stop-color="{{lt.c1c}}" stop-opacity="{{lt.c1o}}"/><stop offset="0.7" stop-color="{{lt.c2c}}" stop-opacity="{{lt.c2o}}"/><stop offset="1" stop-color="{{lt.c2c}}" stop-opacity="0"/></radialGradient>
     </defs>
-    <g opacity="{{v.sun}}" filter="url(#paneSoft)">
-      <sc-for list="{{panes}}" as="pn" hint-placeholder-count="4"><polygon points="{{pn.pts}}" fill="{{lt.paneC}}" opacity="{{lt.paneO}}"/></sc-for>
+    <sc-if value="{{v.sunOn}}" hint-placeholder-val="{{ false }}">
+    <g opacity="{{v.sun}}">
+      <sc-for list="{{panes}}" as="pn" hint-placeholder-count="4"><polygon points="{{pn.pts}}" fill="{{lt.paneC}}" stroke="{{lt.paneC}}" stroke-width="7" stroke-opacity="0.45" stroke-linejoin="round" paint-order="stroke" opacity="{{lt.paneO}}"/></sc-for>
     </g>
     <g clip-path="url(#panes)" opacity="{{v.sun}}">
       <rect x="175" y="256" width="650" height="2" fill="#fff6dc" opacity="0.8"/><rect x="175" y="542" width="650" height="3" fill="#fff6dc" opacity="0.9"/>
       <rect x="175" y="810" width="650" height="20" fill="#fff3d4" opacity="0.4"/><rect x="175" y="829" width="650" height="2" fill="#fff8e4" opacity="0.9"/>
       <rect x="175" y="256" width="650" height="40" fill="#fff0cc" opacity="0.16"/><rect x="175" y="545" width="650" height="40" fill="#fff0cc" opacity="0.16"/><rect x="175" y="830" width="650" height="40" fill="#fff0cc" opacity="0.16"/>
     </g>
-    <rect x="-1600" y="-1000" width="4200" height="3000" fill="url(#lampPool)" opacity="{{v.lamp}}"/>
+    </sc-if>
+    <sc-if value="{{v.lampOnB}}" hint-placeholder-val="{{ false }}"><rect x="215" y="-170" width="1400" height="1400" fill="url(#lampPool)"/></sc-if>
     <!-- only the glow's own circle (r 340 round the wick) flickers, not the whole wall -->
-    <rect class="{{v.candleCls}}" x="410" y="-144" width="680" height="680" fill="url(#candleGlow)" opacity="{{v.candle}}" style="transition: opacity 600ms"/>
+    <sc-if value="{{v.candleOn}}" hint-placeholder-val="{{ false }}">
+      <g opacity="{{v.candle}}"><rect x="410" y="-144" width="680" height="680" fill="url(#candleGlow)"><animate attributeName="opacity" dur="1.7s" repeatCount="indefinite" calcMode="discrete" keyTimes="0;0.2;0.35;0.6;0.8" values="1;0.86;0.97;0.82;0.94"/></rect></g>
+    </sc-if>
   </svg>
 
   <!-- ============ THE TWO WINDOWS: west on the left (sunset), east on the right (sunrise) ============ -->
@@ -677,10 +681,10 @@ a{color:inherit}
       <g transform="translate({{w.gx}} 112)">
         <g clip-path="url(#{{w.clipId}})">
           <rect width="144" height="604" fill="url(#{{w.skyId}})"/>
-          <sc-if value="{{w.stars}}" hint-placeholder-val="{{ false }}"><path class="twinkle" d="{{w.starD}}" fill="#fff8e0"/></sc-if>
+          <sc-if value="{{w.stars}}" hint-placeholder-val="{{ false }}"><path d="{{w.starD}}" fill="#fff8e0" opacity="0.9"><animate attributeName="opacity" values="0.9;0.4;0.9" dur="3s" repeatCount="indefinite" calcMode="spline" keyTimes="0;0.5;1" keySplines=".45 0 .55 1;.45 0 .55 1"/></path></sc-if>
           <sc-if value="{{w.moon}}" hint-placeholder-val="{{ false }}"><circle cx="96" cy="120" r="13" fill="#f4ecd2"/><circle cx="102" cy="115" r="12" fill="{{w.top}}"/></sc-if>
           <sc-if value="{{w.sun}}" hint-placeholder-val="{{ false }}"><circle cx="{{w.sx}}" cy="{{w.sy}}" r="{{w.sr2}}" fill="{{w.sc}}" opacity="0.28"/><circle cx="{{w.sx}}" cy="{{w.sy}}" r="{{w.sr}}" fill="{{w.sc}}"/></sc-if>
-          <g class="drift" opacity="{{w.cloudOp}}" fill="{{w.cloudC}}">
+          <g opacity="{{w.cloudOp}}" fill="{{w.cloudC}}"><animateTransform attributeName="transform" type="translate" values="-14 0;14 0;-14 0" dur="18s" repeatCount="indefinite" calcMode="spline" keyTimes="0;0.5;1" keySplines=".45 0 .55 1;.45 0 .55 1"/>
             <ellipse cx="34" cy="150" rx="30" ry="11"/><ellipse cx="54" cy="142" rx="22" ry="12"/><ellipse cx="74" cy="152" rx="22" ry="9"/>
             <ellipse cx="104" cy="262" rx="26" ry="10"/><ellipse cx="122" cy="254" rx="18" ry="10"/>
             <sc-if value="{{w.heavy}}" hint-placeholder-val="{{ false }}"><ellipse cx="72" cy="70" rx="70" ry="26"/><ellipse cx="20" cy="210" rx="44" ry="16"/><ellipse cx="120" cy="190" rx="40" ry="14"/></sc-if>
@@ -700,7 +704,8 @@ a{color:inherit}
           </sc-if>
           <!-- west window: the tree, which follows the seasons -->
           <sc-if value="{{w.tree}}" hint-placeholder-val="{{ false }}">
-            <g class="treeTop">
+            <g>
+              <animateTransform data-gust="0" attributeName="transform" type="rotate" begin="indefinite" dur="1.2s" repeatCount="4" values="0 18 604;3.5 18 604;-1.5 18 604;0 18 604" keyTimes="0;0.35;0.7;1" calcMode="spline" keySplines=".45 0 .55 1;.45 0 .55 1;.45 0 .55 1"/>
               <path d="M2 604 C10 520 20 444 26 392 C30 356 34 330 44 304 L56 306 C48 334 44 362 42 396 C38 452 34 528 32 604 Z" fill="{{w.trunk}}" stroke="#2a2420" stroke-width="1.2"/>
               <path d="{{w.limbsD}}" stroke="{{w.trunk}}" stroke-width="5" fill="none" stroke-linecap="round"/>
               <path d="{{w.twigsD}}" stroke="{{w.trunk}}" stroke-width="1.8" fill="none" stroke-linecap="round"/>
@@ -711,14 +716,14 @@ a{color:inherit}
               <sc-if value="{{w.snowy}}" hint-placeholder-val="{{ false }}"><path d="{{w.snowD2}}" stroke="#ffffff" stroke-width="2.4" fill="none" stroke-linecap="round"/></sc-if>
             </g>
             <sc-for list="{{w.falling}}" as="fl" hint-placeholder-count="6">
-              <g transform="translate({{fl.x}} {{fl.y}})"><path class="leafFall" d="M0 0 C-4 -3 -8 0 -7 5 C-6 9 -2 12 0 14 C2 12 6 9 7 5 C8 0 4 -3 0 0 Z" fill="{{fl.c}}" stroke="#2a2420" stroke-width="0.8" style="animation-delay: {{fl.delay}}s; animation-duration: {{fl.dur}}s"/></g>
+              <g transform="translate({{fl.x}} {{fl.y}})"><path d="M0 0 C-4 -3 -8 0 -7 5 C-6 9 -2 12 0 14 C2 12 6 9 7 5 C8 0 4 -3 0 0 Z" fill="{{fl.c}}" stroke="#2a2420" stroke-width="0.8" opacity="0"><animateTransform attributeName="transform" type="translate" values="0 0;-50 420" dur="{{fl.dur}}s" begin="{{fl.delay}}s" repeatCount="indefinite"/><animateTransform attributeName="transform" type="rotate" additive="sum" values="0 0 5.5;560 0 5.5" dur="{{fl.dur}}s" begin="{{fl.delay}}s" repeatCount="indefinite"/><animate attributeName="opacity" values="0;1;0.9" keyTimes="0;0.08;1" dur="{{fl.dur}}s" begin="{{fl.delay}}s" repeatCount="indefinite"/></path></g>
             </sc-for>
           </sc-if>
           <sc-if value="{{w.rain}}" hint-placeholder-val="{{ false }}">
-            <g class="rainfall"><path d="{{w.rainD}}" stroke="#dbe6ef" stroke-width="1.3" stroke-linecap="round" fill="none" opacity="0.75"/></g>
+            <g><animateTransform attributeName="transform" type="translate" values="0 0;0 120" dur="0.42s" repeatCount="indefinite"/><path d="{{w.rainD}}" stroke="#dbe6ef" stroke-width="1.3" stroke-linecap="round" fill="none" opacity="0.75"/></g>
             <path d="{{w.dropD}}" fill="#e6eef4" opacity="0.6" stroke="#9fb0bd" stroke-width="0.6"/>
           </sc-if>
-          <sc-if value="{{w.snow}}" hint-placeholder-val="{{ false }}"><g class="sway"><g class="snowfall"><path d="{{w.snowD}}" fill="#ffffff" stroke="#b9c4cc" stroke-width="0.4"/></g></g></sc-if>
+          <sc-if value="{{w.snow}}" hint-placeholder-val="{{ false }}"><g><animateTransform attributeName="transform" type="translate" values="-5 0;5 0;-5 0" dur="3.2s" repeatCount="indefinite" calcMode="spline" keyTimes="0;0.5;1" keySplines=".45 0 .55 1;.45 0 .55 1"/><g><animateTransform attributeName="transform" type="translate" values="0 0;0 150" dur="6s" repeatCount="indefinite"/><path d="{{w.snowD}}" fill="#ffffff" stroke="#b9c4cc" stroke-width="0.4"/></g></g></sc-if>
           <sc-if value="{{w.frost}}" hint-placeholder-val="{{ false }}"><rect y="520" width="144" height="84" fill="url(#frost)"/></sc-if>
           <path d="M84 0 L106 0 L42 604 L20 604 Z" fill="#ffffff" opacity="0.08"/>
         </g>
@@ -735,14 +740,14 @@ a{color:inherit}
   <sc-if value="{{wind.on}}" hint-placeholder-val="{{ false }}">
     <svg width="1400" height="1000" viewBox="-200 0 1400 1000" aria-hidden="true" style="position: absolute; left: -200px; top: 0; pointer-events: none">
       <g transform="{{wind.flip}}" stroke="#ffffff" stroke-width="2.2" fill="none" stroke-linecap="round" opacity="0.85">
-        <path class="windLine" d="M-40 230 C160 200 300 260 480 236 C620 218 700 180 760 204 C800 222 784 254 756 246"/>
-        <path class="windLine" style="animation-delay: 0.5s" d="M-40 420 C200 400 380 450 560 424 C700 404 820 380 900 400 C950 414 940 442 910 436"/>
-        <path class="windLine" style="animation-delay: 0.9s" d="M-40 650 C140 630 320 676 520 650 C640 636 740 610 820 628"/>
-        <path class="windLine" style="animation-delay: 1.3s; stroke: #9aa8b4" d="M-40 330 C180 320 300 350 460 332"/>
+        <path d="M-40 230 C160 200 300 260 480 236 C620 218 700 180 760 204 C800 222 784 254 756 246" stroke-dasharray="180 1420" stroke-dashoffset="1600" visibility="hidden"><set data-gust="0" attributeName="visibility" to="visible" begin="indefinite" dur="4.8s"/><animate data-gust="0" attributeName="stroke-dashoffset" begin="indefinite" values="1600;0" dur="2.4s" repeatCount="2" calcMode="spline" keySplines=".45 0 .55 1" keyTimes="0;1"/></path>
+        <path d="M-40 420 C200 400 380 450 560 424 C700 404 820 380 900 400 C950 414 940 442 910 436" stroke-dasharray="180 1420" stroke-dashoffset="1600" visibility="hidden"><set data-gust="0.5" attributeName="visibility" to="visible" begin="indefinite" dur="4.8s"/><animate data-gust="0.5" attributeName="stroke-dashoffset" begin="indefinite" values="1600;0" dur="2.4s" repeatCount="2" calcMode="spline" keySplines=".45 0 .55 1" keyTimes="0;1"/></path>
+        <path d="M-40 650 C140 630 320 676 520 650 C640 636 740 610 820 628" stroke-dasharray="180 1420" stroke-dashoffset="1600" visibility="hidden"><set data-gust="0.9" attributeName="visibility" to="visible" begin="indefinite" dur="4.8s"/><animate data-gust="0.9" attributeName="stroke-dashoffset" begin="indefinite" values="1600;0" dur="2.4s" repeatCount="2" calcMode="spline" keySplines=".45 0 .55 1" keyTimes="0;1"/></path>
+        <path d="M-40 330 C180 320 300 350 460 332" stroke-dasharray="180 1420" stroke-dashoffset="1600" visibility="hidden" stroke="#9aa8b4"><set data-gust="1.3" attributeName="visibility" to="visible" begin="indefinite" dur="4.8s"/><animate data-gust="1.3" attributeName="stroke-dashoffset" begin="indefinite" values="1600;0" dur="2.4s" repeatCount="2" calcMode="spline" keySplines=".45 0 .55 1" keyTimes="0;1"/></path>
       </g>
     </svg>
     <sc-for list="{{wind.leaves}}" as="bl" hint-placeholder-count="3">
-      <svg width="16" height="16" viewBox="-8 -2 16 16" aria-hidden="true" style="position: absolute; left: {{bl.x}}px; top: {{bl.y}}px; pointer-events: none; overflow: visible"><path class="{{bl.cls}}" d="M0 0 C-4 -3 -8 0 -7 5 C-6 9 -2 12 0 14 C2 12 6 9 7 5 C8 0 4 -3 0 0 Z" fill="{{bl.c}}" stroke="#2a2420" stroke-width="0.8" style="animation-delay: {{bl.d}}s"/></svg>
+      <svg width="16" height="16" viewBox="-8 -2 16 16" aria-hidden="true" style="position: absolute; left: {{bl.x}}px; top: {{bl.y}}px; pointer-events: none; overflow: visible"><path d="M0 0 C-4 -3 -8 0 -7 5 C-6 9 -2 12 0 14 C2 12 6 9 7 5 C8 0 4 -3 0 0 Z" fill="{{bl.c}}" stroke="#2a2420" stroke-width="0.8" visibility="hidden"><animateTransform data-gust="{{bl.d}}" attributeName="transform" type="translate" begin="indefinite" values="0 0;{{bl.dx}} -120" dur="4.2s" fill="freeze" calcMode="spline" keyTimes="0;1" keySplines=".3 .1 .5 1"/><animateTransform data-gust="{{bl.d}}" attributeName="transform" type="rotate" additive="sum" begin="indefinite" values="0 0 6;{{bl.rot}} 0 6" dur="4.2s" fill="freeze" calcMode="spline" keyTimes="0;1" keySplines=".3 .1 .5 1"/><set data-gust="{{bl.d}}" attributeName="visibility" to="visible" begin="indefinite" dur="4.2s"/></path></svg>
     </sc-for>
   </sc-if>
 
@@ -889,7 +894,7 @@ a{color:inherit}
       <path d="{{board.cork}}" fill="#a97b45"/>
       <g transform="translate(24 16) rotate(-3)"><rect width="104" height="22" fill="#fbf6ec" stroke="#2a2420" stroke-width="1"/><text x="52" y="15.5" text-anchor="middle" font-family="Caveat, cursive" font-size="15" font-weight="700" fill="#2a2420">Leave me a note!</text></g>
       <sc-for list="{{board.mini}}" as="nt" hint-placeholder-count="6">
-        <g transform="translate({{nt.x}} {{nt.y}}) rotate({{nt.r}})"><g class="note"><rect x="-19" y="0" width="38" height="36" fill="{{nt.c}}" stroke="#2a2420" stroke-width="1"/><path d="M-12 12 H11 M-12 19 H8 M-12 26 H10" stroke="#2a2420" stroke-width="1" opacity="0.45"/><circle cx="0" cy="3" r="2.6" fill="#c9473b" stroke="#2a2420" stroke-width="0.8"/></g></g>
+        <g transform="translate({{nt.x}} {{nt.y}}) rotate({{nt.r}})"><g><animateTransform data-gust="0" attributeName="transform" type="rotate" begin="indefinite" dur="0.42s" repeatCount="8" values="0 0 3;-6 0 3;0 0 3" keyTimes="0;0.5;1" calcMode="spline" keySplines=".45 0 .55 1;.45 0 .55 1"/><rect x="-19" y="0" width="38" height="36" fill="{{nt.c}}" stroke="#2a2420" stroke-width="1"/><path d="M-12 12 H11 M-12 19 H8 M-12 26 H10" stroke="#2a2420" stroke-width="1" opacity="0.45"/><circle cx="0" cy="3" r="2.6" fill="#c9473b" stroke="#2a2420" stroke-width="0.8"/></g></g>
       </sc-for>
     </svg>
   </button>
@@ -997,7 +1002,7 @@ a{color:inherit}
         </div>
         <svg width="26" height="60" viewBox="0 0 26 60" aria-hidden="true" style="position: absolute; left: 60px; top: 2px"><path d="M8 54 V10 a5 5 0 0 1 10 0 V48 a3 3 0 0 1 -6 0 V16" fill="none" stroke="#8d96a0" stroke-width="2.4" stroke-linecap="round"/></svg>
       </div>
-      <div class="coverL" style="position: absolute; left: 0; top: 0; width: 480px; height: 740px; transform-origin: 0 50%; transform-style: preserve-3d; pointer-events: none">
+      <div class="coverL" style="position: absolute; left: 0; top: 0; width: 480px; height: 740px; transform-origin: 0 50%; transform-style: preserve-3d; transform: rotateY(-178deg); pointer-events: none">
         <div style="position: absolute; inset: 0; background: #e4c68c; border: 1px solid #8a6a3a; border-radius: 7px; box-sizing: border-box; backface-visibility: hidden; display: flex; align-items: center; justify-content: center">
           <div class="typed" style="padding: 10px 22px; background: #fffdf7; border: 1px solid #b89a62; font-size: 18px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase">{{doc.name}}</div>
         </div>
@@ -1423,6 +1428,10 @@ class Component extends DCLogic {
     const mode = this.props.wind ?? 'auto';
     if (mode === 'calm') return;
     this.setState({ gust: true });
+    // The gust's motion is SVG animation (no GPU layers); start each piece once the gust is drawn.
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      document.querySelectorAll('[data-gust]').forEach((a) => { try { a.beginElementAt(parseFloat(a.getAttribute('data-gust')) || 0); } catch (e) { /* no SMIL */ } });
+    }));
     this.later('gustEnd', 4800, () => {
       this.setState({ gust: false });
       this.later('gustWait', mode === 'breezy' ? 9000 : 25000 + Math.random() * 45000, () => this.gust());
@@ -1452,6 +1461,16 @@ class Component extends DCLogic {
     return { webs, websStart: webs.length, absentDays: days, dust: days >= 3 ? Math.min(1, 0.35 + days / 90) : webs.length ? 0.4 : 0, pop: webs.length >= 2 ? 'hello' : 'none', dusting: false };
   }
   componentDidMount() {
+    // The clock's second hand ticks from here, once a second, as an attribute on the drawing: a CSS
+    // animation would put the clock on its own GPU layer, and drag the room's light layers with it.
+    this.secTick = () => {
+      const g = document.querySelector('[data-sec-hand]');
+      if (!g) return;
+      const live = (this.props.mood ?? 'live') === 'live';
+      g.setAttribute('transform', `rotate(${live ? new Date().getSeconds() * 6 : 0} 60 60)`);
+    };
+    this.secTick();
+    this.secTimer = setInterval(this.secTick, 1000);
     // Esc puts things back: the can, the cube, an open file, the board, the tag.
     this.onKey = (e) => {
       if (e.key !== 'Escape') return;
@@ -1473,6 +1492,7 @@ class Component extends DCLogic {
     if (prev && prev.absence !== this.props.absence) this.setState(this.visit(this.props, Date.now(), false));
   }
   componentWillUnmount() {
+    clearInterval(this.secTimer);
     try { window.removeEventListener('keydown', this.onKey); } catch (e) { /* nothing to remove */ }
     Object.keys(this.tm).forEach((k) => { clearTimeout(this.tm[k]); clearInterval(this.tm[k]); });
   }
@@ -1571,10 +1591,10 @@ class Component extends DCLogic {
       edge: oak ? '#e2c08e' : '#433d37',
       boardShadow: day ? (overcast ? 0.16 : 0.24) : 0.4, bsx: (sxv * 0.6 - 75).toFixed(1),
       rowShadow: `drop-shadow(${sxv.toFixed(1)}px ${syv.toFixed(1)}px ${overcast ? 6 : 3}px rgba(45,30,15,${sa}))`,
-      sun: sunny ? (k < 0.12 ? 0.75 : 1) : 0, sunColor: warm ? '#ffc27a' : '#fff4dc',
+      sun: sunny ? (k < 0.12 ? 0.75 : 1) : 0, sunOn: !!sunny, sunColor: warm ? '#ffc27a' : '#fff4dc',
       shadeTint: !day ? (lampOn ? '#2a1d12' : '#14100c') : overcast ? '#5e646a' : warm ? '#6b4a2a' : '#6e6250',
       shadeAmount: !day ? (lampOn ? 0.42 : s.candle === 'lit' ? 0.5 : 0.6) : overcast ? 0.2 : warm ? 0.2 : 0.12,
-      lamp: lampOn ? 1 : 0, candle: s.candle === 'lit' ? (day ? 0.55 : 1) : 0, candleCls: s.candle === 'lit' ? 'candleLight' : '',
+      lamp: lampOn ? 1 : 0, lampOnB: !!lampOn, candle: s.candle === 'lit' ? (day ? 0.55 : 1) : 0, candleCls: s.candle === 'lit' ? 'candleLight' : '', candleOn: s.candle === 'lit',
       clock: `${hh}:${mm} · ${season} · ${WX[weather]} · ${!day ? (lampOn ? 'night, lamp on' : 'night') : overcast ? 'soft light' : H < 7.5 ? 'sunrise, east window' : east ? 'morning sun, east window' : warm ? 'sunset light, west window' : 'afternoon sun, west window'}`,
     };
 
@@ -2276,7 +2296,7 @@ class Component extends DCLogic {
       },
       wind: {
         on: s.gust, flip: !day || east ? 'translate(1000 0) scale(-1 1)' : '',
-        leaves: s.gust && season === 'autumn' ? [[300, 0], [420, 0.6], [520, 1.2]].map(([y, d], i) => ({ x: !day || east ? 1010 : -20, y, d, cls: !day || east ? 'blowLeafL' : 'blowLeaf', c: ['#d9822b', '#c0532a', '#e3a33b'][i] })) : [],
+        leaves: s.gust && season === 'autumn' ? [[300, 0], [420, 0.6], [520, 1.2]].map(([y, d], i) => ({ x: !day || east ? 1010 : -20, y, d, cls: !day || east ? 'blowLeafL' : 'blowLeaf', dx: !day || east ? -1300 : 1300, rot: !day || east ? -900 : 900, c: ['#d9822b', '#c0532a', '#e3a33b'][i] })) : [],
       },
       cube3d, shelfFace, shelfFaceBody: shadeFace('#161412', 0), cubeUI, party,
       openCube: () => this.setState({ cubeOpen: true, cubeHover: false }),
