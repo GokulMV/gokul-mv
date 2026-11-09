@@ -106,19 +106,8 @@ function trimBleed(...views: Array<{ cx: number; cy: number; s: number }>): void
   logic.onChange?.();
 }
 
-let settle = 0;
-function apply(glide: boolean): void {
+function apply(): void {
   const { w, h: hh } = screen();
-  room.classList.toggle('glide', glide);
-  // While the camera eases in or out the room moves as one finished picture; it is redrawn
-  // sharp at the new size once it lands.
-  clearTimeout(settle);
-  if (glide) {
-    room.classList.add('moving');
-    settle = window.setTimeout(() => room.classList.remove('moving'), 600);
-  } else if (!drag) {
-    room.classList.remove('moving');
-  }
   room.style.transform = `translate(${(w / 2 - cam.cx * cam.s).toFixed(2)}px, ${(hh / 2 - cam.cy * cam.s).toFixed(2)}px) scale(${cam.s.toFixed(4)})`;
 }
 
@@ -140,7 +129,7 @@ function boxOf(el: HTMLElement): { x: number; y: number; w: number; h: number } 
   return { x, y, w: el.offsetWidth, h: el.offsetHeight };
 }
 
-function fit(glide = false): void {
+function fit(): void {
   const bar = document.getElementById('debug-bar');
   document.documentElement.style.setProperty('--bar', `${bar ? bar.offsetHeight : 0}px`);
   const { w, h: hh } = screen();
@@ -153,42 +142,55 @@ function fit(glide = false): void {
   if (narrow && !wasNarrow) lookX = FOCUS_X;
   lookX = clampLook(lookX);
   document.documentElement.dataset.view = narrow ? 'narrow' : 'wide';
+  cam.s = base;
+  cam.cx = narrow ? lookX : ROOM_W / 2;
+  // A tall screen sees more height than the room has: keep the ceiling at the top and let the
+  // floor take the rest, so the lamp stands on something.
+  cam.cy = Math.max(ROOM_H / 2, hh / (2 * cam.s));
+  trimBleed(cam);
+  apply();
+  frameDialog();
+}
 
-  const from = { ...cam };
+/**
+ * Something taken off the shelf (a file, the certificate, the notes board, the cube, the tag) is
+ * brought to the middle of the screen and enlarged to fill it on a narrow screen. Only the dialog
+ * moves: the room behind it stays exactly where it is, so nothing but the dialog is redrawn. (The
+ * first version zoomed the whole room, which made phones redraw the room every frame and flicker.)
+ * The dialog's own entrance animation uses `transform`; this uses the separate `translate` and
+ * `scale` properties through CSS variables on #room, so the two never fight.
+ */
+function frameDialog(): void {
   const dialog = room.querySelector<HTMLElement>('[role="dialog"]');
   focused = dialog;
-  if (dialog && (narrow || hh < 520)) {
-    // Move in on what was taken down, with room for the "put it back" scribble above it.
-    const b = boxOf(dialog);
-    const top = b.y - 60;
-    const bh = b.h + 70;
-    cam.s = Math.max(whole, Math.min(1.6, (w * 0.94) / b.w, (hh * 0.94) / bh));
-    cam.cx = b.x + b.w / 2;
-    cam.cy = top + bh / 2;
-  } else {
-    cam.s = base;
-    cam.cx = narrow ? lookX : ROOM_W / 2;
-    // A tall screen sees more height than the room has: keep the ceiling at the top and let the
-    // floor take the rest, so the lamp stands on something.
-    cam.cy = Math.max(ROOM_H / 2, hh / (2 * cam.s));
+  const st = room.style;
+  const { w, h: hh } = screen();
+  if (dialog) hideHint();
+  if (!dialog || !(narrow || hh < 520)) {
+    for (const k of ['--dlg-tx', '--dlg-ty', '--dlg-s', '--dlg-ox', '--dlg-oy']) st.removeProperty(k);
+    return;
   }
-  // During a glide both ends of it are on screen at some point.
-  if (glide) trimBleed(from, cam); else trimBleed(cam);
-  apply(glide);
+  // Fit it with room for the "put it back" scribble above it, centred on the screen.
+  const b = boxOf(dialog);
+  const bh = b.h + 70;
+  const shown = Math.min(1.6, (w * 0.94) / b.w, (hh * 0.94) / bh); // screen px per room px
+  const k = Math.max(0.5, shown / cam.s);
+  const ox = b.w / 2;
+  const oy = b.h / 2 - 25;
+  st.setProperty('--dlg-s', k.toFixed(4));
+  st.setProperty('--dlg-ox', `${ox.toFixed(1)}px`);
+  st.setProperty('--dlg-oy', `${oy.toFixed(1)}px`);
+  st.setProperty('--dlg-tx', `${(cam.cx - (b.x + ox)).toFixed(1)}px`);
+  st.setProperty('--dlg-ty', `${(cam.cy - (b.y + oy)).toFixed(1)}px`);
 }
 
 // Focusing something near an edge can scroll even a clipped box; the camera does the moving here.
 stage.addEventListener('scroll', () => { stage.scrollTop = 0; stage.scrollLeft = 0; });
 
-// Follow dialogs as they open and close.
-let refit = 0;
+// Frame a dialog the moment it is added, before it is first drawn.
 new MutationObserver(() => {
-  if (refit) return;
-  refit = requestAnimationFrame(() => {
-    refit = 0;
-    const dialog = room.querySelector('[role="dialog"]');
-    if (dialog !== focused) fit(true);
-  });
+  const dialog = room.querySelector('[role="dialog"]');
+  if (dialog !== focused) frameDialog();
 }).observe(room, { childList: true, subtree: true });
 
 // ---------- looking around on a narrow screen: drag the wall, or scroll sideways ----------
@@ -209,7 +211,7 @@ window.addEventListener('pointermove', (e) => {
   if (!drag || e.pointerId !== drag.id) return;
   const dx = e.clientX - drag.x;
   if (!drag.moved && Math.abs(dx) < 6) return;
-  if (!drag.moved) { hideHint(); room.classList.add('moving'); }
+  if (!drag.moved) hideHint();
   drag.moved = true;
   lookX = clampLook(drag.from - dx / base);
   cam.cx = lookX;
@@ -218,13 +220,12 @@ window.addEventListener('pointermove', (e) => {
 const endDrag = (e: PointerEvent): void => {
   if (!drag || e.pointerId !== drag.id) return;
   drag = null;
-  room.classList.remove('moving');
 };
 // One transform per frame however fast the finger moves.
 let framed = 0;
 function frame(): void {
   if (framed) return;
-  framed = requestAnimationFrame(() => { framed = 0; apply(false); });
+  framed = requestAnimationFrame(() => { framed = 0; apply(); });
 }
 window.addEventListener('pointerup', endDrag);
 window.addEventListener('pointercancel', endDrag);

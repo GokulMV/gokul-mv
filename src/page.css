@@ -38,15 +38,17 @@ html[data-input='pointer'] :focus-visible {
   height: 1000px;
 }
 
-/* while the room slides under a finger, or the camera eases in on something, it is moved as
-   one finished picture instead of being redrawn every frame */
-#room.moving {
+/* The room is always its own GPU layer: dragging only moves that finished picture. Nothing switches
+   the layer on and off (each switch made the browser redraw the whole room, which flickered). */
+#room {
   will-change: transform;
 }
 
-/* the camera eases in on something taken off the shelf, and back out */
-#room.glide {
-  transition: transform 520ms cubic-bezier(0.3, 0.7, 0.2, 1);
+/* a dialog taken off the shelf, brought to the middle of a narrow screen (see frameDialog) */
+#room [role='dialog'] {
+  translate: var(--dlg-tx, 0) var(--dlg-ty, 0);
+  scale: var(--dlg-s, 1);
+  transform-origin: var(--dlg-ox, 50%) var(--dlg-oy, 50%);
 }
 
 #look-hint {
@@ -75,7 +77,6 @@ html[data-input='pointer'] :focus-visible {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  #room.glide { transition: none; }
   #look-hint { animation: none; }
 }
 
