@@ -162,9 +162,9 @@ a{color:inherit}
       <linearGradient id="bShadowV" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3a2614" stop-opacity="0"/><stop offset="0.5" stop-color="#3a2614" stop-opacity="1"/><stop offset="1" stop-color="#3a2614" stop-opacity="0"/></linearGradient>
     </defs>
     <g opacity="{{v.boardShadow}}" transform="translate({{v.bsx}} 0)">
-      <rect x="253" y="282" width="668" height="62" rx="31" fill="url(#bShadowV)"/>
-      <rect x="254" y="572" width="666" height="54" rx="27" fill="url(#bShadowV)"/>
-      <rect x="254" y="855" width="666" height="52" rx="26" fill="url(#bShadowV)"/>
+      <rect x="268" y="290" width="638" height="46" rx="16" fill="url(#bShadowV)"/>
+      <rect x="268" y="579" width="638" height="40" rx="14" fill="url(#bShadowV)"/>
+      <rect x="268" y="862" width="638" height="38" rx="13" fill="url(#bShadowV)"/>
     </g>
   </svg>
 
@@ -641,14 +641,20 @@ a{color:inherit}
        out (lt) so that over the wall they give what a multiply shade and screened lights would, and the browser
        never has to blend whole-screen layers on the GPU (which showed as black or white patches when zooming). -->
   <svg width="4200" height="3000" viewBox="-1600 -1000 4200 3000" aria-hidden="true" style="position: absolute; left: -1600px; top: -1000px; pointer-events: none">
-    <rect x="-1600" y="-1000" width="4200" height="3000" fill="{{lt.shadeC}}" opacity="{{lt.shadeO}}"/>
+    <sc-if value="{{lt.flat}}" hint-placeholder-val="{{ true }}"><rect x="-1600" y="-1000" width="4200" height="3000" fill="{{lt.shadeC}}" opacity="{{lt.shadeO}}"/></sc-if>
+    <!-- at night with a light on, the room is darkened less near the light and more away from it, so what the
+         lamp or candle lights keeps its own colours (no milky wash), and the corners fall into shadow -->
+    <sc-if value="{{lt.darkOn}}" hint-placeholder-val="{{ false }}">
+      <defs><radialGradient id="nightDark" cx="{{lt.dcx}}" cy="{{lt.dcy}}" r="{{lt.dr}}" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="{{lt.d0c}}" stop-opacity="{{lt.d0a}}"/><stop offset="{{lt.d1o}}" stop-color="{{lt.d1c}}" stop-opacity="{{lt.d1a}}"/><stop offset="{{lt.d2o}}" stop-color="#1c1209" stop-opacity="{{lt.d2a}}"/><stop offset="{{lt.d3o}}" stop-color="#1c1209" stop-opacity="{{lt.d3a}}"/><stop offset="1" stop-color="#1a1108" stop-opacity="{{lt.d4a}}"/></radialGradient></defs>
+      <rect x="-1600" y="-1000" width="4200" height="3000" fill="url(#nightDark)"/>
+    </sc-if>
   </svg>
   <svg width="4200" height="3000" viewBox="-1600 -1000 4200 3000" aria-hidden="true" style="position: absolute; left: -1600px; top: -1000px; pointer-events: none">
     <defs>
       <filter id="paneSoft" x="-10%" y="-10%" width="120%" height="120%"><feGaussianBlur stdDeviation="4"/></filter>
       <clipPath id="panes"><sc-for list="{{panes}}" as="pn" hint-placeholder-count="4"><polygon points="{{pn.pts}}"/></sc-for></clipPath>
-      <radialGradient id="lampPool" cx="915" cy="530" r="700" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="{{lt.lamp0c}}" stop-opacity="{{lt.lamp0o}}"/><stop offset="0.45" stop-color="{{lt.lamp1c}}" stop-opacity="{{lt.lamp1o}}"/><stop offset="1" stop-color="{{lt.lamp1c}}" stop-opacity="0"/></radialGradient>
-<radialGradient id="candleGlow" cx="750" cy="196" r="340" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="{{lt.c0c}}" stop-opacity="{{lt.c0o}}"/><stop offset="0.3" stop-color="{{lt.c1c}}" stop-opacity="{{lt.c1o}}"/><stop offset="0.7" stop-color="{{lt.c2c}}" stop-opacity="{{lt.c2o}}"/><stop offset="1" stop-color="{{lt.c2c}}" stop-opacity="0"/></radialGradient>
+      <radialGradient id="lampPool" cx="915" cy="492" r="230" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#fff0c8" stop-opacity="{{lt.lampG}}"/><stop offset="0.35" stop-color="#ffd98f" stop-opacity="{{lt.lampG2}}"/><stop offset="1" stop-color="#ffc66e" stop-opacity="0"/></radialGradient>
+<radialGradient id="candleGlow" cx="750" cy="190" r="170" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#fff0c4" stop-opacity="0.55"/><stop offset="0.3" stop-color="#ffcf7e" stop-opacity="0.2"/><stop offset="1" stop-color="#ffb35c" stop-opacity="0"/></radialGradient>
     </defs>
     <sc-if value="{{v.sunOn}}" hint-placeholder-val="{{ false }}">
     <g opacity="{{v.sun}}">
@@ -660,10 +666,10 @@ a{color:inherit}
       <rect x="175" y="256" width="650" height="40" fill="#fff0cc" opacity="0.16"/><rect x="175" y="545" width="650" height="40" fill="#fff0cc" opacity="0.16"/><rect x="175" y="830" width="650" height="40" fill="#fff0cc" opacity="0.16"/>
     </g>
     </sc-if>
-    <sc-if value="{{v.lampOnB}}" hint-placeholder-val="{{ false }}"><rect x="215" y="-170" width="1400" height="1400" fill="url(#lampPool)"/></sc-if>
-    <!-- only the glow's own circle (r 340 round the wick) flickers, not the whole wall -->
+    <sc-if value="{{v.lampOnB}}" hint-placeholder-val="{{ false }}"><rect x="685" y="262" width="460" height="460" fill="url(#lampPool)"/></sc-if>
+    <!-- only the glow's own circle round the wick flickers, not the whole wall -->
     <sc-if value="{{v.candleOn}}" hint-placeholder-val="{{ false }}">
-      <g opacity="{{v.candle}}"><rect x="410" y="-144" width="680" height="680" fill="url(#candleGlow)"><animate attributeName="opacity" dur="1.7s" repeatCount="indefinite" calcMode="discrete" keyTimes="0;0.2;0.35;0.6;0.8" values="1;0.86;0.97;0.82;0.94"/></rect></g>
+      <g opacity="{{v.candle}}"><rect x="580" y="20" width="340" height="340" fill="url(#candleGlow)"><animate attributeName="opacity" dur="1.7s" repeatCount="indefinite" calcMode="discrete" keyTimes="0;0.2;0.35;0.6;0.8" values="1;0.86;0.97;0.82;0.94"/></rect></g>
     </sc-if>
   </svg>
 
@@ -1616,7 +1622,15 @@ class Component extends DCLogic {
       const [lamp0c, lamp0o] = light('#ffc677', 0.6), [lamp1c, lamp1o] = light('#d98b45', 0.2);
       const [c0c, c0o] = light('#ffcf86', 0.75), [c1c, c1o] = light('#ffb35c', 0.3), [c2c, c2o] = light('#e08a3e', 0.1);
       const [paneC, paneO] = light(v.sunColor, 0.45);
-      return { shadeC, shadeO: alpha.toFixed(3), lamp0c, lamp0o, lamp1c, lamp1o, c0c, c0o, c1c, c1o, c2c, c2o, paneC, paneO };
+      // Night with a light on: darkness that grows with distance from the lamp (or the candle, if the lamp is off).
+      const candleLit = s.candle === 'lit';
+      const darkOn = !day && (lampOn || candleLit);
+      const D = lampOn
+        ? { cx: 915, cy: 470, r: 1150, s: [[0, 0.0], [0.12, 0.04], [0.36, 0.3], [0.66, 0.52], [1, 0.66]] }
+        : { cx: 760, cy: 200, r: 980, s: [[0, 0.04], [0.1, 0.1], [0.32, 0.38], [0.62, 0.6], [1, 0.72]] };
+      const dark = { darkOn, flat: !darkOn, dcx: D.cx, dcy: D.cy, dr: D.r, d0c: '#5a3512', d1c: '#3b230d' };
+      D.s.forEach(([o, a], n) => { dark[`d${n}o`] = o; dark[`d${n}a`] = a; });
+      return { shadeC, shadeO: alpha.toFixed(3), ...dark, lampG: !day ? 0.5 : 0.3, lampG2: !day ? 0.16 : 0.1, lamp0c, lamp0o, lamp1c, lamp1o, c0c, c0o, c1c, c1o, c2c, c2o, paneC, paneO };
     })();
 
     // ---------- the two windows ----------
